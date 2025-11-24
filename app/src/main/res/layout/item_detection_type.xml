@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:background="?attr/selectableItemBackground">
+
+    <!-- Detection Icon (Small) -->
+    <FrameLayout
+        android:id="@+id/detection_icon_container"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_alignParentStart="true"
+        android:layout_centerVertical="true"
+        android:layout_marginEnd="12dp">
+
+        <View
+            android:id="@+id/detection_icon_background"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/circle_background" />
+
+        <TextView
+            android:id="@+id/detection_icon_text"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="VD"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF" />
+
+    </FrameLayout>
+
+    <!-- Detection Name -->
+    <TextView
+        android:id="@+id/detection_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_toEndOf="@id/detection_icon_container"
+        android:layout_toStartOf="@id/subscribe_btn"
+        android:layout_centerVertical="true"
+        android:layout_marginEnd="12dp"
+        android:text="Vehicle Detection"
+        android:textSize="15sp"
+        android:textColor="#000000"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <!-- Subscribe Button -->
+    <TextView
+        android:id="@+id/subscribe_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:text="Subscribe"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-medium"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:gravity="center"
+        android:background="@drawable/button_subscribe"
+        android:clickable="true"
+        android:focusable="true" />
+
+</RelativeLayout>

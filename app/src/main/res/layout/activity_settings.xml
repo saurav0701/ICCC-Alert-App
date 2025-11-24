@@ -1,0 +1,481 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F8F9FA">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="8dp"
+        android:paddingBottom="24dp">
+
+        <!-- Appearance Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Appearance"
+            android:textSize="13sp"
+            android:textColor="#757575"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.08"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="10dp" />
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="8dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="1dp"
+            app:cardBackgroundColor="#FFFFFF">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Theme Mode -->
+                <RelativeLayout
+                    android:id="@+id/theme_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="16dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:layout_toStartOf="@+id/theme_icon"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Theme"
+                            android:textSize="16sp"
+                            android:textColor="#1A1A1A"
+                            android:fontFamily="sans-serif" />
+
+                        <TextView
+                            android:id="@+id/theme_value"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Light"
+                            android:textSize="14sp"
+                            android:textColor="#757575"
+                            android:fontFamily="sans-serif"
+                            android:layout_marginTop="2dp" />
+
+                    </LinearLayout>
+
+                    <ImageView
+                        android:id="@+id/theme_icon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:src="@drawable/ic_arrow_forward"
+                        android:tint="#BDBDBD"
+                        android:contentDescription="Theme options" />
+
+                </RelativeLayout>
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Notifications Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Notifications"
+            android:textSize="13sp"
+            android:textColor="#757575"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.08"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="10dp" />
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="8dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="1dp"
+            app:cardBackgroundColor="#FFFFFF">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Enable Notifications -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:layout_toStartOf="@+id/switch_notifications"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Enable Notifications"
+                            android:textSize="16sp"
+                            android:textColor="#1A1A1A"
+                            android:fontFamily="sans-serif" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Receive alerts for subscribed channels"
+                            android:textSize="13sp"
+                            android:textColor="#757575"
+                            android:fontFamily="sans-serif"
+                            android:layout_marginTop="2dp" />
+
+                    </LinearLayout>
+
+                    <Switch
+                        android:id="@+id/switch_notifications"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:checked="true" />
+
+                </RelativeLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#F0F0F0"
+                    android:layout_marginStart="18dp" />
+
+                <!-- Vibration -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:layout_toStartOf="@+id/switch_vibration"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Vibration"
+                            android:textSize="16sp"
+                            android:textColor="#1A1A1A"
+                            android:fontFamily="sans-serif" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Vibrate on new alerts"
+                            android:textSize="13sp"
+                            android:textColor="#757575"
+                            android:fontFamily="sans-serif"
+                            android:layout_marginTop="2dp" />
+
+                    </LinearLayout>
+
+                    <Switch
+                        android:id="@+id/switch_vibration"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:checked="true" />
+
+                </RelativeLayout>
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Storage Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Storage"
+            android:textSize="13sp"
+            android:textColor="#757575"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.08"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="10dp" />
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="8dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="1dp"
+            app:cardBackgroundColor="#FFFFFF">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:id="@+id/storage_info_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Loading storage info..."
+                    android:textSize="14sp"
+                    android:textColor="#424242"
+                    android:lineSpacingExtra="4dp"
+                    android:layout_marginBottom="16dp" />
+
+                <Button
+                    android:id="@+id/clear_data_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:text="Clear App Data"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:background="@drawable/logout_button_background"
+                    android:textAllCaps="false"
+                    android:fontFamily="sans-serif-medium"
+                    android:drawableStart="@drawable/ic_delete"
+                    android:drawableTint="#FFFFFF"
+                    android:drawablePadding="8dp"
+                    android:gravity="center" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Note: This will NOT delete your subscriptions or logout"
+                    android:textSize="12sp"
+                    android:textColor="#9E9E9E"
+                    android:textStyle="italic"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Support Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Support"
+            android:textSize="13sp"
+            android:textColor="#757575"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.08"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="10dp" />
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="8dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="1dp"
+            app:cardBackgroundColor="#FFFFFF">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Help -->
+                <RelativeLayout
+                    android:id="@+id/help_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="16dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:id="@+id/help_icon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:layout_marginEnd="16dp"
+                        android:src="@drawable/ic_help"
+                        android:tint="#2196F3"
+                        android:contentDescription="Help" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:layout_toEndOf="@id/help_icon"
+                        android:layout_toStartOf="@+id/help_arrow"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Help"
+                            android:textSize="16sp"
+                            android:textColor="#1A1A1A"
+                            android:fontFamily="sans-serif" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="FAQs and support"
+                            android:textSize="13sp"
+                            android:textColor="#757575"
+                            android:fontFamily="sans-serif"
+                            android:layout_marginTop="2dp" />
+
+                    </LinearLayout>
+
+                    <ImageView
+                        android:id="@+id/help_arrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:src="@drawable/ic_arrow_forward"
+                        android:tint="#BDBDBD"
+                        android:contentDescription="Open help" />
+
+                </RelativeLayout>
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- About Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="About"
+            android:textSize="13sp"
+            android:textColor="#757575"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.08"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="10dp" />
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="1dp"
+            app:cardBackgroundColor="#FFFFFF">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <!-- App Icon and Name -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:src="@mipmap/ic_launcher"
+                        android:contentDescription="App icon" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="ICCC Alert"
+                            android:textSize="20sp"
+                            android:textColor="#1A1A1A"
+                            android:fontFamily="sans-serif-medium" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Version 1.0.0"
+                            android:textSize="14sp"
+                            android:textColor="#757575"
+                            android:fontFamily="sans-serif"
+                            android:layout_marginTop="2dp" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- Description -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Real-time monitoring and intelligent alert system for enhanced security and operational awareness."
+                    android:textSize="14sp"
+                    android:textColor="#616161"
+                    android:fontFamily="sans-serif"
+                    android:lineSpacingExtra="2dp"
+                    android:layout_marginTop="16dp" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+    </LinearLayout>
+
+</ScrollView>

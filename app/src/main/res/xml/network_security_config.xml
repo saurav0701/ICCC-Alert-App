@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow cleartext traffic for local/development servers -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.29.69</domain>
+        <domain includeSubdomains="false">192.0.0.4 </domain>
+        <domain includeSubdomains="false">10.173.114.74</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">192.168.29.36</domain>
+        <domain includeSubdomains="false">a6va.bccliccc.in</domain>
+        <domain includeSubdomains="false">103.208.173.163</domain>
+        <domain includeSubdomains="false">a5va.bccliccc.in</domain>
+        <domain includeSubdomains="false">a9va.bccliccc.in</domain>
+        <domain includeSubdomains="false">a10va.bccliccc.in</domain>
+        <domain includeSubdomains="false">103.208.173.131</domain>
+        <domain includeSubdomains="false">103.208.173.147</domain>
+        <domain includeSubdomains="false">103.208.173.195</domain>
+        <domain includeSubdomains="false">103.208.173.211</domain>
+        <domain includeSubdomains="false">103.208.173.179</domain>
+        <domain includeSubdomains="false">103.210.88.211</domain>
+        <domain includeSubdomains="false">103.210.88.194</domain>
+
+
+        <!-- Add other local IPs if needed -->
+    </domain-config>
+
+    <!-- For production, use HTTPS only -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

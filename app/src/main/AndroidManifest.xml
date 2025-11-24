@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Storage permissions for saving files -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- OSM (OpenStreetMap) Permissions -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <application
+        android:name=".MyApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.ICCCAlertApp"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:usesCleartextTraffic="true"
+        tools:targetApi="31">
+
+        <!-- FileProvider for sharing files -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- WebSocket Service -->
+        <service
+            android:name=".WebSocketService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:stopWithTask="false" />
+
+        <!-- Boot Receiver -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.RECEIVE_BOOT_COMPLETED">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Login Activity - LAUNCHER (First screen) -->
+        <activity
+            android:name=".LoginActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:noHistory="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Registration Activity -->
+        <activity
+            android:name=".RegistrationActivity"
+            android:label="Register"
+            android:parentActivityName=".LoginActivity"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:exported="false"
+            android:noHistory="true" />
+
+        <!-- OTP Verification Activity -->
+        <activity
+            android:name=".OTPVerificationActivity"
+            android:label="Verify OTP"
+            android:parentActivityName=".LoginActivity"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:exported="false"
+            android:noHistory="true" />
+
+        <!-- Main Activity (After successful login) -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.ICCCAlertApp" />
+
+        <!-- Profile Activity -->
+        <activity
+            android:name=".ProfileActivity"
+            android:label="@string/profile_title"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:exported="false" />
+
+        <!-- Map Activity (for GPS events) -->
+        <activity
+            android:name=".MapActivity"
+            android:label="Event Location"
+            android:parentActivityName=".ChannelDetailActivity"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:exported="false" />
+
+        <!-- Channel Detail Activity -->
+        <activity
+            android:name=".ChannelDetailActivity"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:exported="false" />
+
+        <!-- Search Activity -->
+        <activity
+            android:name=".SearchActivity"
+            android:label="Discover Channels"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:exported="false" />
+
+        <!-- Subscriptions Activity -->
+        <activity
+            android:name=".SubscriptionsActivity"
+            android:label="Your Channels"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:exported="false" />
+
+        <!-- Alerts Activity -->
+        <activity
+            android:name=".AlertsActivity"
+            android:label="Live Alerts"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:exported="false" />
+
+        <!-- Settings Activity -->
+        <activity
+            android:name=".SettingsActivity"
+            android:label="Settings"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:exported="false" />
+
+        <!-- Saved Messages Activity -->
+        <activity
+            android:name=".SavedMessagesActivity"
+            android:label="Saved Messages"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:exported="false" />
+
+    </application>
+
+</manifest>

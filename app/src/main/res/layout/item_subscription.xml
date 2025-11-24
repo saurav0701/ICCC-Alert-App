@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="12dp">
+
+    <!-- Channel Icon (Left) -->
+    <FrameLayout
+        android:id="@+id/channel_icon_container"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_alignParentStart="true"
+        android:layout_centerVertical="true"
+        android:layout_marginEnd="12dp">
+
+        <View
+            android:id="@+id/channel_icon_background"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/circle_background" />
+
+        <TextView
+            android:id="@+id/channel_icon_text"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="VD"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF" />
+
+    </FrameLayout>
+
+    <!-- Channel Content -->
+    <LinearLayout
+        android:id="@+id/channel_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_toEndOf="@id/channel_icon_container"
+        android:layout_toStartOf="@id/unsubscribe_btn"
+        android:layout_centerVertical="true"
+        android:orientation="vertical"
+        android:layout_marginEnd="12dp">
+
+        <TextView
+            android:id="@+id/channel_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Sijua"
+            android:textSize="16sp"
+            android:textStyle="normal"
+            android:textColor="#000000"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium" />
+
+        <TextView
+            android:id="@+id/channel_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Vehicle Detection"
+            android:textSize="14sp"
+            android:textColor="#8A8A8A"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:layout_marginTop="2dp" />
+
+    </LinearLayout>
+
+    <!-- Unsubscribe Button -->
+    <ImageButton
+        android:id="@+id/unsubscribe_btn"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        android:tint="#999999"
+        android:contentDescription="Unsubscribe"
+        android:padding="8dp" />
+
+    <!-- Separator Line -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:layout_alignParentBottom="true"
+        android:layout_marginStart="76dp"
+        android:background="#E5E5E5" />
+
+</RelativeLayout>
