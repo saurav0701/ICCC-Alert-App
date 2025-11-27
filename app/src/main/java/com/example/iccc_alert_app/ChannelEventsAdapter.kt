@@ -1,4 +1,3 @@
-
 package com.example.iccc_alert_app
 
 import android.app.DatePickerDialog
@@ -79,17 +78,14 @@ class ChannelEventsAdapter(
 
         val geofenceMap = data["geofence"] as? Map<*, *> ?: return null
 
-        // Extract geojson
         val geojsonMap = geofenceMap["geojson"] as? Map<*, *> ?: return null
         val type = geojsonMap["type"] as? String ?: return null
         val coordinates = geojsonMap["coordinates"] ?: return null
 
-        // Extract attributes
         val attributesMap = geofenceMap["attributes"] as? Map<*, *>
         val color = attributesMap?.get("color") as? String
         val polylineColor = attributesMap?.get("polylineColor") as? String
 
-        // Parse coordinates based on type
         val points = when (type) {
             "Point" -> {
                 val coord = coordinates as? List<*> ?: return null
@@ -136,9 +132,9 @@ class ChannelEventsAdapter(
 
     private data class GeofenceData(
         val points: List<GeoPoint>,
-        val type: String, // GeoJSON type: Point, LineString, Polygon
+        val type: String,
         val color: String,
-        val geofenceType: String? // P for path, etc.
+        val geofenceType: String?
     )
 
     class HeaderViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -149,13 +145,11 @@ class ChannelEventsAdapter(
         val eventCount: TextView = view.findViewById(R.id.event_count)
         val dateDivider: TextView = view.findViewById(R.id.date_divider)
 
-        // Search elements
         val searchButton: FrameLayout = view.findViewById(R.id.search_button)
         val searchContainer: LinearLayout = view.findViewById(R.id.search_container)
         val searchInput: EditText = view.findViewById(R.id.search_input)
         val closeSearch: FrameLayout = view.findViewById(R.id.close_search)
 
-        // Filter elements
         val filterButton: FrameLayout = view.findViewById(R.id.filter_button)
         val filterContainer: LinearLayout = view.findViewById(R.id.filter_container)
         val dateFilterSpinner: Spinner = view.findViewById(R.id.date_filter_spinner)
@@ -164,7 +158,6 @@ class ChannelEventsAdapter(
         val fromDateButton: Button = view.findViewById(R.id.from_date_button)
         val toDateButton: Button = view.findViewById(R.id.to_date_button)
 
-        // PDF download button
         val downloadPdfButton: FrameLayout = view.findViewById(R.id.download_pdf_button)
     }
 
@@ -180,10 +173,15 @@ class ChannelEventsAdapter(
         val imageOverlay: View = view.findViewById(R.id.image_overlay)
         val loadingContainer: LinearLayout = view.findViewById(R.id.loading_container)
         val errorContainer: LinearLayout = view.findViewById(R.id.error_container)
-        val saveSection: LinearLayout = view.findViewById(R.id.save_section)
+
+        // NEW: Save functionality
+        val saveEventButton: Button = view.findViewById(R.id.save_event_button)
+        val moreActionsButton: Button = view.findViewById(R.id.more_actions_button)
+        val savePrioritySection: LinearLayout = view.findViewById(R.id.save_priority_section)
         val prioritySpinner: Spinner = view.findViewById(R.id.priority_spinner)
         val commentInput: EditText = view.findViewById(R.id.comment_input)
-        val saveButton: Button = view.findViewById(R.id.save_button)
+        val cancelSaveButton: Button = view.findViewById(R.id.cancel_save_button)
+        val confirmSaveButton: Button = view.findViewById(R.id.confirm_save_button)
 
         // Action buttons
         val actionButtonsContainer: LinearLayout = view.findViewById(R.id.action_buttons_container)
@@ -208,6 +206,19 @@ class ChannelEventsAdapter(
         val alertSubtype: TextView = view.findViewById(R.id.alert_subtype)
         val geofenceContainer: LinearLayout = view.findViewById(R.id.geofence_container)
         val geofenceName: TextView = view.findViewById(R.id.geofence_name)
+
+        val saveGpsEventButton: Button = view.findViewById(R.id.save_gps_event_button)
+        val moreGpsActionsButton: Button = view.findViewById(R.id.more_gps_actions_button)
+        val saveGpsPrioritySection: LinearLayout = view.findViewById(R.id.save_gps_priority_section)
+        val gpsPrioritySpinner: Spinner = view.findViewById(R.id.gps_priority_spinner)
+        val gpsCommentInput: EditText = view.findViewById(R.id.gps_comment_input)
+        val cancelGpsSaveButton: Button = view.findViewById(R.id.cancel_gps_save_button)
+        val confirmGpsSaveButton: Button = view.findViewById(R.id.confirm_gps_save_button)
+
+        // GPS Action buttons
+        val gpsActionButtonsContainer: LinearLayout = view.findViewById(R.id.gps_action_buttons_container)
+        val downloadGpsPdfButton: Button = view.findViewById(R.id.download_gps_pdf_button)
+        val shareGpsLocationButton: Button = view.findViewById(R.id.share_gps_location_button)
     }
 
     private data class MapPreviewData(
@@ -218,282 +229,12 @@ class ChannelEventsAdapter(
         val boundingBox: org.osmdroid.util.BoundingBox?
     )
 
-    private fun setupGpsEvent(holder: GpsEventViewHolder, event: Event) {
-        holder.eventType.text = event.typeDisplay ?: "GPS Alert"
-
-        val eventTimeStr = event.data["eventTime"] as? String
-        val eventDateTime = if (eventTimeStr != null) {
-            try {
-                eventTimeParser.parse(eventTimeStr) ?: Date(event.timestamp * 1000)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error parsing eventTime: ${e.message}")
-                Date(event.timestamp * 1000)
-            }
-        } else {
-            Date(event.timestamp * 1000)
-        }
-
-        holder.timestamp.text = timeFormat.format(eventDateTime)
-        holder.eventDate.text = dateFormat.format(eventDateTime)
-
-        // FIXED: Get vehicle info from the top-level event properties
-        val vehicleNum = event.vehicleNumber ?: "Unknown"
-        val transporter = event.vehicleTransporter ?: "Unknown"
-
-        holder.vehicleNumber.text = vehicleNum
-        holder.vehicleTransporter.text = transporter
-
-        // Set icon and color based on event type
-        val (iconText, color) = when (event.type) {
-            "off-route" -> Pair("OR", "#FF5722")
-            "tamper" -> Pair("TM", "#F44336")
-            "overspeed" -> Pair("OS", "#FF9800")
-            else -> Pair("GPS", "#9E9E9E")
-        }
-
-        holder.iconText.text = iconText
-        holder.badge.setBackgroundResource(R.drawable.circle_background)
-        (holder.badge.background as? android.graphics.drawable.GradientDrawable)?.setColor(Color.parseColor(color))
-
-        // Show alert subtype for tamper events
-        val alertSubType = event.data["alertSubType"] as? String
-        if (event.type == "tamper" && alertSubType != null) {
-            holder.alertSubtypeContainer.visibility = View.VISIBLE
-            holder.alertSubtype.text = alertSubType
-        } else {
-            holder.alertSubtypeContainer.visibility = View.GONE
-        }
-
-        // Show geofence info if available
-        val geofenceData = event.data["geofence"] as? Map<*, *>
-        if (geofenceData != null) {
-            val geofenceName = geofenceData["name"] as? String
-            if (geofenceName != null) {
-                holder.geofenceContainer.visibility = View.VISIBLE
-                holder.geofenceName.text = geofenceName
-            } else {
-                holder.geofenceContainer.visibility = View.GONE
-            }
-        } else {
-            holder.geofenceContainer.visibility = View.GONE
-        }
-
-        // Setup map preview
-        setupMapPreview(holder, event)
-
-        // Handle map preview click
-        holder.mapPreviewFrame.setOnClickListener {
-            openMapView(event)
-        }
-
-        // Handle view on map button click
-        holder.viewOnMapButton.setOnClickListener {
-            openMapView(event)
-        }
-    }
-
-    private fun setupMapPreview(holder: GpsEventViewHolder, event: Event) {
-        try {
-            // Configure map with Google Hybrid tiles (same as MapActivity)
-            val baseUrls = arrayOf(
-                "https://mt0.google.com/vt/lyrs=y&hl=en",
-                "https://mt1.google.com/vt/lyrs=y&hl=en",
-                "https://mt2.google.com/vt/lyrs=y&hl=en",
-                "https://mt3.google.com/vt/lyrs=y&hl=en"
-            )
-
-            holder.mapPreview.setTileSource(object : org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase(
-                "Google-Hybrid",
-                0, 22, 256, ".png",
-                baseUrls
-            ) {
-                override fun getTileURLString(pMapTileIndex: Long): String {
-                    val zoom = org.osmdroid.util.MapTileIndex.getZoom(pMapTileIndex)
-                    val x = org.osmdroid.util.MapTileIndex.getX(pMapTileIndex)
-                    val y = org.osmdroid.util.MapTileIndex.getY(pMapTileIndex)
-                    val serverIndex = (x + y) % baseUrls.size
-                    return "${baseUrls[serverIndex]}&x=$x&y=$y&z=$zoom&s=Ga"
-                }
-            })
-
-            // Disable interactions for preview
-            holder.mapPreview.setMultiTouchControls(false)
-            holder.mapPreview.setBuiltInZoomControls(false)
-            holder.mapPreview.isClickable = false
-            holder.mapPreview.isFocusable = false
-
-            // Show loading
-            holder.mapLoadingOverlay.visibility = View.VISIBLE
-
-            // Load map data in background
-            CoroutineScope(Dispatchers.Main).launch {
-                val mapData = withContext(Dispatchers.Default) {
-                    prepareMapPreviewData(event)
-                }
-
-                withContext(Dispatchers.Main) {
-                    renderMapPreview(holder, mapData)
-                    holder.mapLoadingOverlay.visibility = View.GONE
-                }
-            }
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Error setting up map preview: ${e.message}", e)
-            holder.mapLoadingOverlay.visibility = View.GONE
-        }
-    }
-
-    private fun prepareMapPreviewData(event: Event): MapPreviewData {
-        val alertLocation = extractAlertLocation(event.data)
-        val geofenceData = extractGeofenceData(event.data)
-
-        // Calculate bounding box
-        val allPoints = mutableListOf<GeoPoint>()
-
-        // Always add alert location first (critical for tamper events)
-        alertLocation?.let { allPoints.add(it) }
-
-        // Add geofence points if available
-        geofenceData?.points?.let { allPoints.addAll(it) }
-
-        // For tamper events without geofence, ensure we have padding points
-        val boundingBox = if (allPoints.isNotEmpty()) {
-            if (event.type == "tamper" && geofenceData == null && alertLocation != null) {
-                // Add padding points for better zoom (approximately 200 meters)
-                allPoints.add(GeoPoint(alertLocation.latitude + 0.002, alertLocation.longitude))
-                allPoints.add(GeoPoint(alertLocation.latitude - 0.002, alertLocation.longitude))
-                allPoints.add(GeoPoint(alertLocation.latitude, alertLocation.longitude + 0.002))
-                allPoints.add(GeoPoint(alertLocation.latitude, alertLocation.longitude - 0.002))
-            }
-            org.osmdroid.util.BoundingBox.fromGeoPoints(allPoints)
-        } else null
-
-        return MapPreviewData(
-            alertLocation = alertLocation,
-            geofencePoints = geofenceData?.points,
-            geofenceType = geofenceData?.type,
-            geofenceColor = geofenceData?.color,
-            boundingBox = boundingBox
-        )
-    }
-
-    private fun renderMapPreview(holder: GpsEventViewHolder, mapData: MapPreviewData) {
-        try {
-            // Clear existing overlays
-            holder.mapPreview.overlays.clear()
-
-            // Add geofence if available
-            if (!mapData.geofencePoints.isNullOrEmpty() && mapData.geofenceType != null) {
-                val color = parseColor(mapData.geofenceColor)
-
-                when (mapData.geofenceType) {
-                    "LineString" -> {
-                        val polyline = Polyline(holder.mapPreview)
-                        polyline.setPoints(mapData.geofencePoints)
-                        polyline.outlinePaint.color = color
-                        polyline.outlinePaint.strokeWidth = 6f
-                        polyline.outlinePaint.isAntiAlias = true
-                        holder.mapPreview.overlays.add(polyline)
-                    }
-                    "Polygon" -> {
-                        val polygon = Polygon(holder.mapPreview)
-                        polygon.points = mapData.geofencePoints
-                        polygon.fillPaint.color = Color.argb(30, Color.red(color), Color.green(color), Color.blue(color))
-                        polygon.outlinePaint.color = color
-                        polygon.outlinePaint.strokeWidth = 4f
-                        polygon.outlinePaint.isAntiAlias = true
-                        holder.mapPreview.overlays.add(polygon)
-                    }
-                    "Point" -> {
-                        val point = mapData.geofencePoints.first()
-                        val circle = Polygon(holder.mapPreview)
-                        circle.points = Polygon.pointsAsCircle(point, 100.0)
-                        circle.fillPaint.color = Color.argb(50, Color.red(color), Color.green(color), Color.blue(color))
-                        circle.outlinePaint.color = color
-                        circle.outlinePaint.strokeWidth = 3f
-                        holder.mapPreview.overlays.add(circle)
-                    }
-                }
-            }
-
-            // Add alert location marker (on top of geofence)
-            if (mapData.alertLocation != null) {
-                val marker = Marker(holder.mapPreview)
-                marker.position = mapData.alertLocation
-                marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                marker.icon = context.getDrawable(R.drawable.ic_location_red)
-                holder.mapPreview.overlays.add(marker)
-            }
-
-            // Set view to bounding box
-            if (mapData.boundingBox != null) {
-                holder.mapPreview.post {
-                    try {
-                        holder.mapPreview.zoomToBoundingBox(mapData.boundingBox, true, 50)
-                        // Ensure minimum zoom for better visibility in preview
-                        if (holder.mapPreview.zoomLevelDouble < 13.0) {
-                            holder.mapPreview.controller.setZoom(13.0)
-                        }
-                        // Cap maximum zoom to avoid being too close
-                        if (holder.mapPreview.zoomLevelDouble > 18.0) {
-                            holder.mapPreview.controller.setZoom(18.0)
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error setting map bounds: ${e.message}")
-                        // Fallback to alert location
-                        mapData.alertLocation?.let {
-                            holder.mapPreview.controller.setZoom(15.0)
-                            holder.mapPreview.controller.setCenter(it)
-                        }
-                    }
-                }
-            } else if (mapData.alertLocation != null) {
-                holder.mapPreview.controller.setZoom(15.0)
-                holder.mapPreview.controller.setCenter(mapData.alertLocation)
-            }
-
-            holder.mapPreview.invalidate()
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Error rendering map preview: ${e.message}", e)
-        }
-    }
-
-    private fun parseColor(colorStr: String?): Int {
-        if (colorStr == null) return Color.parseColor("#3388ff")
-
-        return try {
-            // Handle both #RRGGBB and #AARRGGBB formats
-            if (colorStr.startsWith("#")) {
-                Color.parseColor(colorStr)
-            } else {
-                Color.parseColor("#$colorStr")
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse color: $colorStr, using default")
-            Color.parseColor("#3388ff")
-        }
-    }
-
-    private fun openMapView(event: Event) {
-        val gpsEvent = event.toGpsEvent()
-        if (gpsEvent == null) {
-            Toast.makeText(context, "Invalid GPS event data", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val intent = Intent(context, MapActivity::class.java)
-        intent.putExtra(MapActivity.EXTRA_GPS_EVENT, Gson().toJson(gpsEvent))
-        context.startActivity(intent)
-    }
-
     override fun getItemViewType(position: Int): Int {
         if (position == 0) return VIEW_TYPE_HEADER
 
         val eventIndex = position - 1
         val event = filteredEvents[eventIndex]
 
-        // Check if it's a GPS event
         return if (event.type == "off-route" || event.type == "tamper" || event.type == "overspeed") {
             VIEW_TYPE_GPS_EVENT
         } else {
@@ -548,6 +289,14 @@ class ChannelEventsAdapter(
         }
     }
 
+    override fun getItemCount() = filteredEvents.size + 1
+
+    fun updateEvents(newEvents: List<Event>) {
+        allEvents = newEvents
+        filteredEvents = newEvents
+        notifyDataSetChanged()
+    }
+
     private fun setupHeader(holder: HeaderViewHolder) {
         holder.backButton.setOnClickListener {
             onBackClick()
@@ -570,13 +319,8 @@ class ChannelEventsAdapter(
             holder.dateDivider.text = "NO EVENTS"
         }
 
-        // Setup Search
         setupSearch(holder)
-
-        // Setup Filter
         setupFilter(holder)
-
-        // Setup PDF Download
         setupPdfDownload(holder)
     }
 
@@ -587,7 +331,6 @@ class ChannelEventsAdapter(
                 return@setOnClickListener
             }
 
-            // Show loading dialog
             val progressDialog = android.app.ProgressDialog(context)
             progressDialog.setMessage("Generating PDF...")
             progressDialog.setCancelable(false)
@@ -793,45 +536,82 @@ class ChannelEventsAdapter(
 
         setupPrioritySpinner(holder)
 
-        holder.saveSection.visibility = View.GONE
+        // Hide all expandable sections initially
+        holder.savePrioritySection.visibility = View.GONE
         holder.actionButtonsContainer.visibility = View.GONE
 
-        holder.imageFrame.setOnClickListener {
-            if (holder.saveSection.visibility == View.VISIBLE || holder.actionButtonsContainer.visibility == View.VISIBLE) {
-                holder.saveSection.visibility = View.GONE
+        // Check if event is already saved
+        val isSaved = event.id?.let { SavedMessagesManager.isMessageSaved(it) } ?: false
+
+        if (isSaved) {
+            holder.saveEventButton.text = "Saved ✓"
+            holder.saveEventButton.isEnabled = false
+            holder.saveEventButton.alpha = 0.6f
+        } else {
+            holder.saveEventButton.text = "Save"
+            holder.saveEventButton.isEnabled = true
+            holder.saveEventButton.alpha = 1.0f
+        }
+
+        // Save button - shows priority selection
+        holder.saveEventButton.setOnClickListener {
+            if (isSaved) {
+                Toast.makeText(context, "Event already saved", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            holder.savePrioritySection.visibility = View.VISIBLE
+            holder.actionButtonsContainer.visibility = View.GONE
+        }
+
+        // More actions button
+        holder.moreActionsButton.setOnClickListener {
+            if (holder.actionButtonsContainer.visibility == View.VISIBLE) {
                 holder.actionButtonsContainer.visibility = View.GONE
             } else {
                 holder.actionButtonsContainer.visibility = View.VISIBLE
+                holder.savePrioritySection.visibility = View.GONE
             }
         }
 
-        // Setup action buttons
-        setupActionButtons(holder, event)
+        // Cancel save button
+        holder.cancelSaveButton.setOnClickListener {
+            holder.savePrioritySection.visibility = View.GONE
+            holder.commentInput.text.clear()
+            holder.prioritySpinner.setSelection(0)
+        }
 
-        holder.saveButton.setOnClickListener {
-            val eventId = event.id ?: return@setOnClickListener
+        // Confirm save button
+        holder.confirmSaveButton.setOnClickListener {
+            val eventId = event.id
+            if (eventId == null) {
+                Toast.makeText(context, "Cannot save: Invalid event", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
 
             val priorityIndex = holder.prioritySpinner.selectedItemPosition
             val priority = Priority.values()[priorityIndex]
             val comment = holder.commentInput.text.toString().trim()
 
-            if (comment.isEmpty()) {
-                Toast.makeText(holder.itemView.context, "Please add a note", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
             val saved = SavedMessagesManager.saveMessage(eventId, event, priority, comment)
 
             if (saved) {
-                Toast.makeText(holder.itemView.context, "Event saved successfully", Toast.LENGTH_SHORT).show()
-                holder.saveButton.text = "Already Saved"
-                holder.saveButton.isEnabled = false
+                Toast.makeText(context, "Event saved successfully", Toast.LENGTH_SHORT).show()
+                holder.saveEventButton.text = "Saved ✓"
+                holder.saveEventButton.isEnabled = false
+                holder.saveEventButton.alpha = 0.6f
+                holder.savePrioritySection.visibility = View.GONE
                 holder.commentInput.text.clear()
+                holder.prioritySpinner.setSelection(0)
             } else {
-                Toast.makeText(holder.itemView.context, "Event already saved", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Event already saved", Toast.LENGTH_SHORT).show()
             }
         }
 
+        // Setup action buttons (download, share, PDF)
+        setupActionButtons(holder, event)
+
+        // Load image
         holder.loadingContainer.visibility = View.VISIBLE
         holder.errorContainer.visibility = View.GONE
         holder.eventImage.visibility = View.GONE
@@ -845,39 +625,19 @@ class ChannelEventsAdapter(
     }
 
     private fun setupActionButtons(holder: EventViewHolder, event: Event) {
-        // Download Image
         holder.downloadImageButton.setOnClickListener {
-            downloadEventImage(event, holder)
+            downloadEventImage(event)
         }
 
-        // Share Image
         holder.shareImageButton.setOnClickListener {
-            shareEventImage(event, holder)
+            shareEventImage(event)
         }
 
-        // Download Event PDF
         holder.downloadEventPdfButton.setOnClickListener {
-            holder.actionButtonsContainer.visibility = View.GONE
-            holder.saveSection.visibility = View.VISIBLE
-
-            event.id?.let { eventId ->
-                if (SavedMessagesManager.isMessageSaved(eventId)) {
-                    holder.saveButton.text = "Generate PDF"
-                    holder.saveButton.isEnabled = true
-                } else {
-                    holder.saveButton.text = "Generate PDF"
-                    holder.saveButton.isEnabled = true
-                }
-            }
-
-            // Override save button to generate PDF
-            holder.saveButton.setOnClickListener {
-                generateSingleEventPdf(event, holder)
-            }
+            generateSingleEventPdf(event)
         }
     }
-
-    private fun downloadEventImage(event: Event, holder: EventViewHolder) {
+    private fun downloadEventImage(event: Event) {
         val progressDialog = android.app.ProgressDialog(context)
         progressDialog.setMessage("Downloading image...")
         progressDialog.setCancelable(false)
@@ -926,7 +686,7 @@ class ChannelEventsAdapter(
         }
     }
 
-    private fun shareEventImage(event: Event, holder: EventViewHolder) {
+    private fun shareEventImage(event: Event) {
         val progressDialog = android.app.ProgressDialog(context)
         progressDialog.setMessage("Preparing to share...")
         progressDialog.setCancelable(false)
@@ -983,7 +743,7 @@ class ChannelEventsAdapter(
         }
     }
 
-    private fun generateSingleEventPdf(event: Event, holder: EventViewHolder) {
+    private fun generateSingleEventPdf(event: Event) {
         val progressDialog = android.app.ProgressDialog(context)
         progressDialog.setMessage("Generating PDF...")
         progressDialog.setCancelable(false)
@@ -998,7 +758,6 @@ class ChannelEventsAdapter(
 
             if (pdfFile != null) {
                 Toast.makeText(context, "PDF saved: ${pdfFile.name}", Toast.LENGTH_LONG).show()
-                holder.saveSection.visibility = View.GONE
                 openPdfFile(pdfFile)
             } else {
                 Toast.makeText(context, "Failed to generate PDF", Toast.LENGTH_SHORT).show()
@@ -1023,6 +782,461 @@ class ChannelEventsAdapter(
             Log.e(TAG, "Error opening PDF: ${e.message}")
             Toast.makeText(context, "No PDF viewer found", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun setupGpsEvent(holder: GpsEventViewHolder, event: Event) {
+        holder.eventType.text = event.typeDisplay ?: "GPS Alert"
+
+        val eventTimeStr = event.data["eventTime"] as? String
+        val eventDateTime = if (eventTimeStr != null) {
+            try {
+                eventTimeParser.parse(eventTimeStr) ?: Date(event.timestamp * 1000)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing eventTime: ${e.message}")
+                Date(event.timestamp * 1000)
+            }
+        } else {
+            Date(event.timestamp * 1000)
+        }
+
+        holder.timestamp.text = timeFormat.format(eventDateTime)
+        holder.eventDate.text = dateFormat.format(eventDateTime)
+
+        val vehicleNum = event.vehicleNumber ?: "Unknown"
+        val transporter = event.vehicleTransporter ?: "Unknown"
+
+        holder.vehicleNumber.text = vehicleNum
+        holder.vehicleTransporter.text = transporter
+
+        val (iconText, color) = when (event.type) {
+            "off-route" -> Pair("OR", "#FF5722")
+            "tamper" -> Pair("TM", "#F44336")
+            "overspeed" -> Pair("OS", "#FF9800")
+            else -> Pair("GPS", "#9E9E9E")
+        }
+
+        holder.iconText.text = iconText
+        holder.badge.setBackgroundResource(R.drawable.circle_background)
+        (holder.badge.background as? android.graphics.drawable.GradientDrawable)?.setColor(Color.parseColor(color))
+
+        val alertSubType = event.data["alertSubType"] as? String
+        if (event.type == "tamper" && alertSubType != null) {
+            holder.alertSubtypeContainer.visibility = View.VISIBLE
+            holder.alertSubtype.text = alertSubType
+        } else {
+            holder.alertSubtypeContainer.visibility = View.GONE
+        }
+
+        val geofenceData = event.data["geofence"] as? Map<*, *>
+        if (geofenceData != null) {
+            val geofenceName = geofenceData["name"] as? String
+            if (geofenceName != null) {
+                holder.geofenceContainer.visibility = View.VISIBLE
+                holder.geofenceName.text = geofenceName
+            } else {
+                holder.geofenceContainer.visibility = View.GONE
+            }
+        } else {
+            holder.geofenceContainer.visibility = View.GONE
+        }
+
+        setupMapPreview(holder, event)
+        setupGpsPrioritySpinner(holder)
+
+        // Hide all expandable sections initially
+        holder.saveGpsPrioritySection.visibility = View.GONE
+        holder.gpsActionButtonsContainer.visibility = View.GONE
+
+        // Check if GPS event is already saved
+        val isSaved = event.id?.let { SavedMessagesManager.isMessageSaved(it) } ?: false
+
+        if (isSaved) {
+            holder.saveGpsEventButton.text = "Saved ✓"
+            holder.saveGpsEventButton.isEnabled = false
+            holder.saveGpsEventButton.alpha = 0.6f
+        } else {
+            holder.saveGpsEventButton.text = "Save"
+            holder.saveGpsEventButton.isEnabled = true
+            holder.saveGpsEventButton.alpha = 1.0f
+        }
+
+        // Save GPS event button - shows priority selection
+        holder.saveGpsEventButton.setOnClickListener {
+            if (isSaved) {
+                Toast.makeText(context, "GPS event already saved", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            holder.saveGpsPrioritySection.visibility = View.VISIBLE
+            holder.gpsActionButtonsContainer.visibility = View.GONE
+        }
+
+        // More GPS actions button
+        holder.moreGpsActionsButton.setOnClickListener {
+            if (holder.gpsActionButtonsContainer.visibility == View.VISIBLE) {
+                holder.gpsActionButtonsContainer.visibility = View.GONE
+            } else {
+                holder.gpsActionButtonsContainer.visibility = View.VISIBLE
+                holder.saveGpsPrioritySection.visibility = View.GONE
+            }
+        }
+
+        // Cancel save button
+        holder.cancelGpsSaveButton.setOnClickListener {
+            holder.saveGpsPrioritySection.visibility = View.GONE
+            holder.gpsCommentInput.text.clear()
+            holder.gpsPrioritySpinner.setSelection(0)
+        }
+
+        // Confirm save button
+        holder.confirmGpsSaveButton.setOnClickListener {
+            val eventId = event.id
+            if (eventId == null) {
+                Toast.makeText(context, "Cannot save: Invalid GPS event", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val priorityIndex = holder.gpsPrioritySpinner.selectedItemPosition
+            val priority = Priority.values()[priorityIndex]
+            val comment = holder.gpsCommentInput.text.toString().trim()
+
+            val saved = SavedMessagesManager.saveMessage(eventId, event, priority, comment)
+
+            if (saved) {
+                Toast.makeText(context, "GPS event saved successfully", Toast.LENGTH_SHORT).show()
+                holder.saveGpsEventButton.text = "Saved ✓"
+                holder.saveGpsEventButton.isEnabled = false
+                holder.saveGpsEventButton.alpha = 0.6f
+                holder.saveGpsPrioritySection.visibility = View.GONE
+                holder.gpsCommentInput.text.clear()
+                holder.gpsPrioritySpinner.setSelection(0)
+            } else {
+                Toast.makeText(context, "GPS event already saved", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // Setup GPS action buttons
+        setupGpsActionButtons(holder, event)
+
+        holder.mapPreviewFrame.setOnClickListener {
+            openMapView(event)
+        }
+
+        holder.viewOnMapButton.setOnClickListener {
+            openMapView(event)
+        }
+    }
+
+    private fun setupGpsPrioritySpinner(holder: GpsEventViewHolder) {
+        val priorities = Priority.values().map { it.displayName }
+        val adapter = ArrayAdapter(
+            holder.itemView.context,
+            android.R.layout.simple_spinner_item,
+            priorities
+        )
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        holder.gpsPrioritySpinner.adapter = adapter
+    }
+
+    private fun setupGpsActionButtons(holder: GpsEventViewHolder, event: Event) {
+        holder.downloadGpsPdfButton.setOnClickListener {
+            generateGpsEventPdf(event)
+        }
+
+        holder.shareGpsLocationButton.setOnClickListener {
+            shareGpsLocation(event)
+        }
+    }
+
+    private fun generateGpsEventPdf(event: Event) {
+        val progressDialog = android.app.ProgressDialog(context)
+        progressDialog.setMessage("Generating GPS Event PDF...")
+        progressDialog.setCancelable(false)
+        progressDialog.show()
+
+        CoroutineScope(Dispatchers.Main).launch {
+            val pdfFile = withContext(Dispatchers.IO) {
+                pdfGenerator.generateSingleEventPdf(event, channelArea, channelType)
+            }
+
+            progressDialog.dismiss()
+
+            if (pdfFile != null) {
+                Toast.makeText(context, "PDF saved: ${pdfFile.name}", Toast.LENGTH_LONG).show()
+                openPdfFile(pdfFile)
+            } else {
+                Toast.makeText(context, "Failed to generate PDF", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun shareGpsLocation(event: Event) {
+        val alertLocation = extractAlertLocation(event.data)
+
+        if (alertLocation == null) {
+            Toast.makeText(context, "Location not available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val vehicleInfo = "${event.vehicleNumber ?: "Unknown Vehicle"} - ${event.vehicleTransporter ?: "Unknown Transporter"}"
+        val eventType = event.typeDisplay ?: "GPS Alert"
+        val latitude = alertLocation.latitude
+        val longitude = alertLocation.longitude
+
+        val locationUrl = "https://www.google.com/maps?q=$latitude,$longitude"
+
+        val shareText = """
+        $eventType
+        
+        Vehicle: $vehicleInfo
+        Location: $latitude, $longitude
+        
+        View on map: $locationUrl
+        
+        Time: ${timeFormat.format(Date(event.timestamp * 1000))}
+        Date: ${dateFormat.format(Date(event.timestamp * 1000))}
+    """.trimIndent()
+
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "$eventType - $vehicleInfo")
+            putExtra(Intent.EXTRA_TEXT, shareText)
+        }
+
+        context.startActivity(Intent.createChooser(shareIntent, "Share GPS Location"))
+    }
+
+    private fun setupMapPreview(holder: GpsEventViewHolder, event: Event) {
+        try {
+            val baseUrls = arrayOf(
+                "https://mt0.google.com/vt/lyrs=y&hl=en",
+                "https://mt1.google.com/vt/lyrs=y&hl=en",
+                "https://mt2.google.com/vt/lyrs=y&hl=en",
+                "https://mt3.google.com/vt/lyrs=y&hl=en"
+            )
+
+            holder.mapPreview.setTileSource(object : org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase(
+                "Google-Hybrid",
+                0, 22, 256, ".png",
+                baseUrls
+            ) {
+                override fun getTileURLString(pMapTileIndex: Long): String {
+                    val zoom = org.osmdroid.util.MapTileIndex.getZoom(pMapTileIndex)
+                    val x = org.osmdroid.util.MapTileIndex.getX(pMapTileIndex)
+                    val y = org.osmdroid.util.MapTileIndex.getY(pMapTileIndex)
+                    val serverIndex = (x + y) % baseUrls.size
+                    return "${baseUrls[serverIndex]}&x=$x&y=$y&z=$zoom&s=Ga"
+                }
+            })
+
+            holder.mapPreview.setMultiTouchControls(false)
+            holder.mapPreview.setBuiltInZoomControls(false)
+            holder.mapPreview.isClickable = false
+            holder.mapPreview.isFocusable = false
+
+            holder.mapLoadingOverlay.visibility = View.VISIBLE
+
+            CoroutineScope(Dispatchers.Main).launch {
+                val mapData = withContext(Dispatchers.Default) {
+                    prepareMapPreviewData(event)
+                }
+
+                withContext(Dispatchers.Main) {
+                    renderMapPreview(holder, mapData)
+                    holder.mapLoadingOverlay.visibility = View.GONE
+                }
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error setting up map preview: ${e.message}", e)
+            holder.mapLoadingOverlay.visibility = View.GONE
+        }
+    }
+
+    private fun prepareMapPreviewData(event: Event): MapPreviewData {
+        val alertLocation = extractAlertLocation(event.data)
+        val geofenceData = extractGeofenceData(event.data)
+
+        val allPoints = mutableListOf<GeoPoint>()
+
+        alertLocation?.let { allPoints.add(it) }
+        geofenceData?.points?.let { allPoints.addAll(it) }
+
+        val boundingBox = if (allPoints.isNotEmpty()) {
+            if (event.type == "tamper" && geofenceData == null && alertLocation != null) {
+                allPoints.add(GeoPoint(alertLocation.latitude + 0.002, alertLocation.longitude))
+                allPoints.add(GeoPoint(alertLocation.latitude - 0.002, alertLocation.longitude))
+                allPoints.add(GeoPoint(alertLocation.latitude, alertLocation.longitude + 0.002))
+                allPoints.add(GeoPoint(alertLocation.latitude, alertLocation.longitude - 0.002))
+            }
+            org.osmdroid.util.BoundingBox.fromGeoPoints(allPoints)
+        } else null
+
+        return MapPreviewData(
+            alertLocation = alertLocation,
+            geofencePoints = geofenceData?.points,
+            geofenceType = geofenceData?.type,
+            geofenceColor = geofenceData?.color,
+            boundingBox = boundingBox
+        )
+    }
+
+    private fun renderMapPreview(holder: GpsEventViewHolder, mapData: MapPreviewData) {
+        try {
+            holder.mapPreview.overlays.clear()
+
+            if (!mapData.geofencePoints.isNullOrEmpty() && mapData.geofenceType != null) {
+                val color = parseColor(mapData.geofenceColor)
+
+                when (mapData.geofenceType) {
+                    "LineString" -> {
+                        val polyline = Polyline(holder.mapPreview)
+                        polyline.setPoints(mapData.geofencePoints)
+                        polyline.outlinePaint.color = color
+                        polyline.outlinePaint.strokeWidth = 6f
+                        polyline.outlinePaint.isAntiAlias = true
+                        holder.mapPreview.overlays.add(polyline)
+                    }
+                    "Polygon" -> {
+                        val polygon = Polygon(holder.mapPreview)
+                        polygon.points = mapData.geofencePoints
+                        polygon.fillPaint.color = Color.argb(30, Color.red(color), Color.green(color), Color.blue(color))
+                        polygon.outlinePaint.color = color
+                        polygon.outlinePaint.strokeWidth = 4f
+                        polygon.outlinePaint.isAntiAlias = true
+                        holder.mapPreview.overlays.add(polygon)
+                    }
+                    "Point" -> {
+                        val point = mapData.geofencePoints.first()
+                        val circle = Polygon(holder.mapPreview)
+                        circle.points = Polygon.pointsAsCircle(point, 100.0)
+                        circle.fillPaint.color = Color.argb(50, Color.red(color), Color.green(color), Color.blue(color))
+                        circle.outlinePaint.color = color
+                        circle.outlinePaint.strokeWidth = 3f
+                        holder.mapPreview.overlays.add(circle)
+                    }
+                }
+            }
+
+            if (mapData.alertLocation != null) {
+                val marker = Marker(holder.mapPreview)
+                marker.position = mapData.alertLocation
+                marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                marker.icon = context.getDrawable(R.drawable.ic_location_red)
+                holder.mapPreview.overlays.add(marker)
+            }
+
+            if (mapData.boundingBox != null) {
+                holder.mapPreview.post {
+                    try {
+                        holder.mapPreview.zoomToBoundingBox(mapData.boundingBox, true, 50)
+                        if (holder.mapPreview.zoomLevelDouble < 13.0) {
+                            holder.mapPreview.controller.setZoom(13.0)
+                        }
+                        if (holder.mapPreview.zoomLevelDouble > 18.0) {
+                            holder.mapPreview.controller.setZoom(18.0)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error setting map bounds: ${e.message}")
+                        mapData.alertLocation?.let {
+                            holder.mapPreview.controller.setZoom(15.0)
+                            holder.mapPreview.controller.setCenter(it)
+                        }
+                    }
+                }
+            } else if (mapData.alertLocation != null) {
+                holder.mapPreview.controller.setZoom(15.0)
+                holder.mapPreview.controller.setCenter(mapData.alertLocation)
+            }
+
+            holder.mapPreview.invalidate()
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error rendering map preview: ${e.message}", e)
+        }
+    }
+
+    private fun parseColor(colorStr: String?): Int {
+        if (colorStr == null) return Color.parseColor("#3388ff")
+
+        return try {
+            if (colorStr.startsWith("#")) {
+                Color.parseColor(colorStr)
+            } else {
+                Color.parseColor("#$colorStr")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse color: $colorStr, using default")
+            Color.parseColor("#3388ff")
+        }
+    }
+
+    private fun openMapView(event: Event) {
+        val gpsEvent = event.toGpsEvent()
+        if (gpsEvent == null) {
+            Toast.makeText(context, "Invalid GPS event data", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val intent = Intent(context, MapActivity::class.java)
+        intent.putExtra(MapActivity.EXTRA_GPS_EVENT, Gson().toJson(gpsEvent))
+        context.startActivity(intent)
+    }
+
+    private fun loadEventImage(event: Event, holder: EventViewHolder) {
+        val area = event.area ?: return
+        val eventId = event.id ?: return
+
+        val httpUrl = getHttpUrlForArea(area)
+        val imageUrl = "$httpUrl/va/event/?id=$eventId"
+
+        Log.d(TAG, "Loading image: $imageUrl")
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val request = Request.Builder()
+                    .url(imageUrl)
+                    .build()
+
+                val response = client.newCall(request).execute()
+
+                if (response.isSuccessful) {
+                    val inputStream = response.body?.byteStream()
+                    val bitmap = BitmapFactory.decodeStream(inputStream)
+
+                    withContext(Dispatchers.Main) {
+                        holder.loadingContainer.visibility = View.GONE
+                        holder.errorContainer.visibility = View.GONE
+                        holder.eventImage.visibility = View.VISIBLE
+                        holder.imageOverlay.visibility = View.VISIBLE
+                        holder.eventImage.setImageBitmap(bitmap)
+
+                        holder.eventImage.alpha = 0f
+                        holder.eventImage.animate()
+                            .alpha(1f)
+                            .setDuration(250)
+                            .start()
+                    }
+                } else {
+                    Log.e(TAG, "Failed to load image: ${response.code}")
+                    withContext(Dispatchers.Main) {
+                        showError(holder)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading image: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    showError(holder)
+                }
+            }
+        }
+    }
+
+    private fun showError(holder: EventViewHolder) {
+        holder.loadingContainer.visibility = View.GONE
+        holder.errorContainer.visibility = View.VISIBLE
+        holder.eventImage.visibility = View.GONE
+        holder.imageOverlay.visibility = View.GONE
     }
 
     private fun getEventDate(event: Event): Date {
@@ -1093,62 +1307,6 @@ class ChannelEventsAdapter(
                 cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
     }
 
-    private fun loadEventImage(event: Event, holder: EventViewHolder) {
-        val area = event.area ?: return
-        val eventId = event.id ?: return
-
-        val httpUrl = getHttpUrlForArea(area)
-        val imageUrl = "$httpUrl/va/event/?id=$eventId"
-
-        Log.d(TAG, "Loading image: $imageUrl")
-
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val request = Request.Builder()
-                    .url(imageUrl)
-                    .build()
-
-                val response = client.newCall(request).execute()
-
-                if (response.isSuccessful) {
-                    val inputStream = response.body?.byteStream()
-                    val bitmap = BitmapFactory.decodeStream(inputStream)
-
-                    withContext(Dispatchers.Main) {
-                        holder.loadingContainer.visibility = View.GONE
-                        holder.errorContainer.visibility = View.GONE
-                        holder.eventImage.visibility = View.VISIBLE
-                        holder.imageOverlay.visibility = View.VISIBLE
-                        holder.eventImage.setImageBitmap(bitmap)
-
-                        holder.eventImage.alpha = 0f
-                        holder.eventImage.animate()
-                            .alpha(1f)
-                            .setDuration(250)
-                            .start()
-                    }
-                } else {
-                    Log.e(TAG, "Failed to load image: ${response.code}")
-                    withContext(Dispatchers.Main) {
-                        showError(holder)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error loading image: ${e.message}")
-                withContext(Dispatchers.Main) {
-                    showError(holder)
-                }
-            }
-        }
-    }
-
-    private fun showError(holder: EventViewHolder) {
-        holder.loadingContainer.visibility = View.GONE
-        holder.errorContainer.visibility = View.VISIBLE
-        holder.eventImage.visibility = View.GONE
-        holder.imageOverlay.visibility = View.GONE
-    }
-
     private fun getHttpUrlForArea(area: String): String {
         return when (area.lowercase()) {
             "sijua", "katras" -> "http://a5va.bccliccc.in:10050"
@@ -1167,11 +1325,4 @@ class ChannelEventsAdapter(
         }
     }
 
-    override fun getItemCount() = filteredEvents.size + 1
-
-    fun updateEvents(newEvents: List<Event>) {
-        allEvents = newEvents
-        filteredEvents = newEvents
-        notifyDataSetChanged()
-    }
 }

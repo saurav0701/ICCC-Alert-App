@@ -92,14 +92,13 @@
             android:exported="false"
             android:noHistory="true" />
 
-        <!-- OTP Verification Activity -->
+        <!-- OTP Verification Activity - REMOVED noHistory -->
         <activity
             android:name=".OTPVerificationActivity"
             android:label="Verify OTP"
             android:parentActivityName=".LoginActivity"
             android:theme="@style/Theme.ICCCAlertApp"
-            android:exported="false"
-            android:noHistory="true" />
+            android:exported="false" />
 
         <!-- Main Activity (After successful login) -->
         <activity

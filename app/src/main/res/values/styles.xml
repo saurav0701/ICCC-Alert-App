@@ -1,0 +1,32 @@
+<resources>
+    <!-- Your existing styles are already here -->
+    <style name="AppTheme" parent="Theme.MaterialComponents.Light.DarkActionBar">
+        <!-- your existing theme attributes -->
+    </style>
+
+    <!-- ADD THESE NEW STYLES BELOW YOUR EXISTING ONES -->
+
+    <!-- Navigation View Style -->
+    <style name="NavigationViewStyle" parent="Widget.MaterialComponents.NavigationView">
+        <item name="itemIconTint">@color/nav_item_state</item>
+        <item name="itemTextColor">@color/nav_item_state</item>
+        <item name="itemBackground">@drawable/nav_item_background</item>
+        <item name="itemHorizontalPadding">16dp</item>
+        <item name="itemVerticalPadding">12dp</item>
+        <item name="itemIconPadding">16dp</item>
+        <item name="android:paddingTop">8dp</item>
+    </style>
+
+    <!-- Section Header Text Style -->
+    <style name="NavigationViewSectionHeaderTextStyle" parent="TextAppearance.AppCompat.Body2">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">#9E9E9E</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:paddingTop">16dp</item>
+        <item name="android:paddingBottom">8dp</item>
+    </style>
+
+</resources>

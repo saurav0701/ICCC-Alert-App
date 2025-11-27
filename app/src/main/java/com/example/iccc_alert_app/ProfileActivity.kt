@@ -2,11 +2,9 @@ package com.example.iccc_alert_app
 
 import android.content.Intent
 import android.os.Bundle
-import android.view.MenuItem
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -20,7 +18,7 @@ class ProfileActivity : BaseDrawerActivity() {
     private lateinit var areaText: TextView
     private lateinit var workingForText: TextView
     private lateinit var subscribedChannelsContainer: LinearLayout
-    private lateinit var loadingView: ProgressBar
+    private lateinit var loadingView: LinearLayout  // ✅ CHANGED from ProgressBar to LinearLayout
     private lateinit var contentView: View
     private lateinit var logoutButton: Button
 
@@ -28,7 +26,7 @@ class ProfileActivity : BaseDrawerActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_profile)
 
-        // Setup toolbar - title will be set by BaseDrawerActivity
+        // Setup toolbar
         supportActionBar?.apply {
             title = "Profile"
         }
@@ -47,7 +45,7 @@ class ProfileActivity : BaseDrawerActivity() {
         areaText = findViewById(R.id.profile_area)
         workingForText = findViewById(R.id.profile_working_for)
         subscribedChannelsContainer = findViewById(R.id.subscribed_channels_container)
-        loadingView = findViewById(R.id.profile_loading)
+        loadingView = findViewById(R.id.profile_loading)  // ✅ Now correctly typed as LinearLayout
         contentView = findViewById(R.id.profile_content)
         logoutButton = findViewById(R.id.logout_button)
 

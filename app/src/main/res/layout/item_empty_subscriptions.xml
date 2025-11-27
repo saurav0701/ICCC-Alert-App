@@ -1,26 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:gravity="center"
-    android:padding="32dp">
+    android:padding="40dp">
 
-    <ImageView
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:src="@drawable/ic_channels"
-        android:tint="#BDBDBD"
-        android:contentDescription="No subscriptions" />
+    <androidx.cardview.widget.CardView
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        app:cardCornerRadius="40dp"
+        app:cardElevation="2dp"
+        app:cardBackgroundColor="#F5F5F5">
+
+        <ImageView
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_channels"
+            android:tint="#BDBDBD"
+            android:contentDescription="No subscriptions" />
+
+    </androidx.cardview.widget.CardView>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="No subscriptions yet"
-        android:textSize="16sp"
-        android:textColor="#757575"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        android:textColor="#616161"
         android:fontFamily="sans-serif-medium"
-        android:layout_marginTop="16dp" />
+        android:layout_marginTop="20dp" />
 
     <TextView
         android:layout_width="wrap_content"
@@ -28,6 +40,23 @@
         android:text="Subscribe to channels to get alerts"
         android:textSize="13sp"
         android:textColor="#9E9E9E"
-        android:layout_marginTop="4dp" />
+        android:gravity="center"
+        android:fontFamily="sans-serif"
+        android:layout_marginTop="8dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/subscribe_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Subscribe Now"
+        android:textSize="14sp"
+        android:fontFamily="sans-serif-medium"
+        app:icon="@drawable/ic_add"
+        app:iconGravity="textStart"
+        app:cornerRadius="20dp"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:layout_marginTop="16dp"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
 </LinearLayout>

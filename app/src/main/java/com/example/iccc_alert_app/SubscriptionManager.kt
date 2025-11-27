@@ -18,6 +18,7 @@ object SubscriptionManager {
     private const val KEY_CHANNELS = "channels"
     private const val KEY_EVENTS = "events"
     private const val KEY_UNREAD = "unread"
+    private const val KEY_LAST_APP_KILL_CHECK = "last_app_kill_check"
     private const val SAVE_DELAY_MS = 500L
 
     private lateinit var prefs: SharedPreferences
@@ -32,27 +33,125 @@ object SubscriptionManager {
     private val saveEventsPending = AtomicBoolean(false)
     private val saveUnreadPending = AtomicBoolean(false)
 
-    // ✅ FIXED: Use ConcurrentHashMap.newKeySet() for thread-safe deduplication
-    private val seenEventIds = ConcurrentHashMap.newKeySet<String>()
+    // ✅ FIXED: Smart duplicate detection
+    // Only use this for RECENT events (last 5 minutes) to avoid immediate duplicates
+    // Don't use it to block catch-up events after app kill
+    private val recentEventIds = ConcurrentHashMap.newKeySet<String>()
+    private val eventTimestamps = ConcurrentHashMap<String, Long>()
+
+    private var wasAppKilled = false
 
     fun initialize(ctx: Context) {
         context = ctx.applicationContext
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        // ✅ Check if app was killed (low battery, etc.)
+        wasAppKilled = detectAppKill()
+
         loadEventsCache()
         loadUnreadCache()
-        buildSeenEventIds()
-        Log.d(TAG, "SubscriptionManager initialized with ${seenEventIds.size} known events")
+
+        if (wasAppKilled) {
+            Log.w(TAG, """
+                ⚠️ APP KILL DETECTED:
+                - App was killed while running (low battery? system kill?)
+                - Clearing recent event IDs to allow catch-up
+                - Old events kept in cache for display
+                - Server will re-deliver missed events
+            """.trimIndent())
+
+            // Don't build seenEventIds from old cache
+            // This allows catch-up events to be added
+            recentEventIds.clear()
+            eventTimestamps.clear()
+
+            // Mark that we've handled this kill
+            prefs.edit().putLong(KEY_LAST_APP_KILL_CHECK, System.currentTimeMillis()).apply()
+        } else {
+            // Normal startup - build recent IDs from cache
+            buildRecentEventIds()
+        }
+
+        // Start cleanup job for old event IDs
+        startRecentEventCleanup()
+
+        Log.d(TAG, "SubscriptionManager initialized (wasKilled=$wasAppKilled, recentIds=${recentEventIds.size})")
     }
 
-    private fun buildSeenEventIds() {
-        seenEventIds.clear()
+    /**
+     * Detect if app was killed unexpectedly
+     */
+    private fun detectAppKill(): Boolean {
+        val lastCheck = prefs.getLong(KEY_LAST_APP_KILL_CHECK, 0L)
+        val now = System.currentTimeMillis()
+        val timeSinceLastCheck = now - lastCheck
+
+        // If it's been more than 10 minutes since last check,
+        // assume app was killed (normal app usage has checks every minute)
+        if (lastCheck > 0 && timeSinceLastCheck > 10 * 60 * 1000) {
+            return true
+        }
+
+        return false
+    }
+
+    /**
+     * Build recent event IDs only from very recent events (last 5 minutes)
+     * This prevents immediate duplicates but allows catch-up
+     */
+    private fun buildRecentEventIds() {
+        recentEventIds.clear()
+        eventTimestamps.clear()
+
+        val fiveMinutesAgo = System.currentTimeMillis() - (5 * 60 * 1000)
+        var recentCount = 0
+
         eventsCache.values.forEach { events ->
             synchronized(events) {
                 events.forEach { event ->
-                    event.id?.let { seenEventIds.add(it) }
+                    if (event.timestamp > fiveMinutesAgo) {
+                        event.id?.let {
+                            recentEventIds.add(it)
+                            eventTimestamps[it] = event.timestamp
+                            recentCount++
+                        }
+                    }
                 }
             }
         }
+
+        Log.d(TAG, "Built recent event IDs: $recentCount events from last 5 minutes")
+    }
+
+    /**
+     * Periodically clean up old event IDs from memory
+     */
+    private fun startRecentEventCleanup() {
+        handler.postDelayed(object : Runnable {
+            override fun run() {
+                val fiveMinutesAgo = System.currentTimeMillis() - (5 * 60 * 1000)
+                val iterator = eventTimestamps.entries.iterator()
+                var cleaned = 0
+
+                while (iterator.hasNext()) {
+                    val entry = iterator.next()
+                    if (entry.value < fiveMinutesAgo) {
+                        recentEventIds.remove(entry.key)
+                        iterator.remove()
+                        cleaned++
+                    }
+                }
+
+                if (cleaned > 0) {
+                    Log.d(TAG, "Cleaned $cleaned old event IDs from memory")
+                }
+
+                // Update app alive timestamp
+                prefs.edit().putLong(KEY_LAST_APP_KILL_CHECK, System.currentTimeMillis()).apply()
+
+                handler.postDelayed(this, 60 * 1000) // Every minute
+            }
+        }, 60 * 1000)
     }
 
     fun getSubscriptions(): List<Channel> {
@@ -85,7 +184,10 @@ object SubscriptionManager {
             eventsCache[channelId]?.let { events ->
                 synchronized(events) {
                     events.forEach { event ->
-                        event.id?.let { seenEventIds.remove(it) }
+                        event.id?.let {
+                            recentEventIds.remove(it)
+                            eventTimestamps.remove(it)
+                        }
                     }
                 }
             }
@@ -127,42 +229,59 @@ object SubscriptionManager {
     }
 
     /**
-     * ✅ FIXED: Proper thread-safe duplicate detection
-     * Returns true if added, false if duplicate
+     * ✅ FIXED: Smart duplicate detection
+     * - Check if event already EXISTS in cache (real duplicate)
+     * - OR if event ID was seen in last 5 minutes (immediate duplicate)
+     * - Otherwise ALLOW it (catch-up after app kill)
      */
     fun addEvent(event: Event): Boolean {
         val eventId = event.id ?: return false
         val channelId = "${event.area}_${event.type}"
+        val timestamp = event.timestamp
 
-        // ✅ CRITICAL: Thread-safe duplicate check using Set.add()
-        // Set.add() returns false if element already exists
-        if (!seenEventIds.add(eventId)) {
-            Log.d(TAG, "⏭️ Duplicate event $eventId, skipping")
-            return false
+        // ✅ First check: Is this event already in our cache?
+        val channelEvents = eventsCache[channelId]
+        if (channelEvents != null) {
+            synchronized(channelEvents) {
+                if (channelEvents.any { it.id == eventId }) {
+                    Log.d(TAG, "⏭️ Event $eventId already in cache, true duplicate")
+                    return false
+                }
+            }
         }
 
-        // Get or create channel list
-        val channelEvents = eventsCache.computeIfAbsent(channelId) {
+        // ✅ Second check: Did we see this ID very recently? (last 5 min)
+        val lastSeenTime = eventTimestamps[eventId]
+        if (lastSeenTime != null) {
+            val timeSinceLastSeen = System.currentTimeMillis() - lastSeenTime
+            if (timeSinceLastSeen < 5 * 60 * 1000) {
+                Log.d(TAG, "⏭️ Event $eventId seen ${timeSinceLastSeen / 1000}s ago, recent duplicate")
+                return false
+            }
+        }
+
+        // ✅ Not a duplicate - add it!
+        val events = eventsCache.computeIfAbsent(channelId) {
             java.util.Collections.synchronizedList(mutableListOf())
         }
 
-        // Add to beginning (newest first)
-        synchronized(channelEvents) {
-            // Double-check within synchronized block
-            if (channelEvents.any { it.id == eventId }) {
-                Log.d(TAG, "⏭️ Duplicate in list $eventId, skipping")
-                return false
-            }
-            channelEvents.add(0, event)
+        synchronized(events) {
+            events.add(0, event)
 
-            // ✅ Limit list size to prevent memory issues
-            if (channelEvents.size > 500) {
-                val removed = channelEvents.removeAt(channelEvents.size - 1)
-                removed.id?.let { seenEventIds.remove(it) }
+            if (events.size > 500) {
+                val removed = events.removeAt(events.size - 1)
+                removed.id?.let {
+                    recentEventIds.remove(it)
+                    eventTimestamps.remove(it)
+                }
             }
         }
 
-        Log.d(TAG, "✅ Added event $eventId to $channelId (total: ${channelEvents.size})")
+        // Track this event ID
+        recentEventIds.add(eventId)
+        eventTimestamps[eventId] = timestamp
+
+        Log.d(TAG, "✅ Added event $eventId to $channelId (timestamp: ${java.util.Date(timestamp)}, total: ${events.size})")
 
         // Update unread count
         unreadCountCache.compute(channelId) { _, count -> (count ?: 0) + 1 }
@@ -176,6 +295,8 @@ object SubscriptionManager {
 
         return true
     }
+
+    // ... rest of the existing methods remain the same ...
 
     private fun scheduleSaveEventsCache() {
         if (saveEventsPending.compareAndSet(false, true)) {
@@ -304,9 +425,6 @@ object SubscriptionManager {
         }
     }
 
-    /**
-     * ✅ NEW: Get count for a specific channel
-     */
     fun getEventCount(channelId: String): Int {
         val events = eventsCache[channelId] ?: return 0
         synchronized(events) {
@@ -314,9 +432,6 @@ object SubscriptionManager {
         }
     }
 
-    /**
-     * ✅ NEW: Get total event count across all channels
-     */
     fun getTotalEventCount(): Int {
         return eventsCache.values.sumOf {
             synchronized(it) { it.size }

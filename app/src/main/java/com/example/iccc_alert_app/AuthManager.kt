@@ -18,7 +18,7 @@ object AuthManager {
     private const val KEY_TOKEN_EXPIRY = "token_expiry"
     private const val KEY_USER_DATA = "user_data"
 
-    private const val BASE_URL = "http://192.168.29.69:9088"
+    private const val BASE_URL = "http://202.140.131.90:8890"
 
     private lateinit var prefs: SharedPreferences
     private val client = OkHttpClient.Builder()

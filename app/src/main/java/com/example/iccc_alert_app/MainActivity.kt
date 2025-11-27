@@ -14,11 +14,11 @@ class MainActivity : BaseDrawerActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Request battery optimization exemption for persistent connection
         BatteryOptimizationHelper.requestBatteryOptimizationExemption(this)
 
-        // Initialize WebSocketManager (which starts the service)
         WebSocketManager.initialize(this)
+
+        LowBatteryWarningManager.initialize(this)
 
         supportActionBar?.title = "My Channels"
         setSelectedMenuItem(R.id.nav_channels)
@@ -38,7 +38,6 @@ class MainActivity : BaseDrawerActivity() {
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
-        // Show filter icon in toolbar for Channels fragment
         menuInflater.inflate(R.menu.menu_channels, menu)
         return true
     }
@@ -55,14 +54,12 @@ class MainActivity : BaseDrawerActivity() {
 
     override fun onPause() {
         super.onPause()
-        // Force save channel states when app goes to background
         ChannelSyncState.forceSave()
         SubscriptionManager.forceSave()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        // Final save before app closes
         ChannelSyncState.forceSave()
         SubscriptionManager.forceSave()
     }

@@ -214,7 +214,151 @@
 
             </LinearLayout>
 
-            <!-- Action Buttons Container (Download, Share, PDF) -->
+            <!-- NEW: Quick Action Buttons Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="#FAFBFC"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:gravity="center">
+
+                <!-- Save Button -->
+                <Button
+                    android:id="@+id/save_event_button"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:text="Save"
+                    android:textSize="13sp"
+                    android:textColor="#FFFFFF"
+                    android:background="@drawable/save_button_background"
+                    android:textAllCaps="false"
+                    android:fontFamily="sans-serif-medium"
+                    android:drawableStart="@drawable/ic_bookmark"
+                    android:drawableTint="#FFFFFF"
+                    android:drawablePadding="6dp"
+                    android:layout_marginEnd="6dp" />
+
+                <!-- More Actions Button -->
+                <Button
+                    android:id="@+id/more_actions_button"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:text="More"
+                    android:textSize="13sp"
+                    android:textColor="#424242"
+                    android:background="@drawable/action_button_secondary_bg"
+                    android:textAllCaps="false"
+                    android:fontFamily="sans-serif-medium"
+                    android:drawableStart="@drawable/ic_more"
+                    android:drawableTint="#424242"
+                    android:drawablePadding="6dp"
+                    android:layout_marginStart="6dp" />
+
+            </LinearLayout>
+
+            <!-- Save with Priority Section (Initially Hidden) -->
+            <LinearLayout
+                android:id="@+id/save_priority_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:background="#F8F9FA"
+                android:padding="18dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Save Event with Priority"
+                    android:textSize="15sp"
+                    android:textColor="#424242"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginBottom="14dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Priority Level"
+                    android:textSize="12sp"
+                    android:textColor="#757575"
+                    android:fontFamily="sans-serif"
+                    android:layout_marginBottom="6dp" />
+
+                <Spinner
+                    android:id="@+id/priority_spinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:background="@drawable/spinner_background"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:layout_marginBottom="16dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Add Note (Optional)"
+                    android:textSize="12sp"
+                    android:textColor="#757575"
+                    android:fontFamily="sans-serif"
+                    android:layout_marginBottom="6dp" />
+
+                <EditText
+                    android:id="@+id/comment_input"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/edit_text_background"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:hint="Add your note here..."
+                    android:maxLength="100"
+                    android:textSize="14sp"
+                    android:textColor="#1A1A1A"
+                    android:inputType="text"
+                    android:imeOptions="actionDone"
+                    android:layout_marginBottom="16dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/cancel_save_button"
+                        android:layout_width="0dp"
+                        android:layout_height="46dp"
+                        android:layout_weight="1"
+                        android:text="Cancel"
+                        android:textColor="#757575"
+                        android:textSize="14sp"
+                        android:background="@drawable/action_button_secondary_bg"
+                        android:textAllCaps="false"
+                        android:fontFamily="sans-serif-medium"
+                        android:layout_marginEnd="8dp" />
+
+                    <Button
+                        android:id="@+id/confirm_save_button"
+                        android:layout_width="0dp"
+                        android:layout_height="46dp"
+                        android:layout_weight="1"
+                        android:text="Save Event"
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp"
+                        android:background="@drawable/save_button_background"
+                        android:textAllCaps="false"
+                        android:fontFamily="sans-serif-medium"
+                        android:layout_marginStart="8dp" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Action Buttons Container (Download, Share, PDF) - Hidden Initially -->
             <LinearLayout
                 android:id="@+id/action_buttons_container"
                 android:layout_width="match_parent"
@@ -227,7 +371,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Quick Actions"
+                    android:text="Additional Actions"
                     android:textSize="15sp"
                     android:textColor="#424242"
                     android:fontFamily="sans-serif-medium"
@@ -288,81 +432,6 @@
                     android:drawableTint="#FFFFFF"
                     android:drawablePadding="8dp"
                     android:gravity="center" />
-
-            </LinearLayout>
-
-            <!-- Save Section -->
-            <LinearLayout
-                android:id="@+id/save_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone"
-                android:background="#FAFBFC"
-                android:padding="18dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Save Event"
-                    android:textSize="15sp"
-                    android:textColor="#424242"
-                    android:fontFamily="sans-serif-medium"
-                    android:layout_marginBottom="14dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Priority Level"
-                    android:textSize="12sp"
-                    android:textColor="#757575"
-                    android:fontFamily="sans-serif"
-                    android:layout_marginBottom="6dp" />
-
-                <Spinner
-                    android:id="@+id/priority_spinner"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:background="@drawable/spinner_background"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:layout_marginBottom="16dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Add Note"
-                    android:textSize="12sp"
-                    android:textColor="#757575"
-                    android:fontFamily="sans-serif"
-                    android:layout_marginBottom="6dp" />
-
-                <EditText
-                    android:id="@+id/comment_input"
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:background="@drawable/edit_text_background"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:hint="Add your note here..."
-                    android:maxLength="100"
-                    android:textSize="14sp"
-                    android:textColor="#1A1A1A"
-                    android:inputType="text"
-                    android:imeOptions="actionDone"
-                    android:layout_marginBottom="16dp" />
-
-                <Button
-                    android:id="@+id/save_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:text="Save Event"
-                    android:textColor="#FFFFFF"
-                    android:textSize="15sp"
-                    android:background="@drawable/save_button_background"
-                    android:textAllCaps="false"
-                    android:fontFamily="sans-serif-medium"
-                    android:letterSpacing="0.02" />
 
             </LinearLayout>
 

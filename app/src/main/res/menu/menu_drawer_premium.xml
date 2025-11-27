@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Main Navigation Items -->
-    <group android:checkableBehavior="single">
+    <!-- Main Navigation Items with improved spacing -->
+    <group
+        android:id="@+id/group_main"
+        android:checkableBehavior="single">
 
         <item
             android:id="@+id/nav_channels"
@@ -18,8 +20,8 @@
 
     </group>
 
-    <!-- Subscribe and Share Section -->
-    <item android:title="Subscribe and Share">
+    <!-- Divider with improved section header -->
+    <item android:title="@string/nav_section_discover">
         <menu>
             <item
                 android:id="@+id/nav_search"
@@ -35,8 +37,8 @@
         </menu>
     </item>
 
-    <!-- Account Section -->
-    <item android:title="Account">
+    <!-- Account Section with better visual hierarchy -->
+    <item android:title="@string/nav_section_account">
         <menu>
             <item
                 android:id="@+id/nav_profile"

@@ -8,7 +8,7 @@ data class RegistrationRequest(
     @SerializedName("phone") val phone: String,
     @SerializedName("area") val area: String,
     @SerializedName("designation") val designation: String,
-    @SerializedName("workingFor") val workingFor: String // CCL or BCCL
+    @SerializedName("organisation") val workingFor: String // CCL or BCCL
 )
 
 // OTP request
@@ -31,7 +31,7 @@ data class User(
     @SerializedName("phone") val phone: String,
     @SerializedName("area") val area: String,
     @SerializedName("designation") val designation: String,
-    @SerializedName("workingFor") val workingFor: String,
+    @SerializedName("organisation") val workingFor: String,
     @SerializedName("isActive") val isActive: Boolean,
     @SerializedName("createdAt") val createdAt: String,
     @SerializedName("updatedAt") val updatedAt: String

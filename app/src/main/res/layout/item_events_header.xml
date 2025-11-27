@@ -6,115 +6,123 @@
     android:background="#FFFFFF">
 
     <!-- Premium Channel Header -->
-    <RelativeLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingTop="16dp"
-        android:paddingBottom="16dp"
+        android:orientation="vertical"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
         android:paddingStart="20dp"
         android:paddingEnd="20dp"
         android:background="@drawable/header_gradient_bg"
         android:elevation="4dp">
 
-        <!-- Back Button -->
+        <!-- Top Row: Back Button + Channel Info -->
         <LinearLayout
-            android:id="@+id/back_button_header"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_alignParentStart="true"
-            android:layout_centerVertical="true"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:background="@drawable/back_button_bg"
-            android:clickable="true"
-            android:focusable="true">
-
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_arrow_back"
-                android:tint="#FFFFFF"
-                android:contentDescription="Back" />
-
-        </LinearLayout>
-
-        <!-- Channel Info Container -->
-        <LinearLayout
-            android:id="@+id/channel_info"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_toEndOf="@id/back_button_header"
-            android:layout_centerVertical="true"
-            android:layout_marginStart="16dp"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
-            <!-- Channel Icon -->
-            <FrameLayout
-                android:layout_width="48dp"
-                android:layout_height="48dp">
-
-                <View
-                    android:id="@+id/channel_badge"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:background="@drawable/circle_background" />
-
-                <TextView
-                    android:id="@+id/channel_icon_text"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:text="VD"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:textColor="#FFFFFF"
-                    android:fontFamily="sans-serif-medium" />
-
-            </FrameLayout>
-
-            <!-- Channel Name and Event Count -->
+            <!-- Back Button -->
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:id="@+id/back_button_header"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:background="@drawable/back_button_bg"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_arrow_back"
+                    android:tint="#FFFFFF"
+                    android:contentDescription="Back" />
+
+            </LinearLayout>
+
+            <!-- Channel Info Container -->
+            <LinearLayout
+                android:id="@+id/channel_info"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_marginStart="14dp">
+                android:layout_weight="1"
+                android:layout_marginStart="16dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-                <TextView
-                    android:id="@+id/channel_name_header"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Sijua - Vehicle Detection"
-                    android:textSize="17sp"
-                    android:textColor="#FFFFFF"
-                    android:fontFamily="sans-serif-medium"
-                    android:letterSpacing="0.01"
-                    android:maxLines="1"
-                    android:ellipsize="end" />
+                <!-- Channel Icon -->
+                <FrameLayout
+                    android:layout_width="48dp"
+                    android:layout_height="48dp">
 
-                <TextView
-                    android:id="@+id/event_count"
-                    android:layout_width="wrap_content"
+                    <View
+                        android:id="@+id/channel_badge"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/circle_background" />
+
+                    <TextView
+                        android:id="@+id/channel_icon_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:text="VD"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="#FFFFFF"
+                        android:fontFamily="sans-serif-medium" />
+
+                </FrameLayout>
+
+                <!-- Channel Name and Event Count -->
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="12 events"
-                    android:textSize="13sp"
-                    android:textColor="#E3F2FD"
-                    android:fontFamily="sans-serif"
-                    android:layout_marginTop="2dp"
-                    android:maxLines="1" />
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginStart="14dp">
+
+                    <TextView
+                        android:id="@+id/channel_name_header"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Sijua - Vehicle Detection"
+                        android:textSize="17sp"
+                        android:textColor="#FFFFFF"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.01"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+
+                    <TextView
+                        android:id="@+id/event_count"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="12 events"
+                        android:textSize="13sp"
+                        android:textColor="#E3F2FD"
+                        android:fontFamily="sans-serif"
+                        android:layout_marginTop="2dp"
+                        android:maxLines="1" />
+
+                </LinearLayout>
 
             </LinearLayout>
 
         </LinearLayout>
 
-        <!-- Right Icons Container -->
+        <!-- Bottom Row: Action Icons -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
             android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:gravity="end"
+            android:layout_marginTop="6dp"
+            android:layout_marginStart="56dp">
 
             <!-- PDF Download Icon -->
             <FrameLayout
@@ -177,7 +185,7 @@
 
         </LinearLayout>
 
-    </RelativeLayout>
+    </LinearLayout>
 
     <!-- Search Bar (Initially Hidden) -->
     <LinearLayout

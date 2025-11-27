@@ -18,7 +18,7 @@
         <domain includeSubdomains="false">103.208.173.211</domain>
         <domain includeSubdomains="false">103.208.173.179</domain>
         <domain includeSubdomains="false">103.210.88.211</domain>
-        <domain includeSubdomains="false">103.210.88.194</domain>
+        <domain includeSubdomains="false">202.140.131.90</domain>
 
 
         <!-- Add other local IPs if needed -->

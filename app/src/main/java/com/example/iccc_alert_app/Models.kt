@@ -54,19 +54,6 @@ object ClientIdManager {
     private const val PREFS_NAME = "iccc_alert_prefs"
     private const val KEY_CLIENT_ID = "client_id"
 
-    /**
-     * Gets or creates a persistent client ID for this device.
-     * The ID is stored in SharedPreferences and will survive:
-     * - App restarts
-     * - Network reconnections
-     * - Device reboots
-     *
-     * Format: android-{androidId}-{randomUuid}
-     * Example: android-b1217ba45902f0e5-a3f4b2c1
-     *
-     * This ID is used by JetStream to identify durable consumers,
-     * allowing the server to resume delivery of missed messages.
-     */
     fun getOrCreateClientId(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 

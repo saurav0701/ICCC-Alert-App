@@ -14,7 +14,7 @@ class RegistrationActivity : AppCompatActivity() {
     private lateinit var phoneInput: EditText
     private lateinit var areaSpinner: Spinner
     private lateinit var designationInput: EditText
-    private lateinit var workingForSpinner: Spinner
+    private lateinit var organisationSpinner: Spinner
     private lateinit var registerButton: Button
     private lateinit var loginText: TextView
     private lateinit var progressBar: ProgressBar
@@ -29,7 +29,7 @@ class RegistrationActivity : AppCompatActivity() {
         "ccwo", "ej", "cvarea", "wjarea", "pbarea", "block2", "katras"
     )
 
-    private val workingForOptions = listOf("CCL", "BCCL")
+    private val organisationOptions = listOf("BCCL")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,7 +48,7 @@ class RegistrationActivity : AppCompatActivity() {
         phoneInput = findViewById(R.id.phone_input)
         areaSpinner = findViewById(R.id.area_spinner)
         designationInput = findViewById(R.id.designation_input)
-        workingForSpinner = findViewById(R.id.working_for_spinner)
+        organisationSpinner = findViewById(R.id.working_for_spinner)
         registerButton = findViewById(R.id.register_button)
         loginText = findViewById(R.id.login_text)
         progressBar = findViewById(R.id.progress_bar)
@@ -64,14 +64,14 @@ class RegistrationActivity : AppCompatActivity() {
         areaAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         areaSpinner.adapter = areaAdapter
 
-        // Setup Working For Spinner
-        val workingForAdapter = ArrayAdapter(
+        // Setup Organisation Spinner
+        val organisationAdapter = ArrayAdapter(
             this,
             android.R.layout.simple_spinner_item,
-            workingForOptions
+            organisationOptions
         )
-        workingForAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        workingForSpinner.adapter = workingForAdapter
+        organisationAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        organisationSpinner.adapter = organisationAdapter
     }
 
     private fun setupListeners() {
@@ -81,7 +81,6 @@ class RegistrationActivity : AppCompatActivity() {
             }
         }
 
-        // FIX: Navigate to LoginActivity instead of just finishing
         loginText.setOnClickListener {
             navigateToLogin()
         }
@@ -123,14 +122,14 @@ class RegistrationActivity : AppCompatActivity() {
         val areaIndex = areaSpinner.selectedItemPosition
         val area = areaValues[areaIndex]
         val designation = designationInput.text.toString().trim()
-        val workingFor = workingForSpinner.selectedItem.toString()
+        val organisation = organisationSpinner.selectedItem.toString()
 
         val request = RegistrationRequest(
             name = name,
             phone = phone,
             area = area,
             designation = designation,
-            workingFor = workingFor
+            workingFor = organisation
         )
 
         setLoading(true)
@@ -146,7 +145,6 @@ class RegistrationActivity : AppCompatActivity() {
                         putExtra("purpose", "registration")
                     }
                     startActivity(intent)
-                    // Add smooth transition
                     overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                     finish()
                 } else {
@@ -159,7 +157,6 @@ class RegistrationActivity : AppCompatActivity() {
     private fun navigateToLogin() {
         val intent = Intent(this, LoginActivity::class.java)
         startActivity(intent)
-        // Add smooth transition
         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
         finish()
     }
@@ -171,7 +168,7 @@ class RegistrationActivity : AppCompatActivity() {
         phoneInput.isEnabled = !loading
         areaSpinner.isEnabled = !loading
         designationInput.isEnabled = !loading
-        workingForSpinner.isEnabled = !loading
+        organisationSpinner.isEnabled = !loading
         loginText.isEnabled = !loading
     }
 
@@ -186,7 +183,6 @@ class RegistrationActivity : AppCompatActivity() {
 
     override fun finish() {
         super.finish()
-        // Add transition when back button pressed
         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
     }
 }

@@ -32,7 +32,7 @@ class WebSocketService : Service() {
 
     companion object {
         private const val TAG = "WebSocketService"
-        private const val WS_URL = "ws://192.168.29.69:9089/ws"
+        private const val WS_URL = "ws://202.140.131.90:2222/ws"
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "iccc_alerts_service"
         private const val RECONNECT_DELAY = 5000L
