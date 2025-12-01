@@ -20,6 +20,7 @@ class SettingsActivity : BaseDrawerActivity() {
     private lateinit var switchNotifications: Switch
     private lateinit var switchVibration: Switch
     private lateinit var helpContainer: RelativeLayout
+    private lateinit var notificationStatusContainer: RelativeLayout
 
     // Storage management
     private lateinit var storageInfoText: TextView
@@ -72,6 +73,7 @@ class SettingsActivity : BaseDrawerActivity() {
         switchNotifications = findViewById(R.id.switch_notifications)
         switchVibration = findViewById(R.id.switch_vibration)
         helpContainer = findViewById(R.id.help_container)
+        notificationStatusContainer = findViewById(R.id.notification_status_container)
 
         storageInfoText = findViewById(R.id.storage_info_text)
         clearDataButton = findViewById(R.id.clear_data_button)
@@ -115,6 +117,10 @@ class SettingsActivity : BaseDrawerActivity() {
 
         helpContainer.setOnClickListener {
             showHelpDialog()
+        }
+
+        notificationStatusContainer.setOnClickListener {
+            NotificationStatusHelper.showNotificationStatusDialog(this)
         }
 
         clearDataButton.setOnClickListener {
@@ -167,29 +173,19 @@ class SettingsActivity : BaseDrawerActivity() {
         progressDialog.setCancelable(false)
         progressDialog.show()
 
-        // ✅ STEP 1: Get subscriptions BEFORE clearing anything
         val subscriptions = SubscriptionManager.getSubscriptions()
 
         try {
-            // ✅ STEP 2: Stop WebSocket service
             WebSocketService.stop(this)
 
-            // Wait for service to stop completely
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 try {
-                    // ✅ STEP 3: Clear ALL local data
                     clearEventData()
                     SavedMessagesManager.clearAll()
                     ChannelSyncState.clearAll()
-
-                    // ✅ STEP 4: CRITICAL - Reset client ID
-                    // This forces server to DELETE old consumers and create NEW ones
                     ClientIdManager.resetClientId(this)
-
-                    // ✅ STEP 5: Restore subscriptions
                     restoreSubscriptions(subscriptions)
 
-                    // ✅ STEP 6: Reinitialize managers with clean state
                     SubscriptionManager.initialize(this)
                     ChannelSyncState.initialize(this)
                     SavedMessagesManager.initialize(this)
@@ -210,11 +206,7 @@ class SettingsActivity : BaseDrawerActivity() {
                         )
                         .setPositiveButton("OK") { _, _ ->
                             updateStorageInfo()
-
-                            // ✅ STEP 7: Restart service with NEW client ID
-                            // Server will see resetConsumers=true and delete old consumers
                             WebSocketService.start(this)
-
                             Toast.makeText(
                                 this,
                                 "Service restarted - receiving current events",
@@ -232,7 +224,7 @@ class SettingsActivity : BaseDrawerActivity() {
                         Toast.LENGTH_LONG
                     ).show()
                 }
-            }, 1000) // Give service 1 second to stop
+            }, 1000)
 
         } catch (e: Exception) {
             progressDialog.dismiss()
@@ -245,7 +237,6 @@ class SettingsActivity : BaseDrawerActivity() {
     }
 
     private fun clearEventData() {
-        // Clear events and unread counts from SubscriptionManager
         val prefsName = "subscriptions"
         val keyEvents = "events"
         val keyUnread = "unread"
@@ -258,7 +249,6 @@ class SettingsActivity : BaseDrawerActivity() {
     }
 
     private fun restoreSubscriptions(subscriptions: List<Channel>) {
-        // Save subscriptions back
         val prefsName = "subscriptions"
         val keyChannels = "channels"
 
@@ -322,6 +312,7 @@ class SettingsActivity : BaseDrawerActivity() {
             • Enable notifications to receive instant alerts
             • Mute individual channels if needed
             • Control vibration settings
+            • Check notification status to diagnose issues
             
             🎨 Appearance
             • Choose between Light, Dark, or System theme
@@ -341,6 +332,12 @@ class SettingsActivity : BaseDrawerActivity() {
             • Clear cached events and saved messages to free up space
             • Your subscriptions and login remain intact
             • You'll receive current events after clearing
+            
+            ⚠️ Battery & Notifications
+            • Keep device charged for 24/7 monitoring
+            • Battery below 15% may affect notifications
+            • Disable battery optimization when prompted
+            • Check notification status if alerts aren't working
             
             ❓ Need More Help?
             Contact your system administrator for technical support.

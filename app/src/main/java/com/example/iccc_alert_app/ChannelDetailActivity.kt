@@ -23,7 +23,6 @@ class ChannelDetailActivity : AppCompatActivity() {
     private var channelEventType: String = ""
     private val handler = Handler(Looper.getMainLooper())
 
-    // Track new events while viewing
     private val pendingEvents = mutableListOf<Event>()
     private var snackbar: Snackbar? = null
 

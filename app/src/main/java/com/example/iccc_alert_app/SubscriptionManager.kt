@@ -21,6 +21,9 @@ object SubscriptionManager {
     private const val KEY_LAST_APP_KILL_CHECK = "last_app_kill_check"
     private const val SAVE_DELAY_MS = 500L
 
+    // ✅ Storage settings - User controls deletion via Settings UI
+    private const val CLEANUP_BATCH_SIZE = 100
+
     private lateinit var prefs: SharedPreferences
     private lateinit var context: Context
     private val gson = Gson()
@@ -33,9 +36,6 @@ object SubscriptionManager {
     private val saveEventsPending = AtomicBoolean(false)
     private val saveUnreadPending = AtomicBoolean(false)
 
-    // ✅ FIXED: Smart duplicate detection
-    // Only use this for RECENT events (last 5 minutes) to avoid immediate duplicates
-    // Don't use it to block catch-up events after app kill
     private val recentEventIds = ConcurrentHashMap.newKeySet<String>()
     private val eventTimestamps = ConcurrentHashMap<String, Long>()
 
@@ -45,7 +45,6 @@ object SubscriptionManager {
         context = ctx.applicationContext
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        // ✅ Check if app was killed (low battery, etc.)
         wasAppKilled = detectAppKill()
 
         loadEventsCache()
@@ -60,34 +59,24 @@ object SubscriptionManager {
                 - Server will re-deliver missed events
             """.trimIndent())
 
-            // Don't build seenEventIds from old cache
-            // This allows catch-up events to be added
             recentEventIds.clear()
             eventTimestamps.clear()
 
-            // Mark that we've handled this kill
             prefs.edit().putLong(KEY_LAST_APP_KILL_CHECK, System.currentTimeMillis()).apply()
         } else {
-            // Normal startup - build recent IDs from cache
             buildRecentEventIds()
         }
 
-        // Start cleanup job for old event IDs
         startRecentEventCleanup()
 
         Log.d(TAG, "SubscriptionManager initialized (wasKilled=$wasAppKilled, recentIds=${recentEventIds.size})")
     }
 
-    /**
-     * Detect if app was killed unexpectedly
-     */
     private fun detectAppKill(): Boolean {
         val lastCheck = prefs.getLong(KEY_LAST_APP_KILL_CHECK, 0L)
         val now = System.currentTimeMillis()
         val timeSinceLastCheck = now - lastCheck
 
-        // If it's been more than 10 minutes since last check,
-        // assume app was killed (normal app usage has checks every minute)
         if (lastCheck > 0 && timeSinceLastCheck > 10 * 60 * 1000) {
             return true
         }
@@ -95,10 +84,6 @@ object SubscriptionManager {
         return false
     }
 
-    /**
-     * Build recent event IDs only from very recent events (last 5 minutes)
-     * This prevents immediate duplicates but allows catch-up
-     */
     private fun buildRecentEventIds() {
         recentEventIds.clear()
         eventTimestamps.clear()
@@ -123,9 +108,6 @@ object SubscriptionManager {
         Log.d(TAG, "Built recent event IDs: $recentCount events from last 5 minutes")
     }
 
-    /**
-     * Periodically clean up old event IDs from memory
-     */
     private fun startRecentEventCleanup() {
         handler.postDelayed(object : Runnable {
             override fun run() {
@@ -146,10 +128,9 @@ object SubscriptionManager {
                     Log.d(TAG, "Cleaned $cleaned old event IDs from memory")
                 }
 
-                // Update app alive timestamp
                 prefs.edit().putLong(KEY_LAST_APP_KILL_CHECK, System.currentTimeMillis()).apply()
 
-                handler.postDelayed(this, 60 * 1000) // Every minute
+                handler.postDelayed(this, 60 * 1000)
             }
         }, 60 * 1000)
     }
@@ -180,7 +161,6 @@ object SubscriptionManager {
         if (removed) {
             saveSubscriptions(current)
 
-            // Clear events for this channel
             eventsCache[channelId]?.let { events ->
                 synchronized(events) {
                     events.forEach { event ->
@@ -194,7 +174,6 @@ object SubscriptionManager {
             eventsCache.remove(channelId)
             unreadCountCache.remove(channelId)
 
-            // Clear sync state
             ChannelSyncState.clearChannel(channelId)
 
             scheduleSaveEventsCache()
@@ -229,74 +208,95 @@ object SubscriptionManager {
     }
 
     /**
-     * ✅ FIXED: Smart duplicate detection
-     * - Check if event already EXISTS in cache (real duplicate)
-     * - OR if event ID was seen in last 5 minutes (immediate duplicate)
-     * - Otherwise ALLOW it (catch-up after app kill)
+     * ✅ UPDATED: No automatic limits - user controls deletion manually
      */
     fun addEvent(event: Event): Boolean {
         val eventId = event.id ?: return false
         val channelId = "${event.area}_${event.type}"
         val timestamp = event.timestamp
+        val now = System.currentTimeMillis()
 
-        // ✅ First check: Is this event already in our cache?
+        // Check if event already EXISTS in cache
         val channelEvents = eventsCache[channelId]
         if (channelEvents != null) {
             synchronized(channelEvents) {
                 if (channelEvents.any { it.id == eventId }) {
-                    Log.d(TAG, "⏭️ Event $eventId already in cache, true duplicate")
+                    Log.d(TAG, "⏭️ Event $eventId already in cache")
                     return false
                 }
             }
         }
 
-        // ✅ Second check: Did we see this ID very recently? (last 5 min)
+        // Check recent IDs
         val lastSeenTime = eventTimestamps[eventId]
-        if (lastSeenTime != null) {
-            val timeSinceLastSeen = System.currentTimeMillis() - lastSeenTime
-            if (timeSinceLastSeen < 5 * 60 * 1000) {
-                Log.d(TAG, "⏭️ Event $eventId seen ${timeSinceLastSeen / 1000}s ago, recent duplicate")
-                return false
-            }
+        if (lastSeenTime != null && (now - lastSeenTime) < 5 * 60 * 1000) {
+            Log.d(TAG, "⏭️ Event $eventId seen recently")
+            return false
         }
 
-        // ✅ Not a duplicate - add it!
         val events = eventsCache.computeIfAbsent(channelId) {
             java.util.Collections.synchronizedList(mutableListOf())
         }
 
         synchronized(events) {
             events.add(0, event)
-
-            if (events.size > 500) {
-                val removed = events.removeAt(events.size - 1)
-                removed.id?.let {
-                    recentEventIds.remove(it)
-                    eventTimestamps.remove(it)
-                }
-            }
+            // ✅ No automatic limits - events accumulate until user deletes
         }
 
-        // Track this event ID
         recentEventIds.add(eventId)
         eventTimestamps[eventId] = timestamp
 
-        Log.d(TAG, "✅ Added event $eventId to $channelId (timestamp: ${java.util.Date(timestamp)}, total: ${events.size})")
+        Log.d(TAG, "✅ Added event $eventId to $channelId (total: ${events.size})")
 
-        // Update unread count
         unreadCountCache.compute(channelId) { _, count -> (count ?: 0) + 1 }
 
-        // Schedule batched save
         scheduleSaveEventsCache()
         scheduleSaveUnreadCache()
-
-        // Notify listeners on main thread
         handler.post { notifyListeners() }
 
         return true
     }
 
-    // ... rest of the existing methods remain the same ...
+    /**
+     * ✅ Get detailed storage statistics (for Settings UI)
+     */
+    fun getDetailedStorageStats(): Map<String, Any> {
+        val now = System.currentTimeMillis()
+        val channelStats = mutableMapOf<String, Map<String, Any>>()
+        var totalEvents = 0
+        var oldestTimestamp = Long.MAX_VALUE
+        var newestTimestamp = 0L
+
+        eventsCache.forEach { (channelId, events) ->
+            synchronized(events) {
+                totalEvents += events.size
+
+                val oldest = events.lastOrNull()?.timestamp ?: 0L
+                val newest = events.firstOrNull()?.timestamp ?: 0L
+
+                if (oldest < oldestTimestamp) oldestTimestamp = oldest
+                if (newest > newestTimestamp) newestTimestamp = newest
+
+                channelStats[channelId] = mapOf(
+                    "count" to events.size,
+                    "oldestAge" to if (oldest > 0) "${(now - oldest) / (60 * 60 * 1000)}h" else "N/A",
+                    "newestAge" to if (newest > 0) "${(now - newest) / (60 * 1000)}min" else "N/A"
+                )
+            }
+        }
+
+        return mapOf(
+            "totalEvents" to totalEvents,
+            "channels" to eventsCache.size,
+            "oldestEventAge" to if (oldestTimestamp < Long.MAX_VALUE) {
+                "${(now - oldestTimestamp) / (24 * 60 * 60 * 1000)} days"
+            } else "N/A",
+            "newestEventAge" to if (newestTimestamp > 0) {
+                "${(now - newestTimestamp) / (60 * 1000)} minutes"
+            } else "N/A",
+            "channelDetails" to channelStats
+        )
+    }
 
     private fun scheduleSaveEventsCache() {
         if (saveEventsPending.compareAndSet(false, true)) {

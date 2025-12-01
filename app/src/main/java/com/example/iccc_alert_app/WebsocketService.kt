@@ -3,6 +3,7 @@ package com.example.iccc_alert_app
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.PowerManager
 import android.os.VibrationEffect
@@ -19,6 +20,9 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.*
+import android.Manifest
+import java.text.SimpleDateFormat
+import java.util.*
 
 // ACK message to send back to server
 data class AckMessage(
@@ -87,7 +91,7 @@ class WebSocketService : Service() {
     private val isProcessing = AtomicInteger(0)
     private val maxConcurrentProcessors = 4
 
-    // ✅ ACK batching system
+    // ACK batching system
     private val pendingAcks = ConcurrentLinkedQueue<String>()
     private val ackBatchSize = 10
     private val ackBatchDelayMs = 100L
@@ -215,7 +219,6 @@ class WebSocketService : Service() {
         Log.d(TAG, "✅ Started $maxConcurrentProcessors event processors")
     }
 
-    // ✅ NEW: Periodic ACK flusher
     private fun startAckFlusher() {
         serviceScope.launch {
             while (isActive) {
@@ -227,7 +230,6 @@ class WebSocketService : Service() {
         }
     }
 
-    // ✅ NEW: Send ACK back to server
     private fun sendAck(eventId: String) {
         pendingAcks.offer(eventId)
         if (pendingAcks.size >= ackBatchSize) {
@@ -235,7 +237,6 @@ class WebSocketService : Service() {
         }
     }
 
-    // ✅ NEW: Flush batched ACKs to server
     private fun flushAcks() {
         if (!isConnected || webSocket == null) return
 
@@ -285,7 +286,6 @@ class WebSocketService : Service() {
         }
     }
 
-    // ✅ UPDATED: Now sends ACK after successful processing
     private suspend fun processEventAsync(text: String) = withContext(Dispatchers.Default) {
         try {
             if (text.contains("\"status\":\"subscribed\"")) return@withContext
@@ -309,7 +309,6 @@ class WebSocketService : Service() {
             val channelId = "${event.area}_${event.type}"
             val requireAck = event.data["_requireAck"] as? Boolean ?: true
 
-            // If not subscribed, still ACK so server stops sending
             if (!SubscriptionManager.isSubscribed(channelId)) {
                 droppedCount.incrementAndGet()
                 if (requireAck) sendAck(event.id)
@@ -331,7 +330,6 @@ class WebSocketService : Service() {
                 seq = sequence
             )
 
-            // Duplicate - still ACK so server stops resending
             if (!isNew && sequence > 0) {
                 droppedCount.incrementAndGet()
                 if (requireAck) sendAck(event.id)
@@ -353,7 +351,6 @@ class WebSocketService : Service() {
                 droppedCount.incrementAndGet()
             }
 
-            // ✅ CRITICAL: Send ACK back to server AFTER successful processing
             if (requireAck) {
                 sendAck(event.id)
             }
@@ -361,7 +358,6 @@ class WebSocketService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "❌ Exception processing: ${e.message}", e)
             errorCount.incrementAndGet()
-            // Don't ACK on error - let server retry
         }
     }
 
@@ -389,12 +385,10 @@ class WebSocketService : Service() {
 
         val filters = subscriptions.map { SubscriptionFilter(area = it.area, eventType = it.eventType) }
 
-        // Enable catch-up mode for all channels
         subscriptions.forEach { sub ->
             ChannelSyncState.enableCatchUpMode("${sub.area}_${sub.eventType}")
         }
 
-        // ✅ Check if we have ANY sync state
         var hasSyncState = false
         val syncState = mutableMapOf<String, SyncStateInfo>()
 
@@ -410,8 +404,6 @@ class WebSocketService : Service() {
             }
         }
 
-        // ✅ CRITICAL: If no sync state exists, this is a fresh start
-        // Tell server to DELETE old consumers and create NEW ones
         val resetConsumers = !hasSyncState
 
         val request = SubscriptionRequestV2(
@@ -532,22 +524,54 @@ class WebSocketService : Service() {
         if (event.id == null || event.areaDisplay == null || event.typeDisplay == null) return
 
         val channelId = "${event.area}_${event.type}"
-        if (SubscriptionManager.isChannelMuted(channelId)) return
+
+        // ✅ CRITICAL CHECKS: Only notify if subscribed AND not muted
+        if (!SubscriptionManager.isSubscribed(channelId)) {
+            Log.d(TAG, "Skipping notification: Not subscribed to $channelId")
+            return
+        }
+
+        if (SubscriptionManager.isChannelMuted(channelId)) {
+            Log.d(TAG, "Skipping notification: Channel $channelId is muted")
+            return
+        }
+
+        // ✅ Check if notifications are enabled in settings
+        if (!SettingsActivity.areNotificationsEnabled(this)) {
+            Log.d(TAG, "Skipping notification: Notifications disabled in settings")
+            return
+        }
+
+        // ✅ Check notification permission (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                Log.w(TAG, "Notification permission not granted, cannot send notification")
+                return
+            }
+        }
 
         val notificationChannelId = "iccc_alerts"
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
-            nm.deleteNotificationChannel(notificationChannelId)
 
-            val channel = NotificationChannel(notificationChannelId, "ICCC Alerts", NotificationManager.IMPORTANCE_HIGH).apply {
-                enableVibration(SettingsActivity.isVibrationEnabled(this@WebSocketService))
-                enableLights(true)
-                if (SettingsActivity.isVibrationEnabled(this@WebSocketService)) {
-                    vibrationPattern = longArrayOf(0, 300, 200, 300)
+            if (nm.getNotificationChannel(notificationChannelId) == null) {
+                val channel = NotificationChannel(
+                    notificationChannelId,
+                    "ICCC Alerts",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Critical security and operational alerts"
+                    enableVibration(SettingsActivity.isVibrationEnabled(this@WebSocketService))
+                    enableLights(true)
+                    lightColor = android.graphics.Color.RED
+                    if (SettingsActivity.isVibrationEnabled(this@WebSocketService)) {
+                        vibrationPattern = longArrayOf(0, 300, 200, 300)
+                    }
+                    setShowBadge(true)
                 }
+                nm.createNotificationChannel(channel)
             }
-            nm.createNotificationChannel(channel)
         }
 
         if (SettingsActivity.isVibrationEnabled(this)) {
@@ -558,7 +582,9 @@ class WebSocketService : Service() {
                     @Suppress("DEPRECATION")
                     vibrator.vibrate(500)
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.e(TAG, "Vibration error: ${e.message}")
+            }
         }
 
         val intent = Intent(this, ChannelDetailActivity::class.java).apply {
@@ -568,20 +594,46 @@ class WebSocketService : Service() {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
-        val pendingIntent = PendingIntent.getActivity(this, event.id.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            event.id.hashCode(),
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
         val location = event.data["location"] as? String ?: "Unknown location"
+        val eventTime = try {
+            val eventTimeStr = event.data["eventTime"] as? String
+            if (eventTimeStr != null) {
+                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(eventTimeStr)
+            } else {
+                Date(event.timestamp * 1000)
+            }
+        } catch (e: Exception) {
+            Date(event.timestamp * 1000)
+        }
+
+        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
         val notification = NotificationCompat.Builder(this, notificationChannelId)
             .setContentTitle("${event.areaDisplay} - ${event.typeDisplay}")
             .setContentText(location)
+            .setSubText(timeFormat.format(eventTime))
             .setSmallIcon(R.drawable.ic_notifications)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(pendingIntent)
             .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_LIGHTS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
 
-        getSystemService(NotificationManager::class.java).notify(event.id.hashCode(), notification)
+        try {
+            getSystemService(NotificationManager::class.java).notify(event.id.hashCode(), notification)
+            Log.d(TAG, "✅ Notification sent for event ${event.id} ($channelId)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send notification: ${e.message}")
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
@@ -594,7 +646,6 @@ class WebSocketService : Service() {
         stopPingPong()
         stopCatchUpMonitoring()
 
-        // ✅ Flush pending ACKs before shutdown
         runBlocking {
             flushAcks()
         }
@@ -615,7 +666,6 @@ class WebSocketService : Service() {
             acked=${ackedCount.get()}, dropped=${droppedCount.get()}, errors=${errorCount.get()}
         """.trimIndent())
 
-        // Restart service
         val restartIntent = Intent(applicationContext, WebSocketService::class.java)
         val pi = PendingIntent.getService(applicationContext, 1, restartIntent, PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE)
         (getSystemService(Context.ALARM_SERVICE) as AlarmManager).set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 1000, pi)
