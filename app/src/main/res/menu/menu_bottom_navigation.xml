@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/nav_channels"
+        android:icon="@drawable/ic_channels"
+        android:title="Channels"
+        android:enabled="true" />
+
+    <item
+        android:id="@+id/nav_saved_messages"
+        android:icon="@drawable/ic_bookmark"
+        android:title="Saved"
+        android:enabled="true" />
+
+    <item
+        android:id="@+id/nav_settings"
+        android:icon="@drawable/ic_settings"
+        android:title="Settings"
+        android:enabled="true" />
+
+</menu>

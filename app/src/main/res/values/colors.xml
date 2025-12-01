@@ -9,6 +9,10 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
+    <color name="bottom_nav_selected">#2196F3</color>
+    <color name="bottom_nav_unselected">#9E9E9E</color>
+    <color name="bottom_nav_ripple">#1A2196F3</color>
+
     <!-- App Theme Colors -->
     <color name="primary">#2196F3</color>
     <color name="primary_dark">#1976D2</color>

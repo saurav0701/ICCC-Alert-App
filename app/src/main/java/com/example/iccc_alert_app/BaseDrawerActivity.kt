@@ -11,12 +11,14 @@ import androidx.appcompat.widget.Toolbar
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import com.example.iccc_alert_app.auth.AuthManager
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.navigation.NavigationView
 
 abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener {
 
     protected lateinit var drawerLayout: DrawerLayout
     private lateinit var navigationView: NavigationView
+    protected lateinit var bottomNavigationView: BottomNavigationView
     private var selectedMenuItemId: Int = R.id.nav_channels
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,6 +33,7 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
 
         drawerLayout = findViewById(R.id.drawer_layout)
         navigationView = findViewById(R.id.nav_view)
+        bottomNavigationView = findViewById(R.id.bottom_navigation)
 
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
@@ -44,8 +47,59 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
 
         navigationView.setNavigationItemSelectedListener(this)
 
+        // Setup bottom navigation
+        setupBottomNavigation()
+
         // Setup navigation header with user data
         setupNavigationHeader()
+    }
+
+    private fun setupBottomNavigation() {
+        bottomNavigationView.setOnItemSelectedListener { item ->
+            // Prevent reselecting the same item
+            if (item.itemId == selectedMenuItemId && isCurrentActivity(item.itemId)) {
+                return@setOnItemSelectedListener false
+            }
+
+            when (item.itemId) {
+                R.id.nav_channels -> {
+                    if (this !is MainActivity) {
+                        navigateToActivity(MainActivity::class.java)
+                    }
+                    true
+                }
+                R.id.nav_saved_messages -> {
+                    if (this !is SavedMessagesActivity) {
+                        navigateToActivity(SavedMessagesActivity::class.java)
+                    }
+                    true
+                }
+                R.id.nav_settings -> {
+                    if (this !is SettingsActivity) {
+                        navigateToActivity(SettingsActivity::class.java)
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun isCurrentActivity(itemId: Int): Boolean {
+        return when (itemId) {
+            R.id.nav_channels -> this is MainActivity
+            R.id.nav_saved_messages -> this is SavedMessagesActivity
+            R.id.nav_settings -> this is SettingsActivity
+            else -> false
+        }
+    }
+
+    private fun navigateToActivity(activityClass: Class<*>) {
+        val intent = Intent(this, activityClass)
+        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        startActivity(intent)
+        // Smooth transition animation
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
     }
 
     private fun setupNavigationHeader() {
@@ -78,13 +132,12 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
         when (item.itemId) {
             R.id.nav_channels -> {
                 if (this !is MainActivity) {
-                    startActivity(Intent(this, MainActivity::class.java))
-                    finish()
+                    navigateToActivity(MainActivity::class.java)
                 }
             }
             R.id.nav_saved_messages -> {
                 if (this !is SavedMessagesActivity) {
-                    startActivity(Intent(this, SavedMessagesActivity::class.java))
+                    navigateToActivity(SavedMessagesActivity::class.java)
                 }
             }
             R.id.nav_search -> {
@@ -97,7 +150,9 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
                 startActivity(Intent(this, ProfileActivity::class.java))
             }
             R.id.nav_settings -> {
-                startActivity(Intent(this, SettingsActivity::class.java))
+                if (this !is SettingsActivity) {
+                    navigateToActivity(SettingsActivity::class.java)
+                }
             }
         }
 
@@ -117,6 +172,14 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
     protected fun setSelectedMenuItem(itemId: Int) {
         selectedMenuItemId = itemId
         navigationView.setCheckedItem(itemId)
+        // Update bottom navigation selection
+        bottomNavigationView.menu.findItem(itemId)?.isChecked = true
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Ensure correct item is selected when activity resumes
+        setSelectedMenuItem(selectedMenuItemId)
     }
 
     override fun onBackPressed() {

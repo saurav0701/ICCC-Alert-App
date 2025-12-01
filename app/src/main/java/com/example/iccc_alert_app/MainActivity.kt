@@ -62,6 +62,12 @@ class MainActivity : BaseDrawerActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Ensure Channels tab is selected
+        setSelectedMenuItem(R.id.nav_channels)
+    }
+
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             when {

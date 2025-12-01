@@ -18,10 +18,13 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="72dp"
         android:src="@drawable/ic_search"
         app:tint="@android:color/white"
         app:backgroundTint="?attr/colorPrimary"
+        app:elevation="6dp"
+        app:pressedTranslationZ="12dp"
         android:contentDescription="Search channels" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

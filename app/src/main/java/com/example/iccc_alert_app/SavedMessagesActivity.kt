@@ -112,6 +112,8 @@ class SavedMessagesActivity : BaseDrawerActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Ensure Saved Messages tab is selected
+        setSelectedMenuItem(R.id.nav_saved_messages)
         refreshData()
     }
 

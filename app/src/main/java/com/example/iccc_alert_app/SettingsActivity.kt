@@ -67,6 +67,12 @@ class SettingsActivity : BaseDrawerActivity() {
         updateStorageInfo()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Ensure Settings tab is selected
+        setSelectedMenuItem(R.id.nav_settings)
+    }
+
     private fun initializeViews() {
         themeContainer = findViewById(R.id.theme_container)
         themeValue = findViewById(R.id.theme_value)
