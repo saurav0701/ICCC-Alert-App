@@ -2,9 +2,6 @@ package com.example.iccc_alert_app
 
 import com.google.gson.annotations.SerializedName
 
-/**
- * GPS-specific event data model for off-route and tamper alerts
- */
 data class GpsEvent(
     @SerializedName("id") val id: String? = null,
     @SerializedName("timestamp") val timestamp: Long = 0L,
@@ -71,10 +68,6 @@ data class GeoJsonGeometry(
     }
 }
 
-/**
- * Convert standard Event to GpsEvent if it's a GPS type
- * FIXED: Get vehicle info from root level, not from data map
- */
 fun Event.toGpsEvent(): GpsEvent? {
     if (type != "off-route" && type != "tamper" && type != "overspeed") {
         return null
@@ -135,8 +128,8 @@ fun Event.toGpsEvent(): GpsEvent? {
         type = type,
         typeDisplay = typeDisplay,
         groupId = groupId,
-        vehicleNumber = vehicleNumber,  // FIXED: Use root level property
-        vehicleTransporter = vehicleTransporter,  // FIXED: Use root level property
+        vehicleNumber = vehicleNumber,
+        vehicleTransporter = vehicleTransporter,
         data = gpsData
     )
 }

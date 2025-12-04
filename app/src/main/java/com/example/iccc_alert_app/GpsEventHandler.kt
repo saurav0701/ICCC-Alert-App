@@ -153,10 +153,6 @@ class GpsEventHandler(
         holder.mapPreviewFrame.addView(imageView)
     }
 
-    /**
-     * Generates a simple bitmap with location information
-     * This is MUCH faster than rendering a MapView
-     */
     private fun generateLocationCardBitmap(
         mapData: EventBindingHelpers.MapPreviewData,
         event: Event
@@ -304,7 +300,6 @@ class GpsEventHandler(
         canvas.drawCircle(x, y - 15f, 8f, iconPaint)
     }
 
-    // ==================== SAVE FUNCTIONALITY ====================
 
     private fun setupGpsSaveButton(holder: EventViewHolders.GpsEventViewHolder, event: Event) {
         val isSaved = event.id?.let { SavedMessagesManager.isMessageSaved(it) } ?: false

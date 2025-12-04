@@ -4,7 +4,6 @@ import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -21,6 +20,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.*
 import android.Manifest
 import java.text.SimpleDateFormat
+import android.app.AlarmManager
+import android.os.Build
 import java.util.*
 
 data class AckMessage(
@@ -39,6 +40,14 @@ class WebSocketService : Service() {
         private const val CHANNEL_ID = "iccc_alerts_service"
         private const val RECONNECT_DELAY = 5000L
         private const val PING_INTERVAL = 30000L
+
+        private const val GROUP_KEY_ALERTS = "com.example.iccc_alert_app.ALERTS"
+        private const val SUMMARY_NOTIFICATION_ID = 9999
+        private const val MAX_VISIBLE_NOTIFICATIONS = 25
+
+        private const val ALERT_NOTIFICATION_CHANNEL_ID = "iccc_alerts"
+        private const val MAX_NOTIFICATIONS_PER_CHANNEL = 10 // Keep last 10 per channel
+
 
         private val instanceLock = Any()
         private var instance: WebSocketService? = null
@@ -75,6 +84,10 @@ class WebSocketService : Service() {
 
         fun getDeviceId(context: Context): String = ClientIdManager.getOrCreateClientId(context)
     }
+
+    private val activeNotificationIds = mutableListOf<Int>()
+    private val notificationIdLock = Any()
+    private val channelNotifications = mutableMapOf<String, MutableList<Int>>() // channelId -> list of notification IDs
 
     private var webSocket: WebSocket? = null
     private lateinit var client: OkHttpClient
@@ -186,11 +199,38 @@ class WebSocketService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "ICCC Alert Service", NotificationManager.IMPORTANCE_LOW).apply {
+            val nm = getSystemService(NotificationManager::class.java)
+
+            // Service notification channel (low priority)
+            val serviceChannel = NotificationChannel(
+                CHANNEL_ID,
+                "ICCC Alert Service",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
                 description = "Keeps connection alive for real-time alerts"
                 setShowBadge(false)
             }
-            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+            nm.createNotificationChannel(serviceChannel)
+
+            // ✅ Alert notification channel (high priority with grouping support)
+            val alertChannel = NotificationChannel(
+                ALERT_NOTIFICATION_CHANNEL_ID,
+                "ICCC Alerts",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Critical security and operational alerts"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 300, 200, 300)
+                enableLights(true)
+                lightColor = android.graphics.Color.RED
+                setShowBadge(true)
+
+                // ✅ FIX: Only enable bubbles on Android 10+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    setAllowBubbles(true)
+                }
+            }
+            nm.createNotificationChannel(alertChannel)
         }
     }
 
@@ -651,6 +691,7 @@ class WebSocketService : Service() {
 
         val channelId = "${event.area}_${event.type}"
 
+        // Check if user wants notifications
         if (!SubscriptionManager.isSubscribed(channelId)) {
             Log.d(TAG, "Skipping notification: Not subscribed to $channelId")
             return
@@ -668,35 +709,12 @@ class WebSocketService : Service() {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                Log.w(TAG, "Notification permission not granted, cannot send notification")
+                Log.w(TAG, "Notification permission not granted")
                 return
             }
         }
 
-        val notificationChannelId = "iccc_alerts"
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val nm = getSystemService(NotificationManager::class.java)
-
-            if (nm.getNotificationChannel(notificationChannelId) == null) {
-                val channel = NotificationChannel(
-                    notificationChannelId,
-                    "ICCC Alerts",
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = "Critical security and operational alerts"
-                    enableVibration(SettingsActivity.isVibrationEnabled(this@WebSocketService))
-                    enableLights(true)
-                    lightColor = android.graphics.Color.RED
-                    if (SettingsActivity.isVibrationEnabled(this@WebSocketService)) {
-                        vibrationPattern = longArrayOf(0, 300, 200, 300)
-                    }
-                    setShowBadge(true)
-                }
-                nm.createNotificationChannel(channel)
-            }
-        }
-
+        // Vibrate if enabled
         if (SettingsActivity.isVibrationEnabled(this)) {
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -710,20 +728,7 @@ class WebSocketService : Service() {
             }
         }
 
-        val intent = Intent(this, ChannelDetailActivity::class.java).apply {
-            putExtra("CHANNEL_ID", channelId)
-            putExtra("CHANNEL_AREA", event.areaDisplay)
-            putExtra("CHANNEL_TYPE", event.typeDisplay)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            event.id.hashCode(),
-            intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
+        // Prepare notification data
         val location = event.data["location"] as? String ?: "Unknown location"
         val eventTime = try {
             val eventTimeStr = event.data["eventTime"] as? String
@@ -737,8 +742,28 @@ class WebSocketService : Service() {
         }
 
         val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+        val notificationId = event.id.hashCode()
 
-        val notification = NotificationCompat.Builder(this, notificationChannelId)
+        // ✅ Create unique group key per channel
+        val groupKey = "group_$channelId"
+
+        // Intent to open channel detail
+        val intent = Intent(this, ChannelDetailActivity::class.java).apply {
+            putExtra("CHANNEL_ID", channelId)
+            putExtra("CHANNEL_AREA", event.areaDisplay)
+            putExtra("CHANNEL_TYPE", event.typeDisplay)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            notificationId,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        // ✅ Create individual notification with PER-CHANNEL GROUP
+        val notification = NotificationCompat.Builder(this, ALERT_NOTIFICATION_CHANNEL_ID)
             .setContentTitle("${event.areaDisplay} - ${event.typeDisplay}")
             .setContentText(location)
             .setSubText(timeFormat.format(eventTime))
@@ -749,17 +774,162 @@ class WebSocketService : Service() {
             .setContentIntent(pendingIntent)
             .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_LIGHTS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            // ✅ Group by channel instead of all together
+            .setGroup(groupKey)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .build()
 
         try {
-            getSystemService(NotificationManager::class.java).notify(event.id.hashCode(), notification)
-            Log.d(TAG, "✅ Notification sent successfully for event ${event.id} ($channelId)")
+            val nm = getSystemService(NotificationManager::class.java)
+
+            // ✅ Manage per-channel notification limit
+            synchronized(notificationIdLock) {
+                // Initialize list for this channel if needed
+                if (!channelNotifications.containsKey(channelId)) {
+                    channelNotifications[channelId] = mutableListOf()
+                }
+
+                val channelNotifs = channelNotifications[channelId]!!
+
+                // Add new notification ID
+                channelNotifs.add(notificationId)
+
+                // Remove oldest notifications for THIS CHANNEL if we exceed limit
+                if (channelNotifs.size > MAX_NOTIFICATIONS_PER_CHANNEL) {
+                    val toRemove = channelNotifs.size - MAX_NOTIFICATIONS_PER_CHANNEL
+                    val oldIds = channelNotifs.take(toRemove)
+
+                    oldIds.forEach { oldId ->
+                        nm.cancel(oldId)
+                    }
+
+                    channelNotifs.removeAll(oldIds.toSet())
+
+                    Log.d(TAG, "Removed $toRemove old notifications from $channelId")
+                }
+            }
+
+            // Show individual notification
+            nm.notify(notificationId, notification)
+
+            // ✅ Update summary notification for THIS CHANNEL
+            updateChannelSummaryNotification(channelId, event.areaDisplay!!, event.typeDisplay!!)
+
+            Log.d(TAG, "✅ Notification sent for event ${event.id} ($channelId)")
+            PersistentLogger.logEvent("NOTIFICATION", "Sent for ${event.id} - ${event.areaDisplay}/${event.typeDisplay}")
+
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send notification: ${e.message}")
+            PersistentLogger.logError("NOTIFICATION", "Failed to send", e)
         }
-        PersistentLogger.logEvent("NOTIFICATION", "Sent for ${event.id} - ${event.areaDisplay}/${event.typeDisplay}")
     }
 
+    private fun updateChannelSummaryNotification(channelId: String, areaDisplay: String, typeDisplay: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            // Grouping not supported on Android < 7.0
+            return
+        }
+
+        synchronized(notificationIdLock) {
+            val notifs = channelNotifications[channelId] ?: return
+            val count = notifs.size
+
+            if (count == 0) {
+                // No notifications for this channel, remove summary
+                val summaryId = channelId.hashCode()
+                getSystemService(NotificationManager::class.java).cancel(summaryId)
+                return
+            }
+
+            // Only show summary if there are 2+ notifications
+            if (count < 2) {
+                return
+            }
+
+            val groupKey = "group_$channelId"
+            val summaryId = channelId.hashCode() // Use channelId hash as summary ID
+
+            // Intent to open channel detail
+            val intent = Intent(this, ChannelDetailActivity::class.java).apply {
+                putExtra("CHANNEL_ID", channelId)
+                putExtra("CHANNEL_AREA", areaDisplay)
+                putExtra("CHANNEL_TYPE", typeDisplay)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                this,
+                summaryId,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+
+            // Create summary notification for THIS CHANNEL
+            val summaryNotification = NotificationCompat.Builder(this, ALERT_NOTIFICATION_CHANNEL_ID)
+                .setContentTitle("$areaDisplay - $typeDisplay")
+                .setContentText("$count new alerts")
+                .setSmallIcon(R.drawable.ic_notifications)
+                .setGroup(groupKey)
+                .setGroupSummary(true)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setStyle(NotificationCompat.InboxStyle()
+                    .setBigContentTitle("$areaDisplay - $typeDisplay")
+                    .setSummaryText("$count alerts"))
+                .build()
+
+            getSystemService(NotificationManager::class.java)
+                .notify(summaryId, summaryNotification)
+        }
+    }
+    fun clearChannelNotifications(channelId: String) {
+        synchronized(notificationIdLock) {
+            val nm = getSystemService(NotificationManager::class.java)
+
+            // Get notification IDs for this channel
+            val notifs = channelNotifications[channelId]
+
+            if (notifs != null) {
+                // Cancel all individual notifications
+                notifs.forEach { id ->
+                    nm.cancel(id)
+                }
+
+                // Cancel summary
+                val summaryId = channelId.hashCode()
+                nm.cancel(summaryId)
+
+                // Clear from tracking
+                channelNotifications.remove(channelId)
+
+                Log.d(TAG, "Cleared ${notifs.size} notifications for $channelId")
+            }
+        }
+    }
+
+    fun clearAllAlertNotifications() {
+        synchronized(notificationIdLock) {
+            val nm = getSystemService(NotificationManager::class.java)
+
+            // Cancel all notifications for all channels
+            channelNotifications.forEach { (channelId, notifs) ->
+                // Cancel individual notifications
+                notifs.forEach { id ->
+                    nm.cancel(id)
+                }
+
+                // Cancel summary
+                val summaryId = channelId.hashCode()
+                nm.cancel(summaryId)
+            }
+
+            // Clear all tracking
+            channelNotifications.clear()
+
+            Log.d(TAG, "Cleared all alert notifications")
+        }
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         PersistentLogger.logServiceLifecycle("START_COMMAND", "flags=$flags, startId=$startId")
@@ -803,9 +973,9 @@ class WebSocketService : Service() {
         SubscriptionManager.forceSave()
 
         val finalStats = """
-            received=${receivedCount.get()}, processed=${processedCount.get()}, 
-            acked=${ackedCount.get()}, dropped=${droppedCount.get()}, errors=${errorCount.get()}
-        """.trimIndent()
+        received=${receivedCount.get()}, processed=${processedCount.get()}, 
+        acked=${ackedCount.get()}, dropped=${droppedCount.get()}, errors=${errorCount.get()}
+    """.trimIndent()
 
         Log.i(TAG, "📊 FINAL: $finalStats")
         PersistentLogger.logServiceLifecycle("DESTROYED", finalStats)

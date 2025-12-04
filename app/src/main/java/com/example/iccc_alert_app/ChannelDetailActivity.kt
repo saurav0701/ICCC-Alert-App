@@ -1,5 +1,9 @@
 package com.example.iccc_alert_app
 
+import android.app.Notification
+import android.app.NotificationManager
+import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -87,6 +91,51 @@ class ChannelDetailActivity : AppCompatActivity() {
 
         // Load events asynchronously to prevent ANR
         loadEventsAsync()
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        // ✅ Clear notifications for THIS channel when user opens it
+        clearChannelNotifications()
+    }
+
+    /**
+     * ✅ UPDATED: Clear notifications for this specific channel
+     */
+    private fun clearChannelNotifications() {
+        try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val activeNotifications = nm.activeNotifications
+                val groupKey = "group_$channelId"
+
+                // Cancel all notifications in this channel's group
+                activeNotifications.forEach { statusBarNotification ->
+                    try {
+                        val notification = statusBarNotification.notification
+                        val notificationGroup = notification.group
+
+                        // Check if notification belongs to this channel's group
+                        if (notificationGroup == groupKey) {
+                            nm.cancel(statusBarNotification.id)
+                            Log.d("ChannelDetail", "Cleared notification ID: ${statusBarNotification.id}")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("ChannelDetail", "Error processing notification: ${e.message}")
+                    }
+                }
+
+                // Also cancel the summary notification for this channel
+                val summaryId = channelId.hashCode()
+                nm.cancel(summaryId)
+
+                Log.d("ChannelDetail", "Finished clearing notifications for $channelId")
+            }
+        } catch (e: Exception) {
+            Log.e("ChannelDetail", "Error clearing notifications: ${e.message}")
+        }
     }
 
     /**

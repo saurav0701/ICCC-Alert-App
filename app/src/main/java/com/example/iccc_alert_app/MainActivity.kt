@@ -1,10 +1,13 @@
 package com.example.iccc_alert_app
 
 import android.Manifest
+import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import androidx.activity.result.contract.ActivityResultContracts
@@ -65,6 +68,33 @@ class MainActivity : BaseDrawerActivity() {
         super.onResume()
         // Ensure Channels tab is selected
         setSelectedMenuItem(R.id.nav_channels)
+
+        // ✅ Clear alert notifications when user opens app
+        clearAlertNotifications()
+    }
+
+    // ✅ UPDATED: Helper function to clear all channel notifications
+    private fun clearAlertNotifications() {
+        try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            // Get all active notifications
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val activeNotifications = nm.activeNotifications
+
+                // Cancel all notifications from the alerts channel
+                activeNotifications.forEach { statusBarNotification ->
+                    // Check if it's an alert notification (not the service notification)
+                    if (statusBarNotification.id != 1001) { // Skip service notification
+                        nm.cancel(statusBarNotification.id)
+                    }
+                }
+            }
+
+            Log.d("MainActivity", "Cleared alert notifications")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error clearing notifications: ${e.message}")
+        }
     }
 
     private fun requestNotificationPermission() {
