@@ -15,16 +15,14 @@ import com.google.gson.annotations.SerializedName
 import okhttp3.*
 import java.util.concurrent.TimeUnit
 import android.os.IBinder
-import android.annotation.SuppressLint
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.*
 import android.Manifest
 import java.text.SimpleDateFormat
 import java.util.*
 
-// ACK message to send back to server
 data class AckMessage(
     @SerializedName("type") val type: String,
     @SerializedName("eventId") val eventId: String? = null,
@@ -42,26 +40,39 @@ class WebSocketService : Service() {
         private const val RECONNECT_DELAY = 5000L
         private const val PING_INTERVAL = 30000L
 
+        private val instanceLock = Any()
         private var instance: WebSocketService? = null
+        private val isServiceRunning = AtomicBoolean(false)
 
         fun start(context: Context) {
-            val intent = Intent(context, WebSocketService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            synchronized(instanceLock) {
+                if (isServiceRunning.get()) {
+                    Log.w(TAG, "Service already running, ignoring duplicate start")
+                    PersistentLogger.logServiceLifecycle("START_IGNORED", "Service already running")
+                    return
+                }
+
+                val intent = Intent(context, WebSocketService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
             }
         }
 
         fun stop(context: Context) {
-            context.stopService(Intent(context, WebSocketService::class.java))
+            synchronized(instanceLock) {
+                context.stopService(Intent(context, WebSocketService::class.java))
+                isServiceRunning.set(false)
+                PersistentLogger.logServiceLifecycle("STOPPED", "Service stopped by user")
+            }
         }
 
         fun updateSubscriptions() {
             instance?.sendSubscriptionV2()
         }
 
-        @SuppressLint("HardwareIds")
         fun getDeviceId(context: Context): String = ClientIdManager.getOrCreateClientId(context)
     }
 
@@ -78,7 +89,6 @@ class WebSocketService : Service() {
     private var pingRunnable: Runnable? = null
     private lateinit var deviceId: String
 
-    // Event processing
     private val eventQueue = ConcurrentLinkedQueue<String>()
     private val receivedCount = AtomicInteger(0)
     private val processedCount = AtomicInteger(0)
@@ -91,31 +101,72 @@ class WebSocketService : Service() {
     private val isProcessing = AtomicInteger(0)
     private val maxConcurrentProcessors = 4
 
-    // ACK batching system
     private val pendingAcks = ConcurrentLinkedQueue<String>()
     private val ackBatchSize = 10
-    private val ackBatchDelayMs = 100L
     private var ackBatchJob: Job? = null
 
-    // Catch-up monitoring
     private var catchUpMonitorRunnable: Runnable? = null
     private val catchUpCheckInterval = 5000L
     private val stableEmptyThreshold = 3
-    private val consecutiveEmptyChecks = ConcurrentHashMap<String, Int>()
+    private val consecutiveEmptyChecks = java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+    private var hasSubscribed = AtomicBoolean(false)
+    private var lastSubscriptionTime = 0L
+
+    // ✅ Track connection state changes
+    private var lastConnectionState = false
+    private var connectionStateChangeTime = 0L
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "Service created")
 
-        instance = this
+        synchronized(instanceLock) {
+            if (isServiceRunning.get()) {
+                Log.w(TAG, "Service already running, stopping duplicate")
+                PersistentLogger.logServiceLifecycle("CREATE_DUPLICATE", "Stopping duplicate instance")
+                stopSelf()
+                return
+            }
+
+            isServiceRunning.set(true)
+            instance = this
+        }
+
+        Log.d(TAG, "Service created")
+        PersistentLogger.logServiceLifecycle("CREATED", "Service onCreate called")
+
         deviceId = getDeviceId(this)
         Log.d(TAG, "✅ Using persistent client ID: $deviceId")
+        PersistentLogger.logEvent("SYSTEM", "Client ID: $deviceId")
 
         createNotificationChannel()
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+
+        // ✅ Check if device is in doze mode at startup
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val isDozing = powerManager.isDeviceIdleMode
+            val isIgnoringBatteryOpt = powerManager.isIgnoringBatteryOptimizations(packageName)
+
+            PersistentLogger.logEvent("SYSTEM",
+                "Startup state - Dozing: $isDozing, Battery opt exemption: $isIgnoringBatteryOpt")
+
+            if (isDozing) {
+                PersistentLogger.logDozeMode(true, "Service starting in doze mode!")
+            }
+        }
+
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ICCCAlertApp::WebSocketWakeLock")
-        wakeLock.acquire()
+
+        try {
+            if (!wakeLock.isHeld) {
+                wakeLock.acquire()
+                PersistentLogger.logServiceLifecycle("WAKELOCK", "Acquired")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to acquire wake lock: ${e.message}")
+            PersistentLogger.logError("WAKELOCK", "Failed to acquire", e)
+        }
 
         ChannelSyncState.initialize(this)
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
@@ -162,9 +213,14 @@ class WebSocketService : Service() {
     }
 
     private fun connect() {
-        if (webSocket != null) return
+        if (webSocket != null) {
+            Log.w(TAG, "WebSocket already exists, ignoring connect")
+            PersistentLogger.logConnection("CONNECT_IGNORED", "WebSocket already exists")
+            return
+        }
 
         Log.d(TAG, "Connecting with persistent client ID: $deviceId")
+        PersistentLogger.logConnection("CONNECTING", "Attempt ${reconnectAttempts + 1}")
         updateNotification("Connecting...")
 
         val request = Request.Builder().url(WS_URL).build()
@@ -174,10 +230,24 @@ class WebSocketService : Service() {
                 Log.d(TAG, "✅ WebSocket connected")
                 isConnected = true
                 reconnectAttempts = 0
+                hasSubscribed.set(false)
+
+                // ✅ Log connection state change
+                val now = System.currentTimeMillis()
+                val downtime = if (connectionStateChangeTime > 0) (now - connectionStateChangeTime) / 1000 else 0
+                PersistentLogger.logConnection("CONNECTED", "Downtime: ${downtime}s")
+                lastConnectionState = true
+                connectionStateChangeTime = now
 
                 handler.post {
                     updateNotification("Connected - Monitoring alerts")
-                    sendSubscriptionV2()
+
+                    handler.postDelayed({
+                        if (isConnected && !hasSubscribed.get()) {
+                            sendSubscriptionV2()
+                        }
+                    }, 100)
+
                     startPingPong()
                     logEventStats()
                 }
@@ -190,20 +260,38 @@ class WebSocketService : Service() {
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 isConnected = false
+                hasSubscribed.set(false)
+                PersistentLogger.logConnection("CLOSING", "Code: $code, Reason: $reason")
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 isConnected = false
+                hasSubscribed.set(false)
                 this@WebSocketService.webSocket = null
                 stopPingPong()
+
+                // ✅ Log disconnection
+                val now = System.currentTimeMillis()
+                PersistentLogger.logConnection("CLOSED", "Code: $code, Reason: $reason")
+                lastConnectionState = false
+                connectionStateChangeTime = now
+
                 scheduleReconnect()
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 Log.e(TAG, "WebSocket error: ${t.message}")
                 isConnected = false
+                hasSubscribed.set(false)
                 this@WebSocketService.webSocket = null
                 stopPingPong()
+
+                // ✅ Log failure with details
+                val now = System.currentTimeMillis()
+                PersistentLogger.logError("CONNECTION", "WebSocket failure: ${t.message}", t)
+                lastConnectionState = false
+                connectionStateChangeTime = now
+
                 handler.post {
                     updateNotification("Disconnected - Reconnecting...")
                     scheduleReconnect()
@@ -217,6 +305,7 @@ class WebSocketService : Service() {
             processingJobs.add(serviceScope.launch { processEventsLoop(id) })
         }
         Log.d(TAG, "✅ Started $maxConcurrentProcessors event processors")
+        PersistentLogger.logServiceLifecycle("PROCESSORS", "Started $maxConcurrentProcessors processors")
     }
 
     private fun startAckFlusher() {
@@ -259,8 +348,14 @@ class WebSocketService : Service() {
         if (sent) {
             ackedCount.addAndGet(acks.size)
             Log.d(TAG, "✅ Sent ACK for ${acks.size} events (total: ${ackedCount.get()})")
+
+            // ✅ Log periodic ACK stats
+            if (ackedCount.get() % 100 == 0) {
+                PersistentLogger.logEvent("ACK", "Total ACKs sent: ${ackedCount.get()}")
+            }
         } else {
             Log.e(TAG, "❌ Failed to send ACK, re-queuing ${acks.size} events")
+            PersistentLogger.logError("ACK", "Failed to send ${acks.size} ACKs")
             acks.forEach { pendingAcks.offer(it) }
         }
     }
@@ -281,6 +376,7 @@ class WebSocketService : Service() {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Processor $processorId error: ${e.message}", e)
+                PersistentLogger.logError("PROCESSOR_$processorId", "Processing error", e)
                 errorCount.incrementAndGet()
             }
         }
@@ -298,6 +394,7 @@ class WebSocketService : Service() {
                 gson.fromJson(text, Event::class.java)
             } catch (e: Exception) {
                 errorCount.incrementAndGet()
+                PersistentLogger.logError("PARSE", "Failed to parse event", e)
                 return@withContext
             }
 
@@ -332,6 +429,7 @@ class WebSocketService : Service() {
 
             if (!isNew && sequence > 0) {
                 droppedCount.incrementAndGet()
+                PersistentLogger.logEventProcessing("DUPLICATE", event.id, "seq=$sequence, channel=$channelId")
                 if (requireAck) sendAck(event.id)
                 return@withContext
             }
@@ -340,6 +438,7 @@ class WebSocketService : Service() {
 
             if (addedSuccessfully) {
                 processedCount.incrementAndGet()
+                PersistentLogger.logEventProcessing("PROCESSED", event.id, "seq=$sequence, channel=$channelId")
 
                 withContext(Dispatchers.Main) {
                     if (SettingsActivity.areNotificationsEnabled(this@WebSocketService)) {
@@ -349,6 +448,7 @@ class WebSocketService : Service() {
                 }
             } else {
                 droppedCount.incrementAndGet()
+                PersistentLogger.logEventProcessing("DROPPED", event.id, "Already in cache")
             }
 
             if (requireAck) {
@@ -357,6 +457,7 @@ class WebSocketService : Service() {
 
         } catch (e: Exception) {
             Log.e(TAG, "❌ Exception processing: ${e.message}", e)
+            PersistentLogger.logError("PROCESS", "Exception processing event", e)
             errorCount.incrementAndGet()
         }
     }
@@ -365,12 +466,20 @@ class WebSocketService : Service() {
         handler.postDelayed(object : Runnable {
             override fun run() {
                 if (isConnected) {
-                    Log.i(TAG, """
-                        📊 STATS: received=${receivedCount.get()}, queued=${eventQueue.size}, 
+                    val stats = """
+                        received=${receivedCount.get()}, queued=${eventQueue.size}, 
                         processed=${processedCount.get()}, acked=${ackedCount.get()}, 
                         dropped=${droppedCount.get()}, errors=${errorCount.get()}, 
                         pendingAcks=${pendingAcks.size}
-                    """.trimIndent())
+                    """.trimIndent()
+
+                    Log.i(TAG, "📊 STATS: $stats")
+
+                    // ✅ Log detailed stats every 10 minutes
+                    if (processedCount.get() % 100 == 0) {
+                        PersistentLogger.logEvent("STATS", stats)
+                    }
+
                     handler.postDelayed(this, 10000)
                 }
             }
@@ -378,7 +487,18 @@ class WebSocketService : Service() {
     }
 
     fun sendSubscriptionV2() {
-        if (!isConnected || webSocket == null) return
+        if (!isConnected || webSocket == null) {
+            Log.w(TAG, "Cannot subscribe - not connected")
+            PersistentLogger.logEvent("SUBSCRIPTION", "Failed - not connected")
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        if (hasSubscribed.get() && (now - lastSubscriptionTime) < 5000) {
+            Log.w(TAG, "Skipping duplicate subscription (sent ${now - lastSubscriptionTime}ms ago)")
+            PersistentLogger.logEvent("SUBSCRIPTION", "Skipped - duplicate within 5s")
+            return
+        }
 
         val subscriptions = SubscriptionManager.getSubscriptions()
         if (subscriptions.isEmpty()) return
@@ -416,26 +536,26 @@ class WebSocketService : Service() {
         val json = gson.toJson(request)
         Log.d(TAG, "📤 Subscription: $json")
 
+        // ✅ Log subscription details
+        PersistentLogger.logEvent("SUBSCRIPTION",
+            "Mode: ${if (resetConsumers) "RESET" else "RESUME"}, Channels: ${filters.size}")
+
         if (resetConsumers) {
-            Log.w(TAG, """
-            ⚠️ RESET MODE ACTIVE:
-            - No sync state found (fresh start or cleared data)
-            - Server will DELETE all old durable consumers for this client
-            - Server will CREATE NEW consumers from current position
-            - You will receive current/recent events as a new subscriber
-        """.trimIndent())
+            Log.w(TAG, "⚠️ RESET MODE: Will delete old consumers and start fresh")
+            PersistentLogger.logEvent("SUBSCRIPTION", "RESET MODE - deleting old consumers")
         } else {
-            Log.i(TAG, """
-            ✅ RESUME MODE:
-            - Sync state exists (${syncState.size} channels)
-            - Server will RESUME existing durable consumers
-            - You will receive missed events since last connection
-        """.trimIndent())
+            Log.i(TAG, "✅ RESUME MODE: Will resume from last known sequences")
+            PersistentLogger.logEvent("SUBSCRIPTION", "RESUME MODE - ${syncState.size} channels with state")
         }
 
         if (webSocket?.send(json) == true) {
+            hasSubscribed.set(true)
+            lastSubscriptionTime = now
             Log.d(TAG, "✅ Subscription sent (reset=$resetConsumers)")
+            PersistentLogger.logEvent("SUBSCRIPTION", "Sent successfully")
             startCatchUpMonitoring()
+        } else {
+            PersistentLogger.logError("SUBSCRIPTION", "Failed to send")
         }
     }
 
@@ -451,11 +571,13 @@ class WebSocketService : Service() {
 
                 val subscriptions = SubscriptionManager.getSubscriptions()
                 var allComplete = true
+                var activeCatchUps = 0
 
                 subscriptions.forEach { sub ->
                     val channelId = "${sub.area}_${sub.eventType}"
 
                     if (ChannelSyncState.isInCatchUpMode(channelId)) {
+                        activeCatchUps++
                         val progress = ChannelSyncState.getCatchUpProgress(channelId)
 
                         if (progress > 0 && eventQueue.isEmpty() && isProcessing.get() == 0) {
@@ -466,6 +588,7 @@ class WebSocketService : Service() {
                                 ChannelSyncState.disableCatchUpMode(channelId)
                                 consecutiveEmptyChecks.remove(channelId)
                                 Log.i(TAG, "✅ Catch-up complete for $channelId ($progress events)")
+                                PersistentLogger.logCatchUp("Complete: $channelId - $progress events")
                             } else {
                                 allComplete = false
                             }
@@ -476,11 +599,12 @@ class WebSocketService : Service() {
                     }
                 }
 
-                if (allComplete) {
+                if (activeCatchUps > 0 && allComplete) {
                     Log.i(TAG, "🎉 ALL CHANNELS CAUGHT UP")
+                    PersistentLogger.logCatchUp("ALL COMPLETE - ${subscriptions.size} channels")
                     consecutiveEmptyChecks.clear()
                     stopCatchUpMonitoring()
-                } else {
+                } else if (activeCatchUps > 0) {
                     handler.postDelayed(this, catchUpCheckInterval)
                 }
             }
@@ -512,11 +636,13 @@ class WebSocketService : Service() {
     private fun scheduleReconnect() {
         if (reconnectAttempts >= maxReconnectAttempts) {
             updateNotification("Connection failed - Tap to retry")
+            PersistentLogger.logConnection("RECONNECT_FAILED", "Max attempts reached")
             return
         }
 
         reconnectAttempts++
         val delay = RECONNECT_DELAY * reconnectAttempts.coerceAtMost(12)
+        PersistentLogger.logConnection("RECONNECT_SCHEDULED", "Attempt $reconnectAttempts in ${delay}ms")
         handler.postDelayed({ connect() }, delay)
     }
 
@@ -525,7 +651,6 @@ class WebSocketService : Service() {
 
         val channelId = "${event.area}_${event.type}"
 
-        // ✅ CRITICAL CHECKS: Only notify if subscribed AND not muted
         if (!SubscriptionManager.isSubscribed(channelId)) {
             Log.d(TAG, "Skipping notification: Not subscribed to $channelId")
             return
@@ -536,13 +661,11 @@ class WebSocketService : Service() {
             return
         }
 
-        // ✅ Check if notifications are enabled in settings
         if (!SettingsActivity.areNotificationsEnabled(this)) {
             Log.d(TAG, "Skipping notification: Notifications disabled in settings")
             return
         }
 
-        // ✅ Check notification permission (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 Log.w(TAG, "Notification permission not granted, cannot send notification")
@@ -630,19 +753,29 @@ class WebSocketService : Service() {
 
         try {
             getSystemService(NotificationManager::class.java).notify(event.id.hashCode(), notification)
-            Log.d(TAG, "✅ Notification sent for event ${event.id} ($channelId)")
+            Log.d(TAG, "✅ Notification sent successfully for event ${event.id} ($channelId)")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send notification: ${e.message}")
         }
+        PersistentLogger.logEvent("NOTIFICATION", "Sent for ${event.id} - ${event.areaDisplay}/${event.typeDisplay}")
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        PersistentLogger.logServiceLifecycle("START_COMMAND", "flags=$flags, startId=$startId")
+        return START_STICKY
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
         super.onDestroy()
-        instance = null
+
+        synchronized(instanceLock) {
+            instance = null
+            isServiceRunning.set(false)
+        }
+
         stopPingPong()
         stopCatchUpMonitoring()
 
@@ -656,15 +789,27 @@ class WebSocketService : Service() {
         webSocket?.close(1000, "Service stopped")
         webSocket = null
 
-        if (wakeLock.isHeld) wakeLock.release()
+        if (wakeLock.isHeld) {
+            try {
+                wakeLock.release()
+                PersistentLogger.logServiceLifecycle("WAKELOCK", "Released")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error releasing wake lock: ${e.message}")
+                PersistentLogger.logError("WAKELOCK", "Failed to release", e)
+            }
+        }
 
         ChannelSyncState.forceSave()
         SubscriptionManager.forceSave()
 
-        Log.i(TAG, """
-            📊 FINAL: received=${receivedCount.get()}, processed=${processedCount.get()}, 
+        val finalStats = """
+            received=${receivedCount.get()}, processed=${processedCount.get()}, 
             acked=${ackedCount.get()}, dropped=${droppedCount.get()}, errors=${errorCount.get()}
-        """.trimIndent())
+        """.trimIndent()
+
+        Log.i(TAG, "📊 FINAL: $finalStats")
+        PersistentLogger.logServiceLifecycle("DESTROYED", finalStats)
+        PersistentLogger.flush()
 
         val restartIntent = Intent(applicationContext, WebSocketService::class.java)
         val pi = PendingIntent.getService(applicationContext, 1, restartIntent, PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE)
@@ -673,5 +818,6 @@ class WebSocketService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
+        PersistentLogger.logServiceLifecycle("TASK_REMOVED", "App removed from recent apps")
     }
 }

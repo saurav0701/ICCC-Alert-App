@@ -217,20 +217,16 @@
                     android:gravity="center_vertical"
                     android:layout_marginTop="6dp">
 
-                    <View
-                        android:layout_width="12dp"
-                        android:layout_height="12dp"
-                        android:background="@drawable/circle_background"
-                        android:backgroundTint="#FF9800" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Current Location"
-                        android:textSize="11sp"
-                        android:textColor="#FFFFFF"
-                        android:fontFamily="sans-serif"
-                        android:layout_marginStart="6dp" />
+
+<!--                    <TextView-->
+<!--                        android:layout_width="wrap_content"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:text="Current Location"-->
+<!--                        android:textSize="11sp"-->
+<!--                        android:textColor="#FFFFFF"-->
+<!--                        android:fontFamily="sans-serif"-->
+<!--                        android:layout_marginStart="6dp" />-->
 
                 </LinearLayout>
 

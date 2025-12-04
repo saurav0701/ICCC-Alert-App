@@ -21,8 +21,7 @@ class MainActivity : BaseDrawerActivity() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            // Permission granted - start service
-            WebSocketService.start(this)
+            // Permission granted - service already started by MyApplication
         } else {
             // Permission denied - show explanation
             showNotificationPermissionRationale()
@@ -39,8 +38,8 @@ class MainActivity : BaseDrawerActivity() {
         // Then request battery optimization exemption
         BatteryOptimizationHelper.requestBatteryOptimizationExemption(this)
 
-        // Initialize WebSocket manager
-        WebSocketManager.initialize(this)
+        // DON'T start service here - MyApplication already handles it!
+        // WebSocketManager is already initialized in MyApplication.onCreate()
 
         // Initialize low battery warning
         LowBatteryWarningManager.initialize(this)
@@ -75,8 +74,7 @@ class MainActivity : BaseDrawerActivity() {
                     this,
                     Manifest.permission.POST_NOTIFICATIONS
                 ) == PackageManager.PERMISSION_GRANTED -> {
-                    // Permission already granted
-                    WebSocketService.start(this)
+                    // Permission already granted - service started by MyApplication
                 }
                 shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
                     // Show rationale before requesting
@@ -87,10 +85,9 @@ class MainActivity : BaseDrawerActivity() {
                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
-        } else {
-            // No permission needed for Android 12 and below
-            WebSocketService.start(this)
         }
+        // For Android 12 and below, no permission needed
+        // Service already started by MyApplication
     }
 
     private fun showNotificationPermissionRationale() {
@@ -112,8 +109,7 @@ class MainActivity : BaseDrawerActivity() {
             }
             .setNegativeButton("Not Now") { dialog, _ ->
                 dialog.dismiss()
-                // Start service anyway (notifications won't work but app will function)
-                WebSocketService.start(this)
+                // Service already started by MyApplication
             }
             .setCancelable(false)
             .show()

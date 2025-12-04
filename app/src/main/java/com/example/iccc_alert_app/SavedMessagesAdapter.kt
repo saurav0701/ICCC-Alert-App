@@ -2,8 +2,10 @@ package com.example.iccc_alert_app
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.net.Uri
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -12,6 +14,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
@@ -20,6 +23,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 import org.osmdroid.util.GeoPoint
@@ -39,6 +44,9 @@ class SavedMessagesAdapter(
     private val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
     private val eventTimeParser = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
     private val client = OkHttpClient()
+
+    // Cache for loaded images
+    private val imageCache = mutableMapOf<String, Bitmap>()
 
     companion object {
         private const val TAG = "SavedMessagesAdapter"
@@ -171,7 +179,7 @@ class SavedMessagesAdapter(
         holder.imageOverlay.visibility = View.GONE
 
         if (event.id != null && event.area != null) {
-            loadEventImage(event, holder)
+            loadEventImage(event, holder, savedMessage)
         } else {
             showVAError(holder)
         }
@@ -473,9 +481,16 @@ class SavedMessagesAdapter(
         }
     }
 
-    private fun loadEventImage(event: Event, holder: VAEventViewHolder) {
+    private fun loadEventImage(event: Event, holder: VAEventViewHolder, savedMessage: SavedMessage) {
         val area = event.area ?: return
         val eventId = event.id ?: return
+
+        // Check cache first
+        val cacheKey = "$area-$eventId"
+        if (imageCache.containsKey(cacheKey)) {
+            displayCachedImage(holder, imageCache[cacheKey]!!, event, savedMessage)
+            return
+        }
 
         val httpUrl = getHttpUrlForArea(area)
         val imageUrl = "$httpUrl/va/event/?id=$eventId"
@@ -494,6 +509,9 @@ class SavedMessagesAdapter(
                     val inputStream = response.body?.byteStream()
                     val bitmap = BitmapFactory.decodeStream(inputStream)
 
+                    // Cache the bitmap
+                    imageCache[cacheKey] = bitmap
+
                     withContext(Dispatchers.Main) {
                         holder.loadingContainer.visibility = View.GONE
                         holder.errorContainer.visibility = View.GONE
@@ -506,6 +524,11 @@ class SavedMessagesAdapter(
                             .alpha(1f)
                             .setDuration(200)
                             .start()
+
+                        // Add click listener to open ImageViewerActivity
+                        holder.eventImage.setOnClickListener {
+                            openImageViewer(bitmap, event)
+                        }
                     }
                 } else {
                     Log.e(TAG, "Failed to load image: ${response.code}")
@@ -519,6 +542,46 @@ class SavedMessagesAdapter(
                     showVAError(holder)
                 }
             }
+        }
+    }
+
+    private fun displayCachedImage(holder: VAEventViewHolder, bitmap: Bitmap, event: Event, savedMessage: SavedMessage) {
+        holder.loadingContainer.visibility = View.GONE
+        holder.errorContainer.visibility = View.GONE
+        holder.eventImage.visibility = View.VISIBLE
+        holder.imageOverlay.visibility = View.VISIBLE
+        holder.eventImage.setImageBitmap(bitmap)
+
+        // Add click listener to open ImageViewerActivity
+        holder.eventImage.setOnClickListener {
+            openImageViewer(bitmap, event)
+        }
+    }
+
+    private fun openImageViewer(bitmap: Bitmap, event: Event) {
+        try {
+            // Save bitmap to temporary file
+            val tempFile = File(context.cacheDir, "temp_image_${System.currentTimeMillis()}.jpg")
+            FileOutputStream(tempFile).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+            }
+
+            // Get URI using FileProvider
+            val imageUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                tempFile
+            )
+
+            val intent = Intent(context, ImageViewerActivity::class.java)
+            intent.putExtra("IMAGE_URI", imageUri.toString())
+            intent.putExtra("EVENT_TYPE", event.typeDisplay ?: "Event")
+            intent.putExtra("EVENT_LOCATION", event.data["location"] as? String ?: "Unknown")
+            context.startActivity(intent)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error opening image viewer: ${e.message}", e)
+            Toast.makeText(context, "Unable to open image viewer", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -564,5 +627,10 @@ class SavedMessagesAdapter(
     fun updateMessages(newMessages: List<SavedMessage>) {
         messages = newMessages
         notifyDataSetChanged()
+    }
+
+    // Clean up cache when needed
+    fun clearImageCache() {
+        imageCache.clear()
     }
 }

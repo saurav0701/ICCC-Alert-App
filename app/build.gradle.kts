@@ -66,6 +66,8 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("androidx.compose.material:material-icons-extended")
 
+    implementation("com.github.chrisbanes:PhotoView:2.3.0")
+
     // Lifecycle & Coroutines - ADDED FOR BACKGROUND PROCESSING
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")

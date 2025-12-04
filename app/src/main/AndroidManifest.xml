@@ -13,6 +13,12 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- ✅ NEW: Request to be exempt from Doze/App Standby -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- ✅ NEW: Allow service to wake device from doze for urgent work -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
     <!-- Storage permissions for saving files -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
@@ -48,24 +54,38 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- WebSocket Service -->
+        <!-- WebSocket Service - CRITICAL CHANGES FOR DOZE MODE -->
         <service
             android:name=".WebSocketService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync"
-            android:stopWithTask="false" />
+            android:stopWithTask="false"
+            android:directBootAware="true" />
 
         <!-- Boot Receiver -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
             android:exported="true"
+            android:directBootAware="true"
             android:permission="android.permission.RECEIVE_BOOT_COMPLETED">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ✅ NEW: Doze Mode Exemption Receiver -->
+        <receiver
+            android:name=".DozeExemptionReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.os.action.DEVICE_IDLE_MODE_CHANGED" />
+                <action android:name="android.os.action.POWER_SAVE_MODE_CHANGED" />
             </intent-filter>
         </receiver>
 
@@ -92,7 +112,7 @@
             android:exported="false"
             android:noHistory="true" />
 
-        <!-- OTP Verification Activity - REMOVED noHistory -->
+        <!-- OTP Verification Activity -->
         <activity
             android:name=".OTPVerificationActivity"
             android:label="Verify OTP"
@@ -124,10 +144,21 @@
             android:theme="@style/Theme.ICCCAlertApp"
             android:exported="false" />
 
+        <activity
+            android:name=".ImageViewerActivity"
+            android:label="Event Image"
+            android:parentActivityName=".ChannelDetailActivity"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:exported="false"
+            android:screenOrientation="unspecified"
+            android:configChanges="orientation|screenSize" />
+
         <!-- Channel Detail Activity -->
         <activity
             android:name=".ChannelDetailActivity"
             android:parentActivityName=".MainActivity"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             android:theme="@style/Theme.ICCCAlertApp"
             android:exported="false" />
 

@@ -22,7 +22,6 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Map Preview Container (Clickable) -->
             <FrameLayout
                 android:id="@+id/map_preview_frame"
                 android:layout_width="match_parent"
@@ -32,64 +31,31 @@
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground">
 
-                <!-- Map Preview (actual mini map) -->
+                <!-- Map Preview (actual mini map) - initially hidden -->
                 <org.osmdroid.views.MapView
                     android:id="@+id/map_preview"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:clickable="false"
-                    android:focusable="false" />
+                    android:focusable="false"
+                    android:visibility="invisible"
+                    android:alpha="0" />
 
-                <!-- Overlay with icon when loading -->
+                <!-- Loading overlay - shown while map loads -->
                 <FrameLayout
                     android:id="@+id/map_loading_overlay"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:background="#80000000"
+                    android:background="#F5F7FA"
                     android:clickable="false"
-                    android:visibility="gone">
+                    android:visibility="visible">
 
                     <ProgressBar
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:layout_gravity="center"
-                        android:indeterminateTint="#FFFFFF" />
+                        android:indeterminateTint="#2196F3" />
                 </FrameLayout>
-
-                <!-- Event Badge (at top left) -->
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="start|top"
-                    android:layout_margin="16dp"
-                    android:background="@drawable/badge_background"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="8dp"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:elevation="4dp"
-                    android:clickable="false"
-                    android:focusable="false">
-
-                    <View
-                        android:id="@+id/event_badge"
-                        android:layout_width="8dp"
-                        android:layout_height="8dp"
-                        android:background="@drawable/circle_background"
-                        android:layout_marginEnd="8dp" />
-
-                    <TextView
-                        android:id="@+id/event_icon_text"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="OR"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:textColor="#FFFFFF"
-                        android:fontFamily="sans-serif-medium" />
-                </LinearLayout>
 
             </FrameLayout>
 

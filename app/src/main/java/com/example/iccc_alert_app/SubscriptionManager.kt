@@ -18,11 +18,9 @@ object SubscriptionManager {
     private const val KEY_CHANNELS = "channels"
     private const val KEY_EVENTS = "events"
     private const val KEY_UNREAD = "unread"
-    private const val KEY_LAST_APP_KILL_CHECK = "last_app_kill_check"
+    private const val KEY_LAST_RUNTIME_CHECK = "last_runtime_check"  // ✅ NEW
+    private const val KEY_SERVICE_STARTED_AT = "service_started_at"   // ✅ NEW
     private const val SAVE_DELAY_MS = 500L
-
-    // ✅ Storage settings - User controls deletion via Settings UI
-    private const val CLEANUP_BATCH_SIZE = 100
 
     private lateinit var prefs: SharedPreferences
     private lateinit var context: Context
@@ -45,43 +43,84 @@ object SubscriptionManager {
         context = ctx.applicationContext
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        wasAppKilled = detectAppKill()
+        // ✅ FIXED: Better app kill detection
+        wasAppKilled = detectAppKillOrBackgroundClear()
 
         loadEventsCache()
         loadUnreadCache()
 
         if (wasAppKilled) {
             Log.w(TAG, """
-                ⚠️ APP KILL DETECTED:
-                - App was killed while running (low battery? system kill?)
-                - Clearing recent event IDs to allow catch-up
-                - Old events kept in cache for display
+                ⚠️ APP WAS KILLED OR CLEARED FROM BACKGROUND:
+                - Clearing recent event IDs for catch-up
+                - Sync will resume from last known sequences
                 - Server will re-deliver missed events
             """.trimIndent())
 
             recentEventIds.clear()
             eventTimestamps.clear()
-
-            prefs.edit().putLong(KEY_LAST_APP_KILL_CHECK, System.currentTimeMillis()).apply()
         } else {
             buildRecentEventIds()
         }
 
+        // ✅ Mark that we're now running
+        markServiceRunning()
+
         startRecentEventCleanup()
+        startRuntimeChecker()  // ✅ NEW
 
         Log.d(TAG, "SubscriptionManager initialized (wasKilled=$wasAppKilled, recentIds=${recentEventIds.size})")
     }
 
-    private fun detectAppKill(): Boolean {
-        val lastCheck = prefs.getLong(KEY_LAST_APP_KILL_CHECK, 0L)
+    // ✅ FIXED: Detect both app kills AND background clears
+    private fun detectAppKillOrBackgroundClear(): Boolean {
+        val lastRuntimeCheck = prefs.getLong(KEY_LAST_RUNTIME_CHECK, 0L)
+        val serviceStartedAt = prefs.getLong(KEY_SERVICE_STARTED_AT, 0L)
         val now = System.currentTimeMillis()
-        val timeSinceLastCheck = now - lastCheck
 
-        if (lastCheck > 0 && timeSinceLastCheck > 10 * 60 * 1000) {
-            return true
+        // If service was marked as started but it's been >2 minutes since last runtime check
+        // this means app was killed or cleared from background
+        if (serviceStartedAt > 0 && lastRuntimeCheck > 0) {
+            val timeSinceLastCheck = now - lastRuntimeCheck
+
+            if (timeSinceLastCheck > 2 * 60 * 1000) {  // 2 minutes
+                Log.w(TAG, """
+                    🔴 DETECTED: App was killed or cleared from background
+                    - Service started at: ${serviceStartedAt}
+                    - Last runtime check: ${lastRuntimeCheck} 
+                    - Gap: ${timeSinceLastCheck / 1000}s
+                """.trimIndent())
+
+                // Clear the service started flag since we're restarting
+                prefs.edit().remove(KEY_SERVICE_STARTED_AT).apply()
+                return true
+            }
         }
 
         return false
+    }
+
+    // ✅ NEW: Mark that service is actively running
+    private fun markServiceRunning() {
+        val now = System.currentTimeMillis()
+        prefs.edit()
+            .putLong(KEY_SERVICE_STARTED_AT, now)
+            .putLong(KEY_LAST_RUNTIME_CHECK, now)
+            .apply()
+    }
+
+    // ✅ NEW: Periodically update runtime check to detect kills
+    private fun startRuntimeChecker() {
+        handler.postDelayed(object : Runnable {
+            override fun run() {
+                prefs.edit()
+                    .putLong(KEY_LAST_RUNTIME_CHECK, System.currentTimeMillis())
+                    .apply()
+
+                // Check every 60 seconds
+                handler.postDelayed(this, 60 * 1000)
+            }
+        }, 60 * 1000)
     }
 
     private fun buildRecentEventIds() {
@@ -127,8 +166,6 @@ object SubscriptionManager {
                 if (cleaned > 0) {
                     Log.d(TAG, "Cleaned $cleaned old event IDs from memory")
                 }
-
-                prefs.edit().putLong(KEY_LAST_APP_KILL_CHECK, System.currentTimeMillis()).apply()
 
                 handler.postDelayed(this, 60 * 1000)
             }
@@ -207,9 +244,6 @@ object SubscriptionManager {
         prefs.edit().putString(KEY_CHANNELS, json).apply()
     }
 
-    /**
-     * ✅ UPDATED: No automatic limits - user controls deletion manually
-     */
     fun addEvent(event: Event): Boolean {
         val eventId = event.id ?: return false
         val channelId = "${event.area}_${event.type}"
@@ -240,7 +274,6 @@ object SubscriptionManager {
 
         synchronized(events) {
             events.add(0, event)
-            // ✅ No automatic limits - events accumulate until user deletes
         }
 
         recentEventIds.add(eventId)
@@ -257,9 +290,6 @@ object SubscriptionManager {
         return true
     }
 
-    /**
-     * ✅ Get detailed storage statistics (for Settings UI)
-     */
     fun getDetailedStorageStats(): Map<String, Any> {
         val now = System.currentTimeMillis()
         val channelStats = mutableMapOf<String, Map<String, Any>>()
@@ -404,6 +434,12 @@ object SubscriptionManager {
         handler.removeCallbacksAndMessages(null)
         saveEventsCacheNow()
         saveUnreadCacheNow()
+
+        // ✅ Update runtime check on force save
+        prefs.edit()
+            .putLong(KEY_LAST_RUNTIME_CHECK, System.currentTimeMillis())
+            .apply()
+
         Log.d(TAG, "Force saved all data")
     }
 

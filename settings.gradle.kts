@@ -16,9 +16,9 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://jitpack.io") }  // ADD THIS LINE
     }
 }
 
 rootProject.name = "ICCC-Alert-App"
 include(":app")
- 

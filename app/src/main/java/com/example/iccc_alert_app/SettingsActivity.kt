@@ -2,14 +2,23 @@ package com.example.iccc_alert_app
 
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Button
 import android.widget.RelativeLayout
+import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.content.FileProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SettingsActivity : BaseDrawerActivity() {
 
@@ -25,6 +34,11 @@ class SettingsActivity : BaseDrawerActivity() {
     // Storage management
     private lateinit var storageInfoText: TextView
     private lateinit var clearDataButton: Button
+
+    // Diagnostics
+    private lateinit var viewLogsContainer: RelativeLayout
+    private lateinit var exportLogsContainer: RelativeLayout
+    private lateinit var clearLogsContainer: RelativeLayout
 
     companion object {
         private const val PREFS_NAME = "ICCCAlertPrefs"
@@ -83,6 +97,11 @@ class SettingsActivity : BaseDrawerActivity() {
 
         storageInfoText = findViewById(R.id.storage_info_text)
         clearDataButton = findViewById(R.id.clear_data_button)
+
+        // Diagnostics views
+        viewLogsContainer = findViewById(R.id.view_logs_container)
+        exportLogsContainer = findViewById(R.id.export_logs_container)
+        clearLogsContainer = findViewById(R.id.clear_logs_container)
     }
 
     private fun loadSettings() {
@@ -131,6 +150,19 @@ class SettingsActivity : BaseDrawerActivity() {
 
         clearDataButton.setOnClickListener {
             showClearDataConfirmation()
+        }
+
+        // Diagnostics listeners
+        viewLogsContainer.setOnClickListener {
+            showLogsDialog()
+        }
+
+        exportLogsContainer.setOnClickListener {
+            exportLogs()
+        }
+
+        clearLogsContainer.setOnClickListener {
+            confirmClearLogs()
         }
     }
 
@@ -184,7 +216,7 @@ class SettingsActivity : BaseDrawerActivity() {
         try {
             WebSocketService.stop(this)
 
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            Handler(Looper.getMainLooper()).postDelayed({
                 try {
                     clearEventData()
                     SavedMessagesManager.clearAll()
@@ -265,6 +297,112 @@ class SettingsActivity : BaseDrawerActivity() {
             .commit()
     }
 
+    // ============================================
+    // DIAGNOSTICS - LOG MANAGEMENT
+    // ============================================
+
+    private fun showLogsDialog() {
+        val logs = PersistentLogger.getRecentLogs(200)
+
+        if (logs.isEmpty()) {
+            Toast.makeText(this, "No logs available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val logText = logs.joinToString("\n")
+
+        val scrollView = ScrollView(this)
+        val textView = TextView(this).apply {
+            text = logText
+            textSize = 10f
+            setTextIsSelectable(true)
+            setPadding(32, 32, 32, 32)
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+        scrollView.addView(textView)
+
+        AlertDialog.Builder(this)
+            .setTitle("Recent Logs (last 200 lines)")
+            .setView(scrollView)
+            .setPositiveButton("Refresh") { _, _ ->
+                showLogsDialog()
+            }
+            .setNegativeButton("Close", null)
+            .setNeutralButton("Export") { _, _ ->
+                exportLogs()
+            }
+            .show()
+    }
+
+    private fun exportLogs() {
+        val progressDialog = android.app.ProgressDialog(this)
+        progressDialog.setMessage("Exporting logs...")
+        progressDialog.setCancelable(false)
+        progressDialog.show()
+
+        CoroutineScope(Dispatchers.Main).launch {
+            val file = withContext(Dispatchers.IO) {
+                PersistentLogger.exportLogs()
+            }
+
+            progressDialog.dismiss()
+
+            if (file != null) {
+                Toast.makeText(
+                    this@SettingsActivity,
+                    "Logs exported: ${file.name}",
+                    Toast.LENGTH_LONG
+                ).show()
+
+                // Offer to share
+                try {
+                    val uri = FileProvider.getUriForFile(
+                        this@SettingsActivity,
+                        "${packageName}.fileprovider",
+                        file
+                    )
+
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+
+                    startActivity(Intent.createChooser(shareIntent, "Share Logs"))
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        this@SettingsActivity,
+                        "File exported but sharing failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            } else {
+                Toast.makeText(
+                    this@SettingsActivity,
+                    "Failed to export logs",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    private fun confirmClearLogs() {
+        AlertDialog.Builder(this)
+            .setTitle("Clear Logs")
+            .setMessage("Are you sure you want to delete all log files? This cannot be undone.")
+            .setPositiveButton("Clear") { _, _ ->
+                PersistentLogger.clearLogs()
+                Toast.makeText(this, "Logs cleared", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .show()
+    }
+
+    // ============================================
+    // THEME MANAGEMENT
+    // ============================================
+
     private fun showThemeDialog() {
         val themes = arrayOf("Light", "Dark", "System Default")
         val themeValues = arrayOf(THEME_LIGHT, THEME_DARK, THEME_SYSTEM)
@@ -305,6 +443,10 @@ class SettingsActivity : BaseDrawerActivity() {
         }
     }
 
+    // ============================================
+    // HELP DIALOG
+    // ============================================
+
     private fun showHelpDialog() {
         val helpText = """
             ICCC Alert - Help & FAQs
@@ -333,6 +475,11 @@ class SettingsActivity : BaseDrawerActivity() {
             • Access saved events from the menu
             • Filter by priority level
             • Add and edit notes anytime
+            
+            🔧 Diagnostics
+            • View logs to troubleshoot issues
+            • Export logs to share with support
+            • Clear logs to free up space
             
             🗑️ Storage Management
             • Clear cached events and saved messages to free up space
