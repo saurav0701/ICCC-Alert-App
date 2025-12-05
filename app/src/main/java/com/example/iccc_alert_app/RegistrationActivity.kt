@@ -29,7 +29,7 @@ class RegistrationActivity : AppCompatActivity() {
         "ccwo", "ej", "cvarea", "wjarea", "pbarea", "block2", "katras"
     )
 
-    private val organisationOptions = listOf("BCCL")
+    private val organisationOptions = listOf("BCCL","CCL")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

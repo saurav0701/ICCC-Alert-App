@@ -35,10 +35,12 @@ class SettingsActivity : BaseDrawerActivity() {
     private lateinit var storageInfoText: TextView
     private lateinit var clearDataButton: Button
 
-    // Diagnostics
+    // Diagnostics - COMMENTED OUT FOR TESTING BUILD
+    /*
     private lateinit var viewLogsContainer: RelativeLayout
     private lateinit var exportLogsContainer: RelativeLayout
     private lateinit var clearLogsContainer: RelativeLayout
+    */
 
     companion object {
         private const val PREFS_NAME = "ICCCAlertPrefs"
@@ -98,10 +100,12 @@ class SettingsActivity : BaseDrawerActivity() {
         storageInfoText = findViewById(R.id.storage_info_text)
         clearDataButton = findViewById(R.id.clear_data_button)
 
-        // Diagnostics views
+        // Diagnostics views - COMMENTED OUT FOR TESTING BUILD
+        /*
         viewLogsContainer = findViewById(R.id.view_logs_container)
         exportLogsContainer = findViewById(R.id.export_logs_container)
         clearLogsContainer = findViewById(R.id.clear_logs_container)
+        */
     }
 
     private fun loadSettings() {
@@ -152,7 +156,8 @@ class SettingsActivity : BaseDrawerActivity() {
             showClearDataConfirmation()
         }
 
-        // Diagnostics listeners
+        // Diagnostics listeners - COMMENTED OUT FOR TESTING BUILD
+        /*
         viewLogsContainer.setOnClickListener {
             showLogsDialog()
         }
@@ -164,6 +169,7 @@ class SettingsActivity : BaseDrawerActivity() {
         clearLogsContainer.setOnClickListener {
             confirmClearLogs()
         }
+        */
     }
 
     private fun updateStorageInfo() {
@@ -299,8 +305,10 @@ class SettingsActivity : BaseDrawerActivity() {
 
     // ============================================
     // DIAGNOSTICS - LOG MANAGEMENT
+    // COMMENTED OUT FOR TESTING BUILD
     // ============================================
 
+    /*
     private fun showLogsDialog() {
         val logs = PersistentLogger.getRecentLogs(200)
 
@@ -398,6 +406,7 @@ class SettingsActivity : BaseDrawerActivity() {
             .setIcon(android.R.drawable.ic_dialog_alert)
             .show()
     }
+    */
 
     // ============================================
     // THEME MANAGEMENT
@@ -443,9 +452,6 @@ class SettingsActivity : BaseDrawerActivity() {
         }
     }
 
-    // ============================================
-    // HELP DIALOG
-    // ============================================
 
     private fun showHelpDialog() {
         val helpText = """
@@ -462,24 +468,15 @@ class SettingsActivity : BaseDrawerActivity() {
             • Control vibration settings
             • Check notification status to diagnose issues
             
-            🎨 Appearance
-            • Choose between Light, Dark, or System theme
-            • Theme changes apply immediately
-            
             📋 Managing Events
             • View all events from subscribed channels
-            • Search and filter events by date
+            • Search and filter events by date and time
             • Save events with priority levels and notes
             
             💾 Saved Messages
             • Access saved events from the menu
             • Filter by priority level
             • Add and edit notes anytime
-            
-            🔧 Diagnostics
-            • View logs to troubleshoot issues
-            • Export logs to share with support
-            • Clear logs to free up space
             
             🗑️ Storage Management
             • Clear cached events and saved messages to free up space
@@ -493,7 +490,7 @@ class SettingsActivity : BaseDrawerActivity() {
             • Check notification status if alerts aren't working
             
             ❓ Need More Help?
-            Contact your system administrator for technical support.
+            Contact system administrator for technical support.
         """.trimIndent()
 
         AlertDialog.Builder(this)

@@ -20,18 +20,14 @@ object EventViewHolders {
         val muteButton: ImageView = view.findViewById(R.id.mute_button_header)
         val menuButton: ImageView = view.findViewById(R.id.menu_button)
 
-        // Search UI elements
-        val searchContainer: LinearLayout = view.findViewById(R.id.search_container)
-        val searchInput: EditText = view.findViewById(R.id.search_input)
-        val closeSearch: FrameLayout = view.findViewById(R.id.close_search)
-
-        // Filter UI elements
-        val filterContainer: LinearLayout = view.findViewById(R.id.filter_container)
-        val dateFilterSpinner: Spinner = view.findViewById(R.id.date_filter_spinner)
-        val applyFilterButton: Button = view.findViewById(R.id.apply_filter_button)
-        val customDateContainer: LinearLayout = view.findViewById(R.id.custom_date_container)
-        val fromDateButton: Button = view.findViewById(R.id.from_date_button)
-        val toDateButton: Button = view.findViewById(R.id.to_date_button)
+        // Active filters display
+        val activeFiltersContainer: LinearLayout = view.findViewById(R.id.active_filters_container)
+        val searchChip: LinearLayout = view.findViewById(R.id.search_chip)
+        val searchChipText: TextView = view.findViewById(R.id.search_chip_text)
+        val searchChipClose: ImageView = view.findViewById(R.id.search_chip_close)
+        val dateFilterChip: LinearLayout = view.findViewById(R.id.date_filter_chip)
+        val dateFilterChipText: TextView = view.findViewById(R.id.date_filter_chip_text)
+        val dateFilterChipClose: ImageView = view.findViewById(R.id.date_filter_chip_close)
     }
 
     class EventViewHolder(view: View) : RecyclerView.ViewHolder(view) {

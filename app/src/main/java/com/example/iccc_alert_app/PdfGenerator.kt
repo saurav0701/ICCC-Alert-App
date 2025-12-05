@@ -40,15 +40,15 @@ class PdfGenerator(private val context: Context) {
         private const val MARGIN = 40
         private const val CONTENT_WIDTH = PAGE_WIDTH - (2 * MARGIN)
 
-        // Table dimensions
-        private const val ROW_HEIGHT = 100f
-        private const val IMAGE_SIZE = 80
+        // ✅ IMPROVED: Larger table image size for better quality
+        private const val ROW_HEIGHT = 120f  // Increased from 100f
+        private const val IMAGE_SIZE = 100   // Increased from 80
         private const val COL_SNO_WIDTH = 50f
-        private const val COL_TYPE_WIDTH = 140f
-        private const val COL_DATETIME_WIDTH = 140f
-        private const val COL_IMAGE_WIDTH = 185f
+        private const val COL_TYPE_WIDTH = 130f  // Slightly reduced to make room for image
+        private const val COL_DATETIME_WIDTH = 130f  // Slightly reduced
+        private const val COL_IMAGE_WIDTH = 205f  // Increased for larger images
 
-        // Premium Color Palette
+        // Premium Color Palette (unchanged)
         private const val COLOR_PRIMARY = "#2C3E50"
         private const val COLOR_SECONDARY = "#3498DB"
         private const val COLOR_ACCENT = "#E74C3C"
@@ -348,14 +348,12 @@ class PdfGenerator(private val context: Context) {
         canvas.drawLine(x, yStart, x, rowEnd, paint)
         paint.style = Paint.Style.FILL
 
-        // Event Image - Load based on event type
+        // ✅ IMPROVED: Event Image with better quality rendering
         val bitmap = when (event.type) {
             "off-route", "tamper", "overspeed" -> {
-                // For GPS events, try map preview first, then fallback to regular image
                 captureMapPreview(event) ?: loadEventImage(event)
             }
             else -> {
-                // For VA events, load regular image
                 loadEventImage(event)
             }
         }
@@ -366,6 +364,10 @@ class PdfGenerator(private val context: Context) {
         if (bitmap != null) {
             val scaledBitmap = scaleBitmapToFit(bitmap, IMAGE_SIZE, IMAGE_SIZE)
 
+            // ✅ Enable high-quality rendering
+            paint.isAntiAlias = true
+            paint.isFilterBitmap = true
+
             // Draw image border
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = 1f
@@ -374,7 +376,7 @@ class PdfGenerator(private val context: Context) {
                 imgY + scaledBitmap.height, paint)
             paint.style = Paint.Style.FILL
 
-            // Draw image
+            // ✅ Draw image with high-quality paint
             canvas.save()
             canvas.drawBitmap(scaledBitmap, imgX, imgY, paint)
             canvas.restore()
@@ -398,6 +400,7 @@ class PdfGenerator(private val context: Context) {
 
         return rowEnd
     }
+
     private fun wrapText(text: String, maxWidth: Float, paint: Paint): List<String> {
         val words = text.split(" ")
         val lines = mutableListOf<String>()
@@ -558,22 +561,29 @@ class PdfGenerator(private val context: Context) {
     }
 
     private fun drawImageWithShadow(canvas: Canvas, paint: Paint, bitmap: Bitmap,
-                                    yStart: Float, maxHeight: Int = 320): Float {
+                                    yStart: Float, maxHeight: Int = 400): Float {  // Increased from 320
         val scaledBitmap = scaleBitmapToFit(bitmap, CONTENT_WIDTH - 40, maxHeight)
         val imgX = MARGIN + 20f
         val imgY = yStart
 
+        // Shadow
         paint.color = Color.parseColor("#000000")
         paint.alpha = 20
         canvas.drawRoundRect(imgX + 2, imgY + 2, imgX + scaledBitmap.width + 2,
             imgY + scaledBitmap.height + 2, 6f, 6f, paint)
         paint.alpha = 255
 
+        // ✅ Enable anti-aliasing and filtering for better quality
+        paint.isAntiAlias = true
+        paint.isFilterBitmap = true
+
         canvas.save()
         val path = android.graphics.Path()
         path.addRoundRect(android.graphics.RectF(imgX, imgY, imgX + scaledBitmap.width,
             imgY + scaledBitmap.height), 6f, 6f, android.graphics.Path.Direction.CW)
         canvas.clipPath(path)
+
+        // ✅ Draw with high-quality paint
         canvas.drawBitmap(scaledBitmap, imgX, imgY, paint)
         canvas.restore()
 
@@ -660,7 +670,17 @@ class PdfGenerator(private val context: Context) {
 
             if (response.isSuccessful) {
                 val inputStream = response.body?.byteStream()
-                BitmapFactory.decodeStream(inputStream)
+
+                // ✅ Use BitmapFactory.Options for high-quality decoding
+                val options = BitmapFactory.Options().apply {
+                    inPreferredConfig = Bitmap.Config.ARGB_8888  // Best quality
+                    inScaled = false  // Don't scale during decode
+                    inDither = false  // No dithering
+                    inPreferQualityOverSpeed = true  // Prefer quality
+                }
+
+                val bitmap = BitmapFactory.decodeStream(inputStream, null, options)
+                bitmap
             } else {
                 null
             }
@@ -677,14 +697,14 @@ class PdfGenerator(private val context: Context) {
                 return@withContext null
             }
 
-            // Extract map data
+            // Extract map data (same as before)
             val alertLoc = (event.data["alertLocation"] as? Map<*, *>)?.let {
                 val lat = (it["lat"] as? Number)?.toDouble() ?: return@withContext null
                 val lng = (it["lng"] as? Number)?.toDouble() ?: return@withContext null
                 GeoPoint(lat, lng)
             } ?: return@withContext null
 
-            // Extract geofence data
+            // Extract geofence data (same as before - code unchanged)
             val geofenceMap = event.data["geofence"] as? Map<*, *>
             val geofencePoints = mutableListOf<GeoPoint>()
             var geofenceType: String? = null
@@ -739,18 +759,22 @@ class PdfGenerator(private val context: Context) {
                 }
             }
 
-            // Create bitmap
-            val mapWidth = 500
-            val mapHeight = 300
+            // ✅ IMPROVED: Create higher resolution bitmap
+            val mapWidth = 800   // Increased from 500
+            val mapHeight = 500  // Increased from 300
             val bitmap = Bitmap.createBitmap(mapWidth, mapHeight, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+            // ✅ Enable high-quality rendering
+            paint.isAntiAlias = true
+            paint.isFilterBitmap = true
 
             // Draw background
             paint.color = Color.parseColor("#F5F7FA")
             canvas.drawRect(0f, 0f, mapWidth.toFloat(), mapHeight.toFloat(), paint)
 
-            // Calculate bounds and scale
+            // Calculate bounds and scale (same logic as before)
             val allPoints = mutableListOf(alertLoc)
             allPoints.addAll(geofencePoints)
 
@@ -762,7 +786,6 @@ class PdfGenerator(private val context: Context) {
             val latRange = maxLat - minLat
             val lngRange = maxLng - minLng
 
-            // Add padding (20%)
             val padding = 0.2
             val paddedLatRange = latRange * (1 + padding)
             val paddedLngRange = lngRange * (1 + padding)
@@ -770,8 +793,7 @@ class PdfGenerator(private val context: Context) {
             val centerLat = (minLat + maxLat) / 2
             val centerLng = (minLng + maxLng) / 2
 
-            // Scale to fit canvas
-            val mapPadding = 40f
+            val mapPadding = 60f  // Increased from 40f
             val scaleX = (mapWidth - 2 * mapPadding) / paddedLngRange
             val scaleY = (mapHeight - 2 * mapPadding) / paddedLatRange
             val scale = minOf(scaleX, scaleY)
@@ -784,7 +806,7 @@ class PdfGenerator(private val context: Context) {
                 return (mapHeight / 2 - (lat - centerLat) * scale).toFloat()
             }
 
-            // Draw geofence
+            // Draw geofence (rendering logic same as before but with better quality)
             if (geofencePoints.isNotEmpty() && geofenceType != null) {
                 val geoColor = try {
                     Color.parseColor(if (geofenceColor.startsWith("#")) geofenceColor else "#$geofenceColor")
@@ -795,8 +817,10 @@ class PdfGenerator(private val context: Context) {
                 when (geofenceType) {
                     "LineString" -> {
                         paint.color = geoColor
-                        paint.strokeWidth = 4f
+                        paint.strokeWidth = 5f  // Increased from 4f
                         paint.style = Paint.Style.STROKE
+                        paint.strokeCap = Paint.Cap.ROUND
+                        paint.strokeJoin = Paint.Join.ROUND
                         val path = android.graphics.Path()
                         geofencePoints.forEachIndexed { index, point ->
                             val x = toCanvasX(point.longitude)
@@ -820,8 +844,10 @@ class PdfGenerator(private val context: Context) {
 
                         // Stroke
                         paint.color = geoColor
-                        paint.strokeWidth = 3f
+                        paint.strokeWidth = 4f  // Increased from 3f
                         paint.style = Paint.Style.STROKE
+                        paint.strokeCap = Paint.Cap.ROUND
+                        paint.strokeJoin = Paint.Join.ROUND
                         canvas.drawPath(path, paint)
                     }
                     "Point" -> {
@@ -832,50 +858,50 @@ class PdfGenerator(private val context: Context) {
                         // Fill
                         paint.color = Color.argb(50, Color.red(geoColor), Color.green(geoColor), Color.blue(geoColor))
                         paint.style = Paint.Style.FILL
-                        canvas.drawCircle(x, y, 30f, paint)
+                        canvas.drawCircle(x, y, 40f, paint)  // Increased from 30f
 
                         // Stroke
                         paint.color = geoColor
-                        paint.strokeWidth = 2f
+                        paint.strokeWidth = 3f  // Increased from 2f
                         paint.style = Paint.Style.STROKE
-                        canvas.drawCircle(x, y, 30f, paint)
+                        canvas.drawCircle(x, y, 40f, paint)
                     }
                 }
             }
 
-            // Draw alert location marker
+            // ✅ IMPROVED: Draw alert location marker with better quality
             paint.style = Paint.Style.FILL
             val alertX = toCanvasX(alertLoc.longitude)
             val alertY = toCanvasY(alertLoc.latitude)
 
             // Marker shadow
             paint.color = Color.argb(100, 0, 0, 0)
-            canvas.drawCircle(alertX + 2, alertY + 2, 12f, paint)
+            canvas.drawCircle(alertX + 3, alertY + 3, 16f, paint)  // Increased from 12f
 
             // Marker
             paint.color = Color.parseColor("#FF5722")
-            canvas.drawCircle(alertX, alertY, 12f, paint)
+            canvas.drawCircle(alertX, alertY, 16f, paint)  // Increased from 12f
 
             // Marker border
             paint.color = Color.WHITE
-            paint.strokeWidth = 2f
+            paint.strokeWidth = 3f  // Increased from 2f
             paint.style = Paint.Style.STROKE
-            canvas.drawCircle(alertX, alertY, 12f, paint)
+            canvas.drawCircle(alertX, alertY, 16f, paint)
 
-            // Add labels
+            // ✅ IMPROVED: Add labels with better rendering
             paint.style = Paint.Style.FILL
             paint.color = Color.WHITE
-            paint.textSize = 11f
+            paint.textSize = 14f  // Increased from 11f
             paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
 
             // Alert label
             val labelText = "Alert Location"
-            val labelWidth = paint.measureText(labelText) + 20
+            val labelWidth = paint.measureText(labelText) + 24
             val labelX = alertX - labelWidth / 2
-            val labelY = alertY - 25
+            val labelY = alertY - 30
 
             paint.color = Color.parseColor("#FF5722")
-            canvas.drawRoundRect(labelX, labelY - 15, labelX + labelWidth, labelY + 5, 4f, 4f, paint)
+            canvas.drawRoundRect(labelX, labelY - 18, labelX + labelWidth, labelY + 6, 5f, 5f, paint)
 
             paint.color = Color.WHITE
             paint.textAlign = Paint.Align.CENTER
@@ -898,6 +924,10 @@ class PdfGenerator(private val context: Context) {
             newHeight = maxHeight
             newWidth = (newHeight * aspectRatio).toInt()
         }
+
+        // ✅ Use FILTER_BITMAP flag for better quality
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        paint.isFilterBitmap = true
 
         return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
     }

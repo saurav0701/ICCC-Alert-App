@@ -138,164 +138,124 @@
 
     </LinearLayout>
 
-    <!-- Search Bar (Initially Hidden) -->
+    <!-- Active Filters Section -->
     <LinearLayout
-        android:id="@+id/search_container"
+        android:id="@+id/active_filters_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:background="#FFFFFF"
-        android:padding="16dp"
-        android:gravity="center_vertical"
-        android:elevation="2dp"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:background="#F5F7FA"
         android:visibility="gone">
 
-        <EditText
-            android:id="@+id/search_input"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:background="@drawable/search_input_bg"
-            android:hint="Search events..."
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:textSize="15sp"
-            android:textColor="#1A1A1A"
-            android:textColorHint="#9E9E9E"
-            android:fontFamily="sans-serif"
-            android:inputType="text"
-            android:imeOptions="actionSearch"
-            android:maxLines="1" />
-
-        <FrameLayout
-            android:id="@+id/close_search"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="12dp"
-            android:background="@drawable/icon_button_light_bg"
-            android:clickable="true"
-            android:focusable="true">
-
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:layout_gravity="center"
-                android:src="@drawable/ic_close"
-                android:tint="#757575"
-                android:contentDescription="Close search" />
-
-        </FrameLayout>
-
-    </LinearLayout>
-
-    <!-- Filter Options (Initially Hidden) -->
-    <LinearLayout
-        android:id="@+id/filter_container"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:background="#FAFBFC"
-        android:padding="16dp"
-        android:elevation="2dp"
-        android:visibility="gone">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Filter by Date"
-            android:textSize="13sp"
-            android:textColor="#424242"
-            android:fontFamily="sans-serif-medium"
-            android:layout_marginBottom="12dp" />
-
-        <LinearLayout
+        <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:scrollbars="none">
 
-            <Spinner
-                android:id="@+id/date_filter_spinner"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:background="@drawable/spinner_background"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp" />
-
-            <Button
-                android:id="@+id/apply_filter_button"
-                android:layout_width="wrap_content"
-                android:layout_height="48dp"
-                android:layout_marginStart="12dp"
-                android:text="Apply"
-                android:textSize="14sp"
-                android:textColor="#FFFFFF"
-                android:background="@drawable/save_button_background"
-                android:textAllCaps="false"
-                android:fontFamily="sans-serif-medium"
-                android:paddingStart="24dp"
-                android:paddingEnd="24dp" />
-
-        </LinearLayout>
-
-        <!-- Custom Date Range (Initially Hidden) -->
-        <LinearLayout
-            android:id="@+id/custom_date_container"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginTop="16dp"
-            android:visibility="gone">
-
-            <TextView
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="From Date"
-                android:textSize="12sp"
-                android:textColor="#757575"
-                android:fontFamily="sans-serif"
-                android:layout_marginBottom="6dp" />
+                android:orientation="horizontal">
 
-            <Button
-                android:id="@+id/from_date_button"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="Select Date"
-                android:textSize="14sp"
-                android:textColor="#424242"
-                android:background="@drawable/edit_text_background"
-                android:textAllCaps="false"
-                android:fontFamily="sans-serif"
-                android:gravity="start|center_vertical"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:layout_marginBottom="14dp" />
+                <!-- Search Filter Chip -->
+                <LinearLayout
+                    android:id="@+id/search_chip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:orientation="horizontal"
+                    android:background="@drawable/filter_chip_bg"
+                    android:gravity="center_vertical"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="8dp"
+                    android:layout_marginEnd="8dp"
+                    android:visibility="gone">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="To Date"
-                android:textSize="12sp"
-                android:textColor="#757575"
-                android:fontFamily="sans-serif"
-                android:layout_marginBottom="6dp" />
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_search"
+                        android:tint="#1976D2"
+                        android:layout_marginEnd="6dp" />
 
-            <Button
-                android:id="@+id/to_date_button"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="Select Date"
-                android:textSize="14sp"
-                android:textColor="#424242"
-                android:background="@drawable/edit_text_background"
-                android:textAllCaps="false"
-                android:fontFamily="sans-serif"
-                android:gravity="start|center_vertical"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp" />
+                    <TextView
+                        android:id="@+id/search_chip_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Search: gate"
+                        android:textSize="13sp"
+                        android:textColor="#1976D2"
+                        android:fontFamily="sans-serif-medium"
+                        android:maxLength="30"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
 
-        </LinearLayout>
+                    <ImageView
+                        android:id="@+id/search_chip_close"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_close"
+                        android:tint="#1976D2"
+                        android:padding="4dp"
+                        android:layout_marginStart="4dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:contentDescription="Remove search filter" />
+
+                </LinearLayout>
+
+                <!-- Date Filter Chip -->
+                <LinearLayout
+                    android:id="@+id/date_filter_chip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:orientation="horizontal"
+                    android:background="@drawable/filter_chip_bg"
+                    android:gravity="center_vertical"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="8dp"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_calendar"
+                        android:tint="#1976D2"
+                        android:layout_marginEnd="6dp" />
+
+                    <TextView
+                        android:id="@+id/date_filter_chip_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Today"
+                        android:textSize="13sp"
+                        android:textColor="#1976D2"
+                        android:fontFamily="sans-serif-medium"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+
+                    <ImageView
+                        android:id="@+id/date_filter_chip_close"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_close"
+                        android:tint="#1976D2"
+                        android:padding="4dp"
+                        android:layout_marginStart="4dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:contentDescription="Remove date filter" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </HorizontalScrollView>
 
     </LinearLayout>
 

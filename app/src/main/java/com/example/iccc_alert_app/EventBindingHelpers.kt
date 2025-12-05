@@ -1,6 +1,7 @@
 package com.example.iccc_alert_app
 
 import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -42,6 +43,7 @@ class EventBindingHelpers(
     val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
     private val eventTimeParser = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
     val displayDateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+    val displayDateTimeFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
     private val client = OkHttpClient()
     private val pdfGenerator = PdfGenerator(context)
 
@@ -442,44 +444,77 @@ class EventBindingHelpers(
         }
     }
 
-    // ==================== DATE PICKER ====================
+    // ==================== DATE TIME PICKER ====================
 
-    fun showDatePicker(
+    /**
+     * Show DateTimePicker with both date and time selection
+     */
+    fun showDateTimePicker(
         isFromDate: Boolean,
+        currentDateTime: Date?,
         customFromDate: Date?,
         customToDate: Date?,
-        onDateSelected: (Date) -> Unit
+        onDateTimeSelected: (Date) -> Unit
     ) {
         val calendar = Calendar.getInstance()
+        if (currentDateTime != null) {
+            calendar.time = currentDateTime
+        }
+
+        // First show date picker
         val datePicker = DatePickerDialog(
             context,
             { _, year, month, dayOfMonth ->
                 val selectedCalendar = Calendar.getInstance()
-                selectedCalendar.set(year, month, dayOfMonth, 0, 0, 0)
-                selectedCalendar.set(Calendar.MILLISECOND, 0)
+                selectedCalendar.set(year, month, dayOfMonth)
 
-                // Validation
-                if (isFromDate && customToDate != null) {
-                    if (selectedCalendar.time.after(customToDate)) {
-                        Toast.makeText(context, "From date cannot be after To date", Toast.LENGTH_SHORT).show()
-                        return@DatePickerDialog
-                    }
-                } else if (!isFromDate && customFromDate != null) {
-                    if (selectedCalendar.time.before(customFromDate)) {
-                        Toast.makeText(context, "To date cannot be before From date", Toast.LENGTH_SHORT).show()
-                        return@DatePickerDialog
-                    }
-                }
+                // Then show time picker
+                val timePicker = TimePickerDialog(
+                    context,
+                    { _, hourOfDay, minute ->
+                        selectedCalendar.set(Calendar.HOUR_OF_DAY, hourOfDay)
+                        selectedCalendar.set(Calendar.MINUTE, minute)
+                        selectedCalendar.set(Calendar.SECOND, 0)
+                        selectedCalendar.set(Calendar.MILLISECOND, 0)
 
-                onDateSelected(selectedCalendar.time)
+                        // Validation
+                        if (isFromDate && customToDate != null) {
+                            if (selectedCalendar.time.after(customToDate)) {
+                                Toast.makeText(
+                                    context,
+                                    "From date/time cannot be after To date/time",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                return@TimePickerDialog
+                            }
+                        } else if (!isFromDate && customFromDate != null) {
+                            if (selectedCalendar.time.before(customFromDate)) {
+                                Toast.makeText(
+                                    context,
+                                    "To date/time cannot be before From date/time",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                return@TimePickerDialog
+                            }
+                        }
+
+                        onDateTimeSelected(selectedCalendar.time)
+                    },
+                    calendar.get(Calendar.HOUR_OF_DAY),
+                    calendar.get(Calendar.MINUTE),
+                    true // 24-hour format
+                )
+                timePicker.show()
             },
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH),
             calendar.get(Calendar.DAY_OF_MONTH)
         )
 
+        // Set max date to current time
         datePicker.datePicker.maxDate = System.currentTimeMillis()
 
+        // Set constraints based on from/to selection
         if (!isFromDate && customFromDate != null) {
             datePicker.datePicker.minDate = customFromDate.time
         }
@@ -489,8 +524,6 @@ class EventBindingHelpers(
 
         datePicker.show()
     }
-
-    // ==================== SPINNER SETUP ====================
 
     fun setupPrioritySpinner(spinner: Spinner) {
         val priorities = Priority.values().map { it.displayName }

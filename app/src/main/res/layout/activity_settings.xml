@@ -283,7 +283,8 @@
 
         </androidx.cardview.widget.CardView>
 
-        <!-- Diagnostics Section -->
+        <!-- Diagnostics Section - COMMENTED OUT FOR TESTING BUILD -->
+        <!--
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -312,7 +313,6 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- View Logs -->
                 <RelativeLayout
                     android:id="@+id/view_logs_container"
                     android:layout_width="match_parent"
@@ -381,7 +381,6 @@
                     android:background="#F0F0F0"
                     android:layout_marginStart="18dp" />
 
-                <!-- Export Logs -->
                 <RelativeLayout
                     android:id="@+id/export_logs_container"
                     android:layout_width="match_parent"
@@ -450,7 +449,6 @@
                     android:background="#F0F0F0"
                     android:layout_marginStart="18dp" />
 
-                <!-- Clear Logs -->
                 <RelativeLayout
                     android:id="@+id/clear_logs_container"
                     android:layout_width="match_parent"
@@ -516,6 +514,7 @@
             </LinearLayout>
 
         </androidx.cardview.widget.CardView>
+        -->
 
         <!-- Storage Section -->
         <TextView

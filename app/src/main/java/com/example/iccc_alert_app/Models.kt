@@ -93,15 +93,6 @@ object ClientIdManager {
         return prefs.getString(KEY_CLIENT_ID, null)
     }
 
-    /**
-     * Resets the client ID - useful for:
-     * - Debugging
-     * - User logout
-     * - Testing different scenarios
-     *
-     * WARNING: This will create NEW durable consumers on next connection,
-     * and old durable consumers will be abandoned (but not deleted from NATS).
-     */
     fun resetClientId(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val oldId = prefs.getString(KEY_CLIENT_ID, null)
@@ -109,9 +100,6 @@ object ClientIdManager {
         android.util.Log.d("ClientIdManager", "⚠️ Client ID reset (old ID: $oldId)")
     }
 
-    /**
-     * Check if a client ID already exists
-     */
     fun hasClientId(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.contains(KEY_CLIENT_ID)

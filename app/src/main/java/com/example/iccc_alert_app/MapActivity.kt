@@ -33,6 +33,11 @@ class MapActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "MapActivity"
         const val EXTRA_GPS_EVENT = "gps_event"
+
+        // Jharkhand state center coordinates
+        private const val JHARKHAND_CENTER_LAT = 23.6102
+        private const val JHARKHAND_CENTER_LNG = 85.2799
+        private const val JHARKHAND_DEFAULT_ZOOM = 8.0
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -401,6 +406,11 @@ class MapActivity : AppCompatActivity() {
         mapView.setMultiTouchControls(true)
         mapView.setBuiltInZoomControls(false)
 
+        // Set initial view to Jharkhand (before zooming to actual location)
+        val jharkhandCenter = GeoPoint(JHARKHAND_CENTER_LAT, JHARKHAND_CENTER_LNG)
+        mapView.controller.setZoom(JHARKHAND_DEFAULT_ZOOM)
+        mapView.controller.setCenter(jharkhandCenter)
+
         // Add geofence overlays FIRST (so they appear behind markers)
         mapData.geofenceOverlays.forEach { overlay ->
             when (overlay) {
@@ -445,7 +455,7 @@ class MapActivity : AppCompatActivity() {
             mapView.overlays.add(marker)
         }
 
-        // Set initial view
+        // Zoom to actual event location with animation
         if (mapData.boundingPoints.isNotEmpty()) {
             try {
                 val boundingBox = org.osmdroid.util.BoundingBox.fromGeoPoints(mapData.boundingPoints)
@@ -455,14 +465,13 @@ class MapActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Log.e(TAG, "Error zooming to bounds: ${e.message}")
                 mapData.centerPoint?.let {
-                    mapView.controller.setZoom(15.0)
-                    mapView.controller.setCenter(it)
+                    mapView.controller.animateTo(it, 15.0, 1000L)
                 }
             }
         } else {
+            // If no bounding points, zoom to center point or stay at Jharkhand view
             mapData.centerPoint?.let {
-                mapView.controller.setZoom(15.0)
-                mapView.controller.setCenter(it)
+                mapView.controller.animateTo(it, 15.0, 1000L)
             }
         }
 

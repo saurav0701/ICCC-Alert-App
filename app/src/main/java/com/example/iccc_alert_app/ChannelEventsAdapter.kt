@@ -1,5 +1,6 @@
 package com.example.iccc_alert_app
 
+import android.app.Dialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -10,6 +11,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.Window
 import android.widget.*
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -18,9 +20,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.Polygon
-import org.osmdroid.views.overlay.Polyline
 import java.util.*
 
 /**
@@ -138,10 +137,7 @@ class ChannelEventsAdapter(
         super.onViewRecycled(holder)
         if (holder is EventViewHolders.GpsEventViewHolder) {
             try {
-                // Cancel any active map rendering for this holder
                 gpsEventHandler.cancelRendering(holder)
-
-                // Clean up the map preview frame
                 holder.mapPreviewFrame.removeAllViews()
                 holder.mapLoadingOverlay.visibility = View.VISIBLE
             } catch (e: Exception) {
@@ -160,7 +156,7 @@ class ChannelEventsAdapter(
 
     fun updateMuteState(muted: Boolean) {
         isMuted = muted
-        notifyItemChanged(0) // Update header only
+        notifyItemChanged(0)
     }
 
     fun clearImageCache() {
@@ -172,6 +168,62 @@ class ChannelEventsAdapter(
         return (dp * context.resources.displayMetrics.density).toInt()
     }
 
+    private fun updateFilterChipsDisplay(holder: EventViewHolders.HeaderViewHolder) {
+        val hasSearchFilter = searchQuery.isNotEmpty()
+        val hasDateFilter = selectedFilterOption != "All"
+
+        // Show/hide the entire filter container
+        if (hasSearchFilter || hasDateFilter) {
+            holder.activeFiltersContainer.visibility = View.VISIBLE
+        } else {
+            holder.activeFiltersContainer.visibility = View.GONE
+        }
+
+        // Update Search Chip
+        if (hasSearchFilter) {
+            holder.searchChip.visibility = View.VISIBLE
+            holder.searchChipText.text = "Search: $searchQuery"
+
+            holder.searchChipClose.setOnClickListener {
+                searchQuery = ""
+                applyFilters()
+            }
+        } else {
+            holder.searchChip.visibility = View.GONE
+        }
+
+        // Update Date Filter Chip
+        if (hasDateFilter) {
+            holder.dateFilterChip.visibility = View.VISIBLE
+
+            val chipText = when (selectedFilterOption) {
+                "Today" -> "Today"
+                "Yesterday" -> "Yesterday"
+                "Custom Date Range" -> {
+                    if (customFromDate != null && customToDate != null) {
+                        val fromStr = bindingHelpers.displayDateFormat.format(customFromDate)
+                        val toStr = bindingHelpers.displayDateFormat.format(customToDate)
+                        "$fromStr - $toStr"
+                    } else {
+                        "Custom Range"
+                    }
+                }
+                else -> selectedFilterOption
+            }
+
+            holder.dateFilterChipText.text = chipText
+
+            holder.dateFilterChipClose.setOnClickListener {
+                selectedFilterOption = "All"
+                customFromDate = null
+                customToDate = null
+                applyFilters()
+            }
+        } else {
+            holder.dateFilterChip.visibility = View.GONE
+        }
+    }
+
     // ==================== HEADER SETUP ====================
 
     private fun setupHeader(holder: EventViewHolders.HeaderViewHolder) {
@@ -179,12 +231,10 @@ class ChannelEventsAdapter(
             onBackClick()
         }
 
-        // ✅ MUTE BUTTON CLICK HANDLER
         holder.muteButton.setOnClickListener {
             onMuteClick()
         }
 
-        // ✅ UPDATE MUTE ICON BASED ON STATE
         if (isMuted) {
             holder.muteButton.setImageResource(R.drawable.ic_notifications_off)
             holder.muteButton.contentDescription = "Unmute notifications"
@@ -214,8 +264,8 @@ class ChannelEventsAdapter(
             showMenuPopup(holder)
         }
 
-        setupSearch(holder)
-        setupFilter(holder)
+        // ✅ NEW: Update filter chips display
+        updateFilterChipsDisplay(holder)
     }
 
     private fun showMenuPopup(holder: EventViewHolders.HeaderViewHolder) {
@@ -225,18 +275,11 @@ class ChannelEventsAdapter(
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.action_search -> {
-                    holder.searchContainer.visibility = View.VISIBLE
-                    holder.filterContainer.visibility = View.GONE
-                    holder.searchInput.requestFocus()
+                    showSearchDialog()
                     true
                 }
                 R.id.action_filter -> {
-                    if (holder.filterContainer.visibility == View.VISIBLE) {
-                        holder.filterContainer.visibility = View.GONE
-                    } else {
-                        holder.filterContainer.visibility = View.VISIBLE
-                        holder.searchContainer.visibility = View.GONE
-                    }
+                    showFilterDialog()
                     true
                 }
                 R.id.action_download_pdf -> {
@@ -247,6 +290,175 @@ class ChannelEventsAdapter(
             }
         }
         popup.show()
+    }
+
+    // ==================== SEARCH DIALOG ====================
+
+    private fun showSearchDialog() {
+        val dialog = Dialog(context)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(R.layout.dialog_search_events)
+        dialog.window?.setLayout(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+
+        val searchInput = dialog.findViewById<EditText>(R.id.search_input)
+        val clearButton = dialog.findViewById<Button>(R.id.clear_search_button)
+        val searchButton = dialog.findViewById<Button>(R.id.search_button)
+
+        // Set current search query
+        searchInput.setText(searchQuery)
+
+        clearButton.setOnClickListener {
+            searchQuery = ""
+            applyFilters()
+            dialog.dismiss()
+        }
+
+        searchButton.setOnClickListener {
+            searchQuery = searchInput.text.toString().lowercase().trim()
+            applyFilters()
+            dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+
+    // ==================== FILTER DIALOG ====================
+
+    private fun showFilterDialog() {
+        val dialog = Dialog(context)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(R.layout.dialog_filter_events)
+        dialog.window?.setLayout(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+
+        val dateFilterSpinner = dialog.findViewById<Spinner>(R.id.date_filter_spinner)
+        val customDateContainer = dialog.findViewById<LinearLayout>(R.id.custom_date_container)
+        val fromDateTimeButton = dialog.findViewById<Button>(R.id.from_datetime_button)
+        val toDateTimeButton = dialog.findViewById<Button>(R.id.to_datetime_button)
+        val clearFilterButton = dialog.findViewById<Button>(R.id.clear_filter_button)
+        val applyFilterButton = dialog.findViewById<Button>(R.id.apply_filter_button)
+
+        // Setup spinner
+        val filterOptions = arrayOf("All", "Today", "Yesterday", "Custom Date Range")
+        val adapter = ArrayAdapter(
+            context,
+            android.R.layout.simple_spinner_item,
+            filterOptions
+        )
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        dateFilterSpinner.adapter = adapter
+
+        // Set current selection
+        val currentIndex = filterOptions.indexOf(selectedFilterOption)
+        if (currentIndex >= 0) {
+            dateFilterSpinner.setSelection(currentIndex)
+        }
+
+        // Update button texts if dates are set
+        if (customFromDate != null) {
+            fromDateTimeButton.text = bindingHelpers.displayDateTimeFormat.format(customFromDate)
+        }
+        if (customToDate != null) {
+            toDateTimeButton.text = bindingHelpers.displayDateTimeFormat.format(customToDate)
+        }
+
+        dateFilterSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (filterOptions[position] == "Custom Date Range") {
+                    customDateContainer.visibility = View.VISIBLE
+                } else {
+                    customDateContainer.visibility = View.GONE
+                }
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        fromDateTimeButton.setOnClickListener {
+            bindingHelpers.showDateTimePicker(
+                isFromDate = true,
+                currentDateTime = customFromDate,
+                customFromDate = customFromDate,
+                customToDate = customToDate
+            ) { date ->
+                customFromDate = date
+                fromDateTimeButton.text = bindingHelpers.displayDateTimeFormat.format(date)
+            }
+        }
+
+        toDateTimeButton.setOnClickListener {
+            bindingHelpers.showDateTimePicker(
+                isFromDate = false,
+                currentDateTime = customToDate,
+                customFromDate = customFromDate,
+                customToDate = customToDate
+            ) { date ->
+                customToDate = date
+                toDateTimeButton.text = bindingHelpers.displayDateTimeFormat.format(date)
+            }
+        }
+
+        clearFilterButton.setOnClickListener {
+            selectedFilterOption = "All"
+            customFromDate = null
+            customToDate = null
+            searchQuery = ""
+            applyFilters()
+            dialog.dismiss()
+        }
+
+        applyFilterButton.setOnClickListener {
+            val selectedOption = dateFilterSpinner.selectedItem.toString()
+            selectedFilterOption = selectedOption
+
+            if (selectedOption == "Custom Date Range") {
+                if (customFromDate == null || customToDate == null) {
+                    Toast.makeText(context, "Please select both from and to date/time", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+            }
+
+            applyFilters()
+            dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+
+    private fun applyFilters() {
+        filteredEvents = allEvents.filter { event ->
+            val matchesSearch = if (searchQuery.isEmpty()) {
+                true
+            } else {
+                val location = (event.data["location"] as? String ?: "").lowercase()
+                val eventType = (event.typeDisplay ?: "").lowercase()
+                location.contains(searchQuery) || eventType.contains(searchQuery)
+            }
+
+            val matchesDateFilter = when (selectedFilterOption) {
+                "All" -> true
+                "Today" -> bindingHelpers.isToday(bindingHelpers.getEventDate(event))
+                "Yesterday" -> bindingHelpers.isYesterday(bindingHelpers.getEventDate(event))
+                "Custom Date Range" -> {
+                    if (customFromDate != null && customToDate != null) {
+                        val eventDate = bindingHelpers.getEventDate(event)
+                        eventDate >= customFromDate!! && eventDate <= customToDate!!
+                    } else {
+                        true
+                    }
+                }
+                else -> true
+            }
+
+            matchesSearch && matchesDateFilter
+        }
+
+        notifyDataSetChanged()
     }
 
     private fun handleBulkPdfDownload() {
@@ -274,104 +486,6 @@ class ChannelEventsAdapter(
         }
     }
 
-    // ==================== SEARCH & FILTER SETUP ====================
-
-    private fun setupSearch(holder: EventViewHolders.HeaderViewHolder) {
-        holder.closeSearch.setOnClickListener {
-            holder.searchContainer.visibility = View.GONE
-            holder.searchInput.text.clear()
-            searchQuery = ""
-            applyFilters()
-        }
-
-        holder.searchInput.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                searchQuery = s?.toString()?.lowercase() ?: ""
-                applyFilters()
-            }
-        })
-    }
-
-    private fun setupFilter(holder: EventViewHolders.HeaderViewHolder) {
-        val filterOptions = arrayOf("All", "Today", "Yesterday", "Custom Date Range")
-        val adapter = ArrayAdapter(
-            holder.itemView.context,
-            android.R.layout.simple_spinner_item,
-            filterOptions
-        )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        holder.dateFilterSpinner.adapter = adapter
-
-        holder.dateFilterSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                selectedFilterOption = filterOptions[position]
-                if (selectedFilterOption == "Custom Date Range") {
-                    holder.customDateContainer.visibility = View.VISIBLE
-                } else {
-                    holder.customDateContainer.visibility = View.GONE
-                }
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
-
-        holder.fromDateButton.setOnClickListener {
-            bindingHelpers.showDatePicker(true, customFromDate, customToDate) { date ->
-                customFromDate = date
-                holder.fromDateButton.text = bindingHelpers.displayDateFormat.format(date)
-            }
-        }
-
-        holder.toDateButton.setOnClickListener {
-            bindingHelpers.showDatePicker(false, customFromDate, customToDate) { date ->
-                customToDate = date
-                holder.toDateButton.text = bindingHelpers.displayDateFormat.format(date)
-            }
-        }
-
-        holder.applyFilterButton.setOnClickListener {
-            applyFilters()
-            holder.filterContainer.visibility = View.GONE
-        }
-    }
-
-    private fun applyFilters() {
-        filteredEvents = allEvents.filter { event ->
-            val matchesSearch = if (searchQuery.isEmpty()) {
-                true
-            } else {
-                val location = (event.data["location"] as? String ?: "").lowercase()
-                val eventType = (event.typeDisplay ?: "").lowercase()
-                location.contains(searchQuery) || eventType.contains(searchQuery)
-            }
-
-            val matchesDateFilter = when (selectedFilterOption) {
-                "All" -> true
-                "Today" -> bindingHelpers.isToday(bindingHelpers.getEventDate(event))
-                "Yesterday" -> bindingHelpers.isYesterday(bindingHelpers.getEventDate(event))
-                "Custom Date Range" -> {
-                    if (customFromDate != null && customToDate != null) {
-                        val eventDate = bindingHelpers.getEventDate(event)
-                        val from = bindingHelpers.resetTime(customFromDate!!)
-                        val to = bindingHelpers.resetTime(customToDate!!)
-                        to.add(Calendar.DAY_OF_MONTH, 1)
-                        eventDate >= from.time && eventDate < to.time
-                    } else {
-                        true
-                    }
-                }
-                else -> true
-            }
-
-            matchesSearch && matchesDateFilter
-        }
-
-        notifyDataSetChanged()
-    }
-
-    // ==================== EVENT ITEM SETUP ====================
 
     private fun setupEvent(holder: EventViewHolders.EventViewHolder, event: Event) {
         holder.eventType.text = event.typeDisplay ?: "Unknown Event"
@@ -480,6 +594,8 @@ class ChannelEventsAdapter(
             generateSingleEventPdf(event)
         }
     }
+
+
 
     // ==================== IMAGE OPERATIONS ====================
 
@@ -605,6 +721,4 @@ class ChannelEventsAdapter(
             }
         }
     }
-
-    // Note: GPS event handling is in GpsEventHandler.kt
 }
