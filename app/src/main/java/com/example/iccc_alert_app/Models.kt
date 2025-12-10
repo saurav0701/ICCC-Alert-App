@@ -106,8 +106,14 @@ object ClientIdManager {
     }
 }
 
+/**
+ * ✅ UPDATED: Dynamic channel configuration based on organization
+ * Supports both BCCL and CCL with different area sets
+ */
 object AvailableChannels {
-    val areas = listOf(
+
+    // BCCL Areas (original - 13 areas)
+    private val bcclAreas = listOf(
         "sijua" to "Sijua",
         "kusunda" to "Kusunda",
         "bastacolla" to "Bastacolla",
@@ -123,6 +129,25 @@ object AvailableChannels {
         "katras" to "Katras"
     )
 
+    // CCL Areas (new - 14 areas)
+    private val cclAreas = listOf(
+        "barkasayal" to "Barka Sayal",
+        "argada" to "Argada",
+        "northkaranpura" to "North Karanpura",
+        "bokarokargali" to "Bokaro & Kargali",
+        "kathara" to "Kathara",
+        "giridih" to "Giridih",
+        "amrapali" to "Amrapali & Chandragupta",
+        "magadh" to "Magadh & Sanghmitra",
+        "rajhara" to "Rajhara",
+        "kuju" to "Kuju",
+        "hazaribagh" to "Hazaribagh",
+        "rajrappa" to "Rajrappa",
+        "dhori" to "Dhori",
+        "piparwar" to "Piparwar"
+    )
+
+    // Common event types for both organizations
     val eventTypes = listOf(
         "cd" to "Crowd Detection",
         "vd" to "Vehicle Detection",
@@ -138,9 +163,56 @@ object AvailableChannels {
         "tamper" to "Tamper Alert"
     )
 
+    /**
+     * Get areas based on current organization
+     * Uses BackendConfig to determine BCCL vs CCL
+     */
+    fun getAreas(): List<Pair<String, String>> {
+        return if (BackendConfig.isCCL()) {
+            cclAreas
+        } else {
+            bcclAreas
+        }
+    }
+
+
+
+    /**
+     * Get all channels for current organization
+     * Generates area × eventType combinations
+     */
     fun getAllChannels(): List<Channel> {
+        val currentAreas = getAreas()
         val channels = mutableListOf<Channel>()
-        for ((area, areaDisplay) in areas) {
+
+        for ((area, areaDisplay) in currentAreas) {
+            for ((eventType, eventTypeDisplay) in eventTypes) {
+                channels.add(
+                    Channel(
+                        id = "${area}_${eventType}",
+                        area = area,
+                        areaDisplay = areaDisplay,
+                        eventType = eventType,
+                        eventTypeDisplay = eventTypeDisplay,
+                        description = "$areaDisplay - $eventTypeDisplay"
+                    )
+                )
+            }
+        }
+
+        android.util.Log.d("AvailableChannels",
+            "Generated ${channels.size} channels for ${BackendConfig.getOrganization()} " +
+                    "(${currentAreas.size} areas × ${eventTypes.size} event types)")
+
+        return channels
+    }
+
+    /**
+     * Get BCCL-specific channels (for testing/migration)
+     */
+    fun getBCCLChannels(): List<Channel> {
+        val channels = mutableListOf<Channel>()
+        for ((area, areaDisplay) in bcclAreas) {
             for ((eventType, eventTypeDisplay) in eventTypes) {
                 channels.add(
                     Channel(
@@ -155,5 +227,109 @@ object AvailableChannels {
             }
         }
         return channels
+    }
+
+    /**
+     * Get CCL-specific channels (for testing/migration)
+     */
+    fun getCCLChannels(): List<Channel> {
+        val channels = mutableListOf<Channel>()
+        for ((area, areaDisplay) in cclAreas) {
+            for ((eventType, eventTypeDisplay) in eventTypes) {
+                channels.add(
+                    Channel(
+                        id = "${area}_${eventType}",
+                        area = area,
+                        areaDisplay = areaDisplay,
+                        eventType = eventType,
+                        eventTypeDisplay = eventTypeDisplay,
+                        description = "$areaDisplay - $eventTypeDisplay"
+                    )
+                )
+            }
+        }
+        return channels
+    }
+
+    /**
+     * Get organization-specific statistics
+     */
+    fun getOrganizationInfo(): String {
+        val org = BackendConfig.getOrganization()
+        val areaCount = getAreas().size
+        val channelCount = getAllChannels().size
+        return "$org - $areaCount areas, $channelCount channels"
+    }
+
+    /**
+     * Check if an area exists in current organization
+     */
+    fun isValidArea(area: String): Boolean {
+        return getAreas().any { it.first == area }
+    }
+
+    /**
+     * Get display name for an area in current organization
+     */
+    fun getAreaDisplayName(area: String): String? {
+        return getAreas().find { it.first == area }?.second
+    }
+
+    /**
+     * Check if an area belongs to BCCL
+     */
+    fun isBCCLArea(area: String): Boolean {
+        return bcclAreas.any { it.first == area }
+    }
+
+    /**
+     * Check if an area belongs to CCL
+     */
+    fun isCCLArea(area: String): Boolean {
+        return cclAreas.any { it.first == area }
+    }
+
+    /**
+     * Get all area codes (internal names) for current organization
+     */
+    fun getAreaCodes(): List<String> {
+        return getAreas().map { it.first }
+    }
+
+    /**
+     * Get all area display names for current organization
+     */
+    fun getAreaDisplayNames(): List<String> {
+        return getAreas().map { it.second }
+    }
+
+    /**
+     * Get event type display name
+     */
+    fun getEventTypeDisplayName(eventType: String): String? {
+        return eventTypes.find { it.first == eventType }?.second
+    }
+
+    /**
+     * Check if an event type is valid
+     */
+    fun isValidEventType(eventType: String): Boolean {
+        return eventTypes.any { it.first == eventType }
+    }
+
+    /**
+     * Get statistics for debugging
+     */
+    fun getStats(): Map<String, Any> {
+        return mapOf(
+            "organization" to BackendConfig.getOrganization(),
+            "bcclAreas" to bcclAreas.size,
+            "cclAreas" to cclAreas.size,
+            "currentAreas" to getAreas().size,
+            "eventTypes" to eventTypes.size,
+            "totalChannels" to getAllChannels().size,
+            "isCCL" to BackendConfig.isCCL(),
+            "isBCCL" to BackendConfig.isBCCL()
+        )
     }
 }

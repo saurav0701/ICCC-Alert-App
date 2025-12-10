@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.provider.Settings
 import android.util.Log
+import com.example.iccc_alert_app.BackendConfig
 import com.google.gson.Gson
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -18,8 +19,6 @@ object AuthManager {
     private const val KEY_TOKEN_EXPIRY = "token_expiry"
     private const val KEY_USER_DATA = "user_data"
 
-    private const val BASE_URL = "http://202.140.131.90:8890"
-
     private lateinit var prefs: SharedPreferences
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -32,6 +31,7 @@ object AuthManager {
 
     fun initialize(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        BackendConfig.initialize(context)
     }
 
     // Get device ID for multi-device support
@@ -46,7 +46,7 @@ object AuthManager {
     fun isLoggedIn(): Boolean {
         val token = getAuthToken()
         val expiry = prefs.getLong(KEY_TOKEN_EXPIRY, 0)
-        val currentTime = System.currentTimeMillis() / 1000 // Convert to seconds
+        val currentTime = System.currentTimeMillis() / 1000
 
         return !token.isNullOrEmpty() && expiry > currentTime
     }
@@ -67,7 +67,7 @@ object AuthManager {
         }
     }
 
-    // Save auth data
+    // Save auth data and set organization
     private fun saveAuthData(authResponse: AuthResponse) {
         prefs.edit().apply {
             putString(KEY_AUTH_TOKEN, authResponse.token)
@@ -75,12 +75,17 @@ object AuthManager {
             putString(KEY_USER_DATA, gson.toJson(authResponse.user))
             apply()
         }
-        Log.d(TAG, "✓ Auth data saved successfully")
+
+        // ✅ SET ORGANIZATION from user data
+        BackendConfig.setOrganization(authResponse.user.workingFor)
+
+        Log.d(TAG, "✓ Auth data saved for ${authResponse.user.workingFor}")
     }
 
     // Clear auth data (logout)
     fun clearAuthData() {
         prefs.edit().clear().apply()
+        BackendConfig.clearOrganization()
         Log.d(TAG, "✓ Auth data cleared")
     }
 
@@ -90,13 +95,18 @@ object AuthManager {
         request: RegistrationRequest,
         callback: (Boolean, String) -> Unit
     ) {
+        // ✅ Use organization-specific URL
+        val baseUrl = BackendConfig.getHttpBaseUrl()
+
         val json = gson.toJson(request)
         val body = json.toRequestBody(JSON)
 
         val httpRequest = Request.Builder()
-            .url("$BASE_URL/auth/register/request")
+            .url("$baseUrl/auth/register/request")
             .post(body)
             .build()
+
+        Log.d(TAG, "Registration request to: $baseUrl (${request.workingFor})")
 
         client.newCall(httpRequest).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
@@ -132,6 +142,8 @@ object AuthManager {
         otp: String,
         callback: (Boolean, String, AuthResponse?) -> Unit
     ) {
+        val baseUrl = BackendConfig.getHttpBaseUrl()
+
         val request = OTPVerificationRequest(
             phone = phone,
             otp = otp,
@@ -142,7 +154,7 @@ object AuthManager {
         val body = json.toRequestBody(JSON)
 
         val httpRequest = Request.Builder()
-            .url("$BASE_URL/auth/register/verify")
+            .url("$baseUrl/auth/register/verify")
             .post(body)
             .build()
 
@@ -193,14 +205,18 @@ object AuthManager {
         phone: String,
         callback: (Boolean, String) -> Unit
     ) {
+        val baseUrl = BackendConfig.getHttpBaseUrl()
+
         val request = OTPRequest(phone = phone, purpose = "login")
         val json = gson.toJson(request)
         val body = json.toRequestBody(JSON)
 
         val httpRequest = Request.Builder()
-            .url("$BASE_URL/auth/login/request")
+            .url("$baseUrl/auth/login/request")
             .post(body)
             .build()
+
+        Log.d(TAG, "Login request to: $baseUrl")
 
         client.newCall(httpRequest).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
@@ -236,6 +252,8 @@ object AuthManager {
         otp: String,
         callback: (Boolean, String, AuthResponse?) -> Unit
     ) {
+        val baseUrl = BackendConfig.getHttpBaseUrl()
+
         val request = OTPVerificationRequest(
             phone = phone,
             otp = otp,
@@ -246,7 +264,7 @@ object AuthManager {
         val body = json.toRequestBody(JSON)
 
         val httpRequest = Request.Builder()
-            .url("$BASE_URL/auth/login/verify")
+            .url("$baseUrl/auth/login/verify")
             .post(body)
             .build()
 
@@ -301,8 +319,10 @@ object AuthManager {
             return
         }
 
+        val baseUrl = BackendConfig.getHttpBaseUrl()
+
         val httpRequest = Request.Builder()
-            .url("$BASE_URL/auth/logout")
+            .url("$baseUrl/auth/logout")
             .addHeader("Authorization", "Bearer $token")
             .post("{}".toRequestBody(JSON))
             .build()
@@ -310,7 +330,6 @@ object AuthManager {
         client.newCall(httpRequest).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 Log.e(TAG, "Logout request failed", e)
-                // Clear local data anyway
                 clearAuthData()
                 callback(true, "Logged out (offline)")
             }

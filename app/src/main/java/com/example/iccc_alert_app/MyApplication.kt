@@ -22,7 +22,7 @@ class MyApplication : Application() {
 
         Log.d(TAG, "Application starting")
 
-        // ✅ Initialize PersistentLogger FIRST - before anything else
+        // ✅ Initialize PersistentLogger FIRST
         try {
             PersistentLogger.initialize(this)
             PersistentLogger.logEvent("SYSTEM", "===== APPLICATION STARTED =====")
@@ -33,13 +33,18 @@ class MyApplication : Application() {
             Log.e(TAG, "Failed to initialize PersistentLogger", e)
         }
 
-        // Apply saved theme before anything else (UI operation - must be synchronous)
+        // Apply saved theme
         applySavedTheme()
 
-        // Initialize critical components on background thread to prevent ANR
+        // Initialize critical components on background thread
         applicationScope.launch {
             try {
-                // Initialize AuthManager FIRST (before anything that might use it)
+                // ✅ Initialize BackendConfig FIRST (before AuthManager)
+                BackendConfig.initialize(this@MyApplication)
+                Log.d(TAG, "BackendConfig initialized")
+                PersistentLogger.logEvent("SYSTEM", "BackendConfig initialized - ${BackendConfig.getOrganization()}")
+
+                // Initialize AuthManager
                 AuthManager.initialize(this@MyApplication)
                 Log.d(TAG, "AuthManager initialized")
                 PersistentLogger.logEvent("SYSTEM", "AuthManager initialized")
@@ -59,8 +64,7 @@ class MyApplication : Application() {
                 Log.d(TAG, "SavedMessagesManager initialized")
                 PersistentLogger.logEvent("SYSTEM", "SavedMessagesManager initialized")
 
-                // Start WebSocket service (persistent connection)
-                // This should be launched on Main dispatcher as it may involve UI
+                // Start WebSocket service
                 launch(Dispatchers.Main) {
                     WebSocketManager.initialize(this@MyApplication)
                     Log.d(TAG, "WebSocketManager initialized")
@@ -104,8 +108,6 @@ class MyApplication : Application() {
     }
 
     override fun onTerminate() {
-        // Note: onTerminate() is rarely called in production (only when process is killed)
-        // This is mainly useful for emulator/testing
         PersistentLogger.logEvent("SYSTEM", "===== APPLICATION TERMINATING =====")
         PersistentLogger.shutdown()
         super.onTerminate()
@@ -134,7 +136,6 @@ class MyApplication : Application() {
         Log.w(TAG, "Memory trim requested: $levelName")
         PersistentLogger.logEvent("SYSTEM", "Memory trim: $levelName")
 
-        // Force flush logs on critical memory situations
         if (level >= TRIM_MEMORY_RUNNING_CRITICAL) {
             PersistentLogger.flush()
         }

@@ -35,7 +35,8 @@ class WebSocketService : Service() {
 
     companion object {
         private const val TAG = "WebSocketService"
-        private const val WS_URL = "ws://202.140.131.90:2222/ws"
+        // ✅ REMOVED: private const val WS_URL = "ws://202.140.131.90:2222/ws"
+
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "iccc_alerts_service"
         private const val RECONNECT_DELAY = 5000L
@@ -46,12 +47,16 @@ class WebSocketService : Service() {
         private const val MAX_VISIBLE_NOTIFICATIONS = 25
 
         private const val ALERT_NOTIFICATION_CHANNEL_ID = "iccc_alerts"
-        private const val MAX_NOTIFICATIONS_PER_CHANNEL = 10 // Keep last 10 per channel
-
+        private const val MAX_NOTIFICATIONS_PER_CHANNEL = 10
 
         private val instanceLock = Any()
         private var instance: WebSocketService? = null
         private val isServiceRunning = AtomicBoolean(false)
+
+        private fun getWebSocketUrl(context: Context): String {
+            BackendConfig.initialize(context)
+            return BackendConfig.getWsUrl()
+        }
 
         fun start(context: Context) {
             synchronized(instanceLock) {
@@ -126,7 +131,6 @@ class WebSocketService : Service() {
     private var hasSubscribed = AtomicBoolean(false)
     private var lastSubscriptionTime = 0L
 
-    // ✅ Track connection state changes
     private var lastConnectionState = false
     private var connectionStateChangeTime = 0L
 
@@ -147,6 +151,14 @@ class WebSocketService : Service() {
 
         Log.d(TAG, "Service created")
         PersistentLogger.logServiceLifecycle("CREATED", "Service onCreate called")
+
+        // ✅ Initialize BackendConfig first
+        BackendConfig.initialize(this)
+        val organization = BackendConfig.getOrganization()
+        val wsUrl = BackendConfig.getWsUrl()
+
+        Log.d(TAG, "✅ Backend Configuration: Organization=$organization, WS=$wsUrl")
+        PersistentLogger.logEvent("SYSTEM", "Backend: $organization, URL: $wsUrl")
 
         deviceId = getDeviceId(this)
         Log.d(TAG, "✅ Using persistent client ID: $deviceId")
@@ -191,7 +203,7 @@ class WebSocketService : Service() {
             .retryOnConnectionFailure(true)
             .build()
 
-        startForeground(NOTIFICATION_ID, createNotification("Connecting..."))
+        startForeground(NOTIFICATION_ID, createNotification("Connecting to $organization..."))
         startEventProcessors()
         startAckFlusher()
         connect()
@@ -259,15 +271,20 @@ class WebSocketService : Service() {
             return
         }
 
-        Log.d(TAG, "Connecting with persistent client ID: $deviceId")
-        PersistentLogger.logConnection("CONNECTING", "Attempt ${reconnectAttempts + 1}")
-        updateNotification("Connecting...")
+        // ✅ Use dynamic URL based on organization
+        val wsUrl = getWebSocketUrl(this)
+        val organization = BackendConfig.getOrganization()
 
-        val request = Request.Builder().url(WS_URL).build()
+        Log.d(TAG, "Connecting to: $wsUrl (Backend: $organization, Client: $deviceId)")
+        PersistentLogger.logConnection("CONNECTING", "Backend: $organization, URL: $wsUrl, Attempt: ${reconnectAttempts + 1}")
+
+        updateNotification("Connecting to $organization...")
+
+        val request = Request.Builder().url(wsUrl).build()
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                Log.d(TAG, "✅ WebSocket connected")
+                Log.d(TAG, "✅ WebSocket connected to $organization backend")
                 isConnected = true
                 reconnectAttempts = 0
                 hasSubscribed.set(false)
@@ -275,12 +292,12 @@ class WebSocketService : Service() {
                 // ✅ Log connection state change
                 val now = System.currentTimeMillis()
                 val downtime = if (connectionStateChangeTime > 0) (now - connectionStateChangeTime) / 1000 else 0
-                PersistentLogger.logConnection("CONNECTED", "Downtime: ${downtime}s")
+                PersistentLogger.logConnection("CONNECTED", "Backend: $organization, Downtime: ${downtime}s")
                 lastConnectionState = true
                 connectionStateChangeTime = now
 
                 handler.post {
-                    updateNotification("Connected - Monitoring alerts")
+                    updateNotification("Connected - $organization Backend")
 
                     handler.postDelayed({
                         if (isConnected && !hasSubscribed.get()) {
@@ -301,7 +318,7 @@ class WebSocketService : Service() {
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 isConnected = false
                 hasSubscribed.set(false)
-                PersistentLogger.logConnection("CLOSING", "Code: $code, Reason: $reason")
+                PersistentLogger.logConnection("CLOSING", "Backend: $organization, Code: $code, Reason: $reason")
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
@@ -312,7 +329,7 @@ class WebSocketService : Service() {
 
                 // ✅ Log disconnection
                 val now = System.currentTimeMillis()
-                PersistentLogger.logConnection("CLOSED", "Code: $code, Reason: $reason")
+                PersistentLogger.logConnection("CLOSED", "Backend: $organization, Code: $code, Reason: $reason")
                 lastConnectionState = false
                 connectionStateChangeTime = now
 
@@ -320,7 +337,7 @@ class WebSocketService : Service() {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.e(TAG, "WebSocket error: ${t.message}")
+                Log.e(TAG, "WebSocket error on $organization backend: ${t.message}")
                 isConnected = false
                 hasSubscribed.set(false)
                 this@WebSocketService.webSocket = null
@@ -328,12 +345,12 @@ class WebSocketService : Service() {
 
                 // ✅ Log failure with details
                 val now = System.currentTimeMillis()
-                PersistentLogger.logError("CONNECTION", "WebSocket failure: ${t.message}", t)
+                PersistentLogger.logError("CONNECTION", "Backend: $organization, Error: ${t.message}", t)
                 lastConnectionState = false
                 connectionStateChangeTime = now
 
                 handler.post {
-                    updateNotification("Disconnected - Reconnecting...")
+                    updateNotification("Disconnected from $organization - Reconnecting...")
                     scheduleReconnect()
                 }
             }
@@ -574,11 +591,13 @@ class WebSocketService : Service() {
         )
 
         val json = gson.toJson(request)
-        Log.d(TAG, "📤 Subscription: $json")
+        val organization = BackendConfig.getOrganization()
+
+        Log.d(TAG, "📤 Subscription to $organization: $json")
 
         // ✅ Log subscription details
         PersistentLogger.logEvent("SUBSCRIPTION",
-            "Mode: ${if (resetConsumers) "RESET" else "RESUME"}, Channels: ${filters.size}")
+            "Backend: $organization, Mode: ${if (resetConsumers) "RESET" else "RESUME"}, Channels: ${filters.size}")
 
         if (resetConsumers) {
             Log.w(TAG, "⚠️ RESET MODE: Will delete old consumers and start fresh")
@@ -591,11 +610,11 @@ class WebSocketService : Service() {
         if (webSocket?.send(json) == true) {
             hasSubscribed.set(true)
             lastSubscriptionTime = now
-            Log.d(TAG, "✅ Subscription sent (reset=$resetConsumers)")
-            PersistentLogger.logEvent("SUBSCRIPTION", "Sent successfully")
+            Log.d(TAG, "✅ Subscription sent to $organization (reset=$resetConsumers)")
+            PersistentLogger.logEvent("SUBSCRIPTION", "Sent successfully to $organization")
             startCatchUpMonitoring()
         } else {
-            PersistentLogger.logError("SUBSCRIPTION", "Failed to send")
+            PersistentLogger.logError("SUBSCRIPTION", "Failed to send to $organization")
         }
     }
 
@@ -675,14 +694,19 @@ class WebSocketService : Service() {
 
     private fun scheduleReconnect() {
         if (reconnectAttempts >= maxReconnectAttempts) {
-            updateNotification("Connection failed - Tap to retry")
-            PersistentLogger.logConnection("RECONNECT_FAILED", "Max attempts reached")
+            val organization = BackendConfig.getOrganization()
+            updateNotification("Connection to $organization failed - Tap to retry")
+            PersistentLogger.logConnection("RECONNECT_FAILED", "Backend: $organization, Max attempts reached")
             return
         }
 
         reconnectAttempts++
         val delay = RECONNECT_DELAY * reconnectAttempts.coerceAtMost(12)
-        PersistentLogger.logConnection("RECONNECT_SCHEDULED", "Attempt $reconnectAttempts in ${delay}ms")
+        val organization = BackendConfig.getOrganization()
+
+        PersistentLogger.logConnection("RECONNECT_SCHEDULED",
+            "Backend: $organization, Attempt: $reconnectAttempts in ${delay}ms")
+
         handler.postDelayed({ connect() }, delay)
     }
 
@@ -946,6 +970,8 @@ class WebSocketService : Service() {
             isServiceRunning.set(false)
         }
 
+        val organization = BackendConfig.getOrganization()
+
         stopPingPong()
         stopCatchUpMonitoring()
 
@@ -973,6 +999,7 @@ class WebSocketService : Service() {
         SubscriptionManager.forceSave()
 
         val finalStats = """
+        Backend: $organization, 
         received=${receivedCount.get()}, processed=${processedCount.get()}, 
         acked=${ackedCount.get()}, dropped=${droppedCount.get()}, errors=${errorCount.get()}
     """.trimIndent()
@@ -982,8 +1009,10 @@ class WebSocketService : Service() {
         PersistentLogger.flush()
 
         val restartIntent = Intent(applicationContext, WebSocketService::class.java)
-        val pi = PendingIntent.getService(applicationContext, 1, restartIntent, PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE)
-        (getSystemService(Context.ALARM_SERVICE) as AlarmManager).set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 1000, pi)
+        val pi = PendingIntent.getService(applicationContext, 1, restartIntent,
+            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE)
+        (getSystemService(Context.ALARM_SERVICE) as AlarmManager).set(
+            AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 1000, pi)
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {

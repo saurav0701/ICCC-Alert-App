@@ -19,17 +19,10 @@ class RegistrationActivity : AppCompatActivity() {
     private lateinit var loginText: TextView
     private lateinit var progressBar: ProgressBar
 
-    private val areas = listOf(
-        "Sijua", "Kusunda", "Bastacolla", "Lodna", "Govindpur", "Barora",
-        "CCWO", "EJ", "CV Area", "WJ Area", "PB Area", "Block 2", "Katras"
-    )
-
-    private val areaValues = listOf(
-        "sijua", "kusunda", "bastacolla", "lodna", "govindpur", "barora",
-        "ccwo", "ej", "cvarea", "wjarea", "pbarea", "block2", "katras"
-    )
-
-    private val organisationOptions = listOf("BCCL","CCL")
+    // ✅ Areas will be dynamically loaded based on organization
+    private var areas = listOf<String>()
+    private var areaValues = listOf<String>()
+    private val organisationOptions = listOf("BCCL", "CCL")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,7 +32,7 @@ class RegistrationActivity : AppCompatActivity() {
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
         initializeViews()
-        setupSpinners()
+        setupOrganisationSpinner()
         setupListeners()
     }
 
@@ -54,16 +47,7 @@ class RegistrationActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progress_bar)
     }
 
-    private fun setupSpinners() {
-        // Setup Area Spinner
-        val areaAdapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_item,
-            areas
-        )
-        areaAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        areaSpinner.adapter = areaAdapter
-
+    private fun setupOrganisationSpinner() {
         // Setup Organisation Spinner
         val organisationAdapter = ArrayAdapter(
             this,
@@ -72,6 +56,46 @@ class RegistrationActivity : AppCompatActivity() {
         )
         organisationAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         organisationSpinner.adapter = organisationAdapter
+
+        // ✅ Load areas when organization is selected
+        organisationSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val selectedOrg = organisationOptions[position]
+                loadAreasForOrganization(selectedOrg)
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        // Load initial areas for BCCL (default)
+        loadAreasForOrganization("BCCL")
+    }
+
+    /**
+     * ✅ Load areas dynamically based on selected organization
+     */
+    private fun loadAreasForOrganization(organization: String) {
+        // Temporarily set organization to get correct areas
+        BackendConfig.setOrganization(organization)
+
+        val areasData = AvailableChannels.getAreas()
+        areas = areasData.map { it.second } // Display names
+        areaValues = areasData.map { it.first } // Internal names
+
+        // Setup Area Spinner with new areas
+        val areaAdapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            areas
+        )
+        areaAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        areaSpinner.adapter = areaAdapter
+
+        Toast.makeText(
+            this,
+            "Loaded ${areas.size} areas for $organization",
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     private fun setupListeners() {
@@ -123,6 +147,9 @@ class RegistrationActivity : AppCompatActivity() {
         val area = areaValues[areaIndex]
         val designation = designationInput.text.toString().trim()
         val organisation = organisationSpinner.selectedItem.toString()
+
+        // ✅ Set organization BEFORE making API call
+        BackendConfig.setOrganization(organisation)
 
         val request = RegistrationRequest(
             name = name,

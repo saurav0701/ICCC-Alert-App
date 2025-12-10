@@ -30,9 +30,6 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
-/**
- * Helper class containing all binding logic and utility methods for ChannelEventsAdapter
- */
 class EventBindingHelpers(
     private val context: Context,
     private val channelArea: String,
@@ -51,7 +48,6 @@ class EventBindingHelpers(
         private const val TAG = "EventBindingHelpers"
     }
 
-    // Data classes
     data class GeofenceData(
         val points: List<GeoPoint>,
         val type: String,
@@ -66,8 +62,6 @@ class EventBindingHelpers(
         val geofenceColor: String?,
         val boundingBox: org.osmdroid.util.BoundingBox?
     )
-
-    // ==================== UTILITY METHODS ====================
 
     fun getEventTypeIcon(type: String): Pair<String, String> {
         return when (type.lowercase()) {
@@ -153,24 +147,50 @@ class EventBindingHelpers(
     }
 
     fun getHttpUrlForArea(area: String): String {
-        return when (area.lowercase()) {
+        val normalizedArea = area.lowercase().replace(" ", "").replace("_", "")
+
+        if (BackendConfig.isCCL()) {
+            return when (normalizedArea) {
+                "barkasayal" -> "https://barkasayal.cclai.in/api"
+                "argada" -> "https://argada.cclai.in/api"
+                "northkaranpura" -> "https://nk.cclai.in/api"
+                "bokarokargali" -> "https://bk.cclai.in/api"
+                "kathara" -> "https://kathara.cclai.in/api"
+                "giridih" -> "https://giridih.cclai.in/api"
+                "amrapali" -> "https://amrapali.cclai.in/api"
+                "magadh" -> "https://magadh.cclai.in/api"
+                "rajhara" -> "https://rajhara.cclai.in/api"
+                "kuju" -> "https://kuju.cclai.in/api"
+                "hazaribagh" -> "https://hazaribagh.cclai.in/api"
+                "rajrappa" -> "https://rajrappa.cclai.in/api"
+                "dhori" -> "https://dhori.cclai.in/api"
+                "piparwar" -> "https://piparwar.cclai.in/api"
+                else -> {
+                    Log.w(TAG, "Unknown CCL area: $area, using default")
+                    "https://barkasayal.cclai.in/api" // Default CCL URL
+                }
+            }
+        }
+
+        return when (normalizedArea) {
             "sijua", "katras" -> "http://a5va.bccliccc.in:10050"
             "kusunda" -> "http://a6va.bccliccc.in:5050"
             "bastacolla" -> "http://a9va.bccliccc.in:5050"
             "lodna" -> "http://a10va.bccliccc.in:5050"
             "govindpur" -> "http://103.208.173.163:5050"
             "barora" -> "http://103.208.173.131:5050"
-            "block 2" -> "http://103.208.173.147:5050"
-            "pb area" -> "http://103.208.173.195:5050"
-            "wj" -> "http://103.208.173.211:5050"
+            "block2" -> "http://103.208.173.147:5050"
+            "pbarea" -> "http://103.208.173.195:5050"
+            "wjarea" -> "http://103.208.173.211:5050"
             "ccwo" -> "http://103.208.173.179:5050"
-            "cv area" -> "http://103.210.88.211:5050"
+            "cvarea" -> "http://103.210.88.211:5050"
             "ej" -> "http://103.210.88.194:5050"
-            else -> "http://a5va.bccliccc.in:10050"
+            else -> {
+                Log.w(TAG, "Unknown BCCL area: $area, using default")
+                "http://a5va.bccliccc.in:10050" // Default BCCL URL
+            }
         }
     }
-
-    // ==================== GEOFENCE & MAP DATA ====================
 
     fun extractAlertLocation(data: Map<String, Any>?): GeoPoint? {
         if (data == null) return null
@@ -280,8 +300,6 @@ class EventBindingHelpers(
         }
     }
 
-    // ==================== PDF & FILE OPERATIONS ====================
-
     fun openPdfFile(file: File) {
         try {
             val uri = FileProvider.getUriForFile(
@@ -338,7 +356,6 @@ class EventBindingHelpers(
         context.startActivity(intent)
     }
 
-    // ==================== IMAGE LOADING ====================
 
     suspend fun loadEventImageBitmap(area: String, eventId: String): Bitmap? {
         return withContext(Dispatchers.IO) {
@@ -346,7 +363,7 @@ class EventBindingHelpers(
                 val httpUrl = getHttpUrlForArea(area)
                 val imageUrl = "$httpUrl/va/event/?id=$eventId"
 
-                Log.d(TAG, "Loading image: $imageUrl")
+                Log.d(TAG, "Loading image (${BackendConfig.getOrganization()}): $imageUrl")
 
                 val request = Request.Builder().url(imageUrl).build()
                 val response = client.newCall(request).execute()
@@ -365,8 +382,6 @@ class EventBindingHelpers(
         }
     }
 
-    // ==================== ACTION OPERATIONS ====================
-
     suspend fun downloadEventImage(event: Event): File? {
         return withContext(Dispatchers.IO) {
             try {
@@ -374,6 +389,8 @@ class EventBindingHelpers(
                 val eventId = event.id ?: return@withContext null
                 val httpUrl = getHttpUrlForArea(area)
                 val imageUrl = "$httpUrl/va/event/?id=$eventId"
+
+                Log.d(TAG, "Downloading image (${BackendConfig.getOrganization()}): $imageUrl")
 
                 val request = Request.Builder().url(imageUrl).build()
                 val response = client.newCall(request).execute()
@@ -408,6 +425,8 @@ class EventBindingHelpers(
                 val eventId = event.id ?: return@withContext null
                 val httpUrl = getHttpUrlForArea(area)
                 val imageUrl = "$httpUrl/va/event/?id=$eventId"
+
+                Log.d(TAG, "Preparing share image (${BackendConfig.getOrganization()}): $imageUrl")
 
                 val request = Request.Builder().url(imageUrl).build()
                 val response = client.newCall(request).execute()
@@ -444,11 +463,6 @@ class EventBindingHelpers(
         }
     }
 
-    // ==================== DATE TIME PICKER ====================
-
-    /**
-     * Show DateTimePicker with both date and time selection
-     */
     fun showDateTimePicker(
         isFromDate: Boolean,
         currentDateTime: Date?,
@@ -461,14 +475,12 @@ class EventBindingHelpers(
             calendar.time = currentDateTime
         }
 
-        // First show date picker
         val datePicker = DatePickerDialog(
             context,
             { _, year, month, dayOfMonth ->
                 val selectedCalendar = Calendar.getInstance()
                 selectedCalendar.set(year, month, dayOfMonth)
 
-                // Then show time picker
                 val timePicker = TimePickerDialog(
                     context,
                     { _, hourOfDay, minute ->
@@ -511,10 +523,8 @@ class EventBindingHelpers(
             calendar.get(Calendar.DAY_OF_MONTH)
         )
 
-        // Set max date to current time
         datePicker.datePicker.maxDate = System.currentTimeMillis()
 
-        // Set constraints based on from/to selection
         if (!isFromDate && customFromDate != null) {
             datePicker.datePicker.minDate = customFromDate.time
         }

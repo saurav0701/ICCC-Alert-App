@@ -3,7 +3,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F8F9FA">
+    android:background="#F8F9FA"
+    android:scrollbars="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -23,8 +24,8 @@
             android:letterSpacing="0.08"
             android:paddingStart="20dp"
             android:paddingEnd="20dp"
-            android:paddingTop="16dp"
-            android:paddingBottom="10dp" />
+            android:paddingTop="20dp"
+            android:paddingBottom="12dp" />
 
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
@@ -33,67 +34,59 @@
             android:layout_marginEnd="16dp"
             android:layout_marginBottom="8dp"
             app:cardCornerRadius="12dp"
-            app:cardElevation="1dp"
-            app:cardBackgroundColor="#FFFFFF">
+            app:cardElevation="1dp">
 
-            <LinearLayout
+            <RelativeLayout
+                android:id="@+id/theme_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:minHeight="64dp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:paddingTop="18dp"
+                android:paddingBottom="18dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
 
-                <!-- Theme Mode -->
-                <RelativeLayout
-                    android:id="@+id/theme_container"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:paddingTop="16dp"
-                    android:paddingBottom="16dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true">
+                    android:layout_centerVertical="true"
+                    android:layout_toStartOf="@+id/theme_icon"
+                    android:orientation="vertical">
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    <TextView
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_centerVertical="true"
-                        android:layout_toStartOf="@+id/theme_icon"
-                        android:orientation="vertical">
+                        android:text="Theme"
+                        android:textSize="17sp"
+                        android:textColor="#1A1A1A"
+                        android:fontFamily="sans-serif-medium" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Theme"
-                            android:textSize="16sp"
-                            android:textColor="#1A1A1A"
-                            android:fontFamily="sans-serif" />
+                    <TextView
+                        android:id="@+id/theme_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Light"
+                        android:textSize="14sp"
+                        android:textColor="#757575"
+                        android:fontFamily="sans-serif"
+                        android:layout_marginTop="4dp" />
 
-                        <TextView
-                            android:id="@+id/theme_value"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Light"
-                            android:textSize="14sp"
-                            android:textColor="#757575"
-                            android:fontFamily="sans-serif"
-                            android:layout_marginTop="2dp" />
+                </LinearLayout>
 
-                    </LinearLayout>
+                <ImageView
+                    android:id="@+id/theme_icon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:src="@drawable/ic_arrow_forward"
+                    android:tint="#BDBDBD"
+                    android:contentDescription="Theme options" />
 
-                    <ImageView
-                        android:id="@+id/theme_icon"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_alignParentEnd="true"
-                        android:layout_centerVertical="true"
-                        android:src="@drawable/ic_arrow_forward"
-                        android:tint="#BDBDBD"
-                        android:contentDescription="Theme options" />
-
-                </RelativeLayout>
-
-            </LinearLayout>
+            </RelativeLayout>
 
         </androidx.cardview.widget.CardView>
 
@@ -108,8 +101,8 @@
             android:letterSpacing="0.08"
             android:paddingStart="20dp"
             android:paddingEnd="20dp"
-            android:paddingTop="16dp"
-            android:paddingBottom="10dp" />
+            android:paddingTop="20dp"
+            android:paddingBottom="12dp" />
 
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
@@ -118,8 +111,7 @@
             android:layout_marginEnd="16dp"
             android:layout_marginBottom="8dp"
             app:cardCornerRadius="12dp"
-            app:cardElevation="1dp"
-            app:cardBackgroundColor="#FFFFFF">
+            app:cardElevation="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -130,10 +122,11 @@
                 <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:paddingTop="16dp"
-                    android:paddingBottom="16dp">
+                    android:minHeight="72dp"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="20dp"
+                    android:paddingTop="18dp"
+                    android:paddingBottom="18dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -146,18 +139,18 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Enable Notifications"
-                            android:textSize="16sp"
+                            android:textSize="17sp"
                             android:textColor="#1A1A1A"
-                            android:fontFamily="sans-serif" />
+                            android:fontFamily="sans-serif-medium" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Receive alerts for subscribed channels"
-                            android:textSize="13sp"
+                            android:textSize="14sp"
                             android:textColor="#757575"
                             android:fontFamily="sans-serif"
-                            android:layout_marginTop="2dp" />
+                            android:layout_marginTop="4dp" />
 
                     </LinearLayout>
 
@@ -167,6 +160,7 @@
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
                         android:layout_centerVertical="true"
+                        android:minHeight="48dp"
                         android:checked="true" />
 
                 </RelativeLayout>
@@ -175,17 +169,18 @@
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="#F0F0F0"
-                    android:layout_marginStart="18dp" />
+                    android:layout_marginStart="20dp" />
 
-                <!-- Notification Status Checker -->
+                <!-- Notification Status -->
                 <RelativeLayout
                     android:id="@+id/notification_status_container"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:paddingTop="16dp"
-                    android:paddingBottom="16dp"
+                    android:minHeight="72dp"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="20dp"
+                    android:paddingTop="18dp"
+                    android:paddingBottom="18dp"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     android:focusable="true">
@@ -201,18 +196,18 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Notification Status"
-                            android:textSize="16sp"
+                            android:textSize="17sp"
                             android:textColor="#1A1A1A"
-                            android:fontFamily="sans-serif" />
+                            android:fontFamily="sans-serif-medium" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Check if notifications are working"
-                            android:textSize="13sp"
+                            android:textSize="14sp"
                             android:textColor="#757575"
                             android:fontFamily="sans-serif"
-                            android:layout_marginTop="2dp" />
+                            android:layout_marginTop="4dp" />
 
                     </LinearLayout>
 
@@ -232,16 +227,17 @@
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="#F0F0F0"
-                    android:layout_marginStart="18dp" />
+                    android:layout_marginStart="20dp" />
 
                 <!-- Vibration -->
                 <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:paddingTop="16dp"
-                    android:paddingBottom="16dp">
+                    android:minHeight="72dp"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="20dp"
+                    android:paddingTop="18dp"
+                    android:paddingBottom="18dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -254,18 +250,18 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Vibration"
-                            android:textSize="16sp"
+                            android:textSize="17sp"
                             android:textColor="#1A1A1A"
-                            android:fontFamily="sans-serif" />
+                            android:fontFamily="sans-serif-medium" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Vibrate on new alerts"
-                            android:textSize="13sp"
+                            android:textSize="14sp"
                             android:textColor="#757575"
                             android:fontFamily="sans-serif"
-                            android:layout_marginTop="2dp" />
+                            android:layout_marginTop="4dp" />
 
                     </LinearLayout>
 
@@ -275,6 +271,7 @@
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
                         android:layout_centerVertical="true"
+                        android:minHeight="48dp"
                         android:checked="true" />
 
                 </RelativeLayout>
@@ -283,20 +280,19 @@
 
         </androidx.cardview.widget.CardView>
 
-        <!-- Diagnostics Section - COMMENTED OUT FOR TESTING BUILD -->
-        <!--
+        <!-- Backend Configuration -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Diagnostics"
+            android:text="Backend Configuration"
             android:textSize="13sp"
             android:textColor="#757575"
             android:fontFamily="sans-serif-medium"
             android:letterSpacing="0.08"
             android:paddingStart="20dp"
             android:paddingEnd="20dp"
-            android:paddingTop="16dp"
-            android:paddingBottom="10dp" />
+            android:paddingTop="20dp"
+            android:paddingBottom="12dp" />
 
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
@@ -305,216 +301,70 @@
             android:layout_marginEnd="16dp"
             android:layout_marginBottom="8dp"
             app:cardCornerRadius="12dp"
-            app:cardElevation="1dp"
-            app:cardBackgroundColor="#FFFFFF">
+            app:cardElevation="1dp">
 
-            <LinearLayout
+            <RelativeLayout
+                android:id="@+id/backend_info_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:minHeight="80dp"
+                android:padding="20dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
 
-                <RelativeLayout
-                    android:id="@+id/view_logs_container"
+                <ImageView
+                    android:id="@+id/backend_icon"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_alignParentStart="true"
+                    android:layout_centerVertical="true"
+                    android:src="@android:drawable/ic_menu_compass"
+                    android:tint="?attr/colorPrimary"
+                    android:contentDescription="Backend Info" />
+
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:paddingTop="16dp"
-                    android:paddingBottom="16dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true">
+                    android:layout_toEndOf="@id/backend_icon"
+                    android:layout_marginStart="16dp"
+                    android:layout_toStartOf="@id/backend_chevron"
+                    android:layout_centerVertical="true"
+                    android:orientation="vertical">
 
-                    <ImageView
-                        android:id="@+id/logs_icon"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_alignParentStart="true"
-                        android:layout_centerVertical="true"
-                        android:layout_marginEnd="16dp"
-                        android:src="@drawable/ic_description"
-                        android:tint="#FF9800"
-                        android:contentDescription="View logs" />
-
-                    <LinearLayout
+                    <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_centerVertical="true"
-                        android:layout_toEndOf="@id/logs_icon"
-                        android:layout_toStartOf="@+id/logs_arrow"
-                        android:orientation="vertical">
+                        android:text="Backend Server"
+                        android:textSize="17sp"
+                        android:textColor="#1A1A1A"
+                        android:fontFamily="sans-serif-medium" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="View Logs"
-                            android:textSize="16sp"
-                            android:textColor="#1A1A1A"
-                            android:fontFamily="sans-serif" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="View recent app activity logs"
-                            android:textSize="13sp"
-                            android:textColor="#757575"
-                            android:fontFamily="sans-serif"
-                            android:layout_marginTop="2dp" />
-
-                    </LinearLayout>
-
-                    <ImageView
-                        android:id="@+id/logs_arrow"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_alignParentEnd="true"
-                        android:layout_centerVertical="true"
-                        android:src="@drawable/ic_arrow_forward"
-                        android:tint="#BDBDBD"
-                        android:contentDescription="Open logs" />
-
-                </RelativeLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="#F0F0F0"
-                    android:layout_marginStart="18dp" />
-
-                <RelativeLayout
-                    android:id="@+id/export_logs_container"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:paddingTop="16dp"
-                    android:paddingBottom="16dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true">
-
-                    <ImageView
-                        android:id="@+id/export_icon"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_alignParentStart="true"
-                        android:layout_centerVertical="true"
-                        android:layout_marginEnd="16dp"
-                        android:src="@drawable/ic_share"
-                        android:tint="#4CAF50"
-                        android:contentDescription="Export logs" />
-
-                    <LinearLayout
+                    <TextView
+                        android:id="@+id/backend_info_text"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_centerVertical="true"
-                        android:layout_toEndOf="@id/export_icon"
-                        android:layout_toStartOf="@+id/export_arrow"
-                        android:orientation="vertical">
+                        android:layout_marginTop="6dp"
+                        android:text="Loading..."
+                        android:textSize="14sp"
+                        android:fontFamily="monospace"
+                        android:textColor="#757575"
+                        android:ellipsize="end"
+                        android:maxLines="2" />
+                </LinearLayout>
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Export Logs"
-                            android:textSize="16sp"
-                            android:textColor="#1A1A1A"
-                            android:fontFamily="sans-serif" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Save logs to file for sharing"
-                            android:textSize="13sp"
-                            android:textColor="#757575"
-                            android:fontFamily="sans-serif"
-                            android:layout_marginTop="2dp" />
-
-                    </LinearLayout>
-
-                    <ImageView
-                        android:id="@+id/export_arrow"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_alignParentEnd="true"
-                        android:layout_centerVertical="true"
-                        android:src="@drawable/ic_arrow_forward"
-                        android:tint="#BDBDBD"
-                        android:contentDescription="Export" />
-
-                </RelativeLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="#F0F0F0"
-                    android:layout_marginStart="18dp" />
-
-                <RelativeLayout
-                    android:id="@+id/clear_logs_container"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:paddingTop="16dp"
-                    android:paddingBottom="16dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true">
-
-                    <ImageView
-                        android:id="@+id/clear_logs_icon"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_alignParentStart="true"
-                        android:layout_centerVertical="true"
-                        android:layout_marginEnd="16dp"
-                        android:src="@drawable/ic_delete"
-                        android:tint="#F44336"
-                        android:contentDescription="Clear logs" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_centerVertical="true"
-                        android:layout_toEndOf="@id/clear_logs_icon"
-                        android:layout_toStartOf="@+id/clear_logs_arrow"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Clear Logs"
-                            android:textSize="16sp"
-                            android:textColor="#1A1A1A"
-                            android:fontFamily="sans-serif" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Delete all log files"
-                            android:textSize="13sp"
-                            android:textColor="#757575"
-                            android:fontFamily="sans-serif"
-                            android:layout_marginTop="2dp" />
-
-                    </LinearLayout>
-
-                    <ImageView
-                        android:id="@+id/clear_logs_arrow"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_alignParentEnd="true"
-                        android:layout_centerVertical="true"
-                        android:src="@drawable/ic_arrow_forward"
-                        android:tint="#BDBDBD"
-                        android:contentDescription="Clear" />
-
-                </RelativeLayout>
-
-            </LinearLayout>
+                <ImageView
+                    android:id="@+id/backend_chevron"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:src="@android:drawable/ic_menu_info_details"
+                    android:tint="?attr/colorControlNormal"
+                    android:contentDescription="View Details" />
+            </RelativeLayout>
 
         </androidx.cardview.widget.CardView>
-        -->
 
         <!-- Storage Section -->
         <TextView
@@ -527,8 +377,8 @@
             android:letterSpacing="0.08"
             android:paddingStart="20dp"
             android:paddingEnd="20dp"
-            android:paddingTop="16dp"
-            android:paddingBottom="10dp" />
+            android:paddingTop="20dp"
+            android:paddingBottom="12dp" />
 
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
@@ -537,29 +387,28 @@
             android:layout_marginEnd="16dp"
             android:layout_marginBottom="8dp"
             app:cardCornerRadius="12dp"
-            app:cardElevation="1dp"
-            app:cardBackgroundColor="#FFFFFF">
+            app:cardElevation="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="24dp">
 
                 <TextView
                     android:id="@+id/storage_info_text"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Loading storage info..."
-                    android:textSize="14sp"
+                    android:textSize="15sp"
                     android:textColor="#424242"
                     android:lineSpacingExtra="4dp"
-                    android:layout_marginBottom="16dp" />
+                    android:layout_marginBottom="20dp" />
 
                 <Button
                     android:id="@+id/clear_data_button"
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
+                    android:layout_height="56dp"
                     android:text="Clear App Data"
                     android:textColor="#FFFFFF"
                     android:textSize="16sp"
@@ -568,17 +417,17 @@
                     android:fontFamily="sans-serif-medium"
                     android:drawableStart="@drawable/ic_delete"
                     android:drawableTint="#FFFFFF"
-                    android:drawablePadding="8dp"
+                    android:drawablePadding="10dp"
                     android:gravity="center" />
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Note: This will NOT delete your subscriptions or logout"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textColor="#9E9E9E"
                     android:textStyle="italic"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="12dp"
                     android:gravity="center" />
 
             </LinearLayout>
@@ -596,8 +445,8 @@
             android:letterSpacing="0.08"
             android:paddingStart="20dp"
             android:paddingEnd="20dp"
-            android:paddingTop="16dp"
-            android:paddingBottom="10dp" />
+            android:paddingTop="20dp"
+            android:paddingBottom="12dp" />
 
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
@@ -606,78 +455,70 @@
             android:layout_marginEnd="16dp"
             android:layout_marginBottom="8dp"
             app:cardCornerRadius="12dp"
-            app:cardElevation="1dp"
-            app:cardBackgroundColor="#FFFFFF">
+            app:cardElevation="1dp">
 
-            <LinearLayout
+            <RelativeLayout
+                android:id="@+id/help_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:minHeight="72dp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:paddingTop="18dp"
+                android:paddingBottom="18dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
 
-                <!-- Help -->
-                <RelativeLayout
-                    android:id="@+id/help_container"
+                <ImageView
+                    android:id="@+id/help_icon"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_alignParentStart="true"
+                    android:layout_centerVertical="true"
+                    android:layout_marginEnd="16dp"
+                    android:src="@drawable/ic_help"
+                    android:tint="#2196F3"
+                    android:contentDescription="Help" />
+
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:paddingTop="16dp"
-                    android:paddingBottom="16dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true">
+                    android:layout_centerVertical="true"
+                    android:layout_toEndOf="@id/help_icon"
+                    android:layout_toStartOf="@+id/help_arrow"
+                    android:orientation="vertical">
 
-                    <ImageView
-                        android:id="@+id/help_icon"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_alignParentStart="true"
-                        android:layout_centerVertical="true"
-                        android:layout_marginEnd="16dp"
-                        android:src="@drawable/ic_help"
-                        android:tint="#2196F3"
-                        android:contentDescription="Help" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    <TextView
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_centerVertical="true"
-                        android:layout_toEndOf="@id/help_icon"
-                        android:layout_toStartOf="@+id/help_arrow"
-                        android:orientation="vertical">
+                        android:text="Help"
+                        android:textSize="17sp"
+                        android:textColor="#1A1A1A"
+                        android:fontFamily="sans-serif-medium" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Help"
-                            android:textSize="16sp"
-                            android:textColor="#1A1A1A"
-                            android:fontFamily="sans-serif" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="FAQs and support"
+                        android:textSize="14sp"
+                        android:textColor="#757575"
+                        android:fontFamily="sans-serif"
+                        android:layout_marginTop="4dp" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="FAQs and support"
-                            android:textSize="13sp"
-                            android:textColor="#757575"
-                            android:fontFamily="sans-serif"
-                            android:layout_marginTop="2dp" />
+                </LinearLayout>
 
-                    </LinearLayout>
+                <ImageView
+                    android:id="@+id/help_arrow"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:src="@drawable/ic_arrow_forward"
+                    android:tint="#BDBDBD"
+                    android:contentDescription="Open help" />
 
-                    <ImageView
-                        android:id="@+id/help_arrow"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_alignParentEnd="true"
-                        android:layout_centerVertical="true"
-                        android:src="@drawable/ic_arrow_forward"
-                        android:tint="#BDBDBD"
-                        android:contentDescription="Open help" />
-
-                </RelativeLayout>
-
-            </LinearLayout>
+            </RelativeLayout>
 
         </androidx.cardview.widget.CardView>
 
@@ -692,8 +533,8 @@
             android:letterSpacing="0.08"
             android:paddingStart="20dp"
             android:paddingEnd="20dp"
-            android:paddingTop="16dp"
-            android:paddingBottom="10dp" />
+            android:paddingTop="20dp"
+            android:paddingBottom="12dp" />
 
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
@@ -701,14 +542,13 @@
             android:layout_marginStart="16dp"
             android:layout_marginEnd="16dp"
             app:cardCornerRadius="12dp"
-            app:cardElevation="1dp"
-            app:cardBackgroundColor="#FFFFFF">
+            app:cardElevation="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="24dp">
 
                 <!-- App Icon and Name -->
                 <LinearLayout
@@ -718,8 +558,8 @@
                     android:gravity="center_vertical">
 
                     <ImageView
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
                         android:src="@mipmap/ic_launcher"
                         android:contentDescription="App icon" />
 
@@ -728,13 +568,13 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:orientation="vertical"
-                        android:layout_marginStart="16dp">
+                        android:layout_marginStart="20dp">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="ICCC Alert"
-                            android:textSize="20sp"
+                            android:textSize="22sp"
                             android:textColor="#1A1A1A"
                             android:fontFamily="sans-serif-medium" />
 
@@ -742,10 +582,10 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Version 1.0.0"
-                            android:textSize="14sp"
+                            android:textSize="15sp"
                             android:textColor="#757575"
                             android:fontFamily="sans-serif"
-                            android:layout_marginTop="2dp" />
+                            android:layout_marginTop="4dp" />
 
                     </LinearLayout>
 
@@ -756,11 +596,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Real-time monitoring and intelligent alert system for enhanced security and operational awareness."
-                    android:textSize="14sp"
+                    android:textSize="15sp"
                     android:textColor="#616161"
                     android:fontFamily="sans-serif"
-                    android:lineSpacingExtra="2dp"
-                    android:layout_marginTop="16dp" />
+                    android:lineSpacingExtra="3dp"
+                    android:layout_marginTop="20dp" />
 
             </LinearLayout>
 

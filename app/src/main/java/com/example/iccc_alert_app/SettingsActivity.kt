@@ -15,6 +15,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.FileProvider
+import com.example.iccc_alert_app.auth.AuthManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,16 +32,13 @@ class SettingsActivity : BaseDrawerActivity() {
     private lateinit var helpContainer: RelativeLayout
     private lateinit var notificationStatusContainer: RelativeLayout
 
+    // ✅ NEW: Backend info views
+    private lateinit var backendInfoContainer: RelativeLayout
+    private lateinit var backendInfoText: TextView
+
     // Storage management
     private lateinit var storageInfoText: TextView
     private lateinit var clearDataButton: Button
-
-    // Diagnostics - COMMENTED OUT FOR TESTING BUILD
-    /*
-    private lateinit var viewLogsContainer: RelativeLayout
-    private lateinit var exportLogsContainer: RelativeLayout
-    private lateinit var clearLogsContainer: RelativeLayout
-    */
 
     companion object {
         private const val PREFS_NAME = "ICCCAlertPrefs"
@@ -81,12 +79,13 @@ class SettingsActivity : BaseDrawerActivity() {
         loadSettings()
         setupListeners()
         updateStorageInfo()
+        updateBackendInfo() // ✅ NEW
     }
 
     override fun onResume() {
         super.onResume()
-        // Ensure Settings tab is selected
         setSelectedMenuItem(R.id.nav_settings)
+        updateBackendInfo() // ✅ Refresh on resume
     }
 
     private fun initializeViews() {
@@ -97,15 +96,12 @@ class SettingsActivity : BaseDrawerActivity() {
         helpContainer = findViewById(R.id.help_container)
         notificationStatusContainer = findViewById(R.id.notification_status_container)
 
+        // ✅ NEW: Backend info views
+        backendInfoContainer = findViewById(R.id.backend_info_container)
+        backendInfoText = findViewById(R.id.backend_info_text)
+
         storageInfoText = findViewById(R.id.storage_info_text)
         clearDataButton = findViewById(R.id.clear_data_button)
-
-        // Diagnostics views - COMMENTED OUT FOR TESTING BUILD
-        /*
-        viewLogsContainer = findViewById(R.id.view_logs_container)
-        exportLogsContainer = findViewById(R.id.export_logs_container)
-        clearLogsContainer = findViewById(R.id.clear_logs_container)
-        */
     }
 
     private fun loadSettings() {
@@ -152,25 +148,277 @@ class SettingsActivity : BaseDrawerActivity() {
             NotificationStatusHelper.showNotificationStatusDialog(this)
         }
 
+        // ✅ NEW: Backend info click listener
+        backendInfoContainer.setOnClickListener {
+            showBackendInfoDialog()
+        }
+
         clearDataButton.setOnClickListener {
             showClearDataConfirmation()
         }
-
-        // Diagnostics listeners - COMMENTED OUT FOR TESTING BUILD
-        /*
-        viewLogsContainer.setOnClickListener {
-            showLogsDialog()
-        }
-
-        exportLogsContainer.setOnClickListener {
-            exportLogs()
-        }
-
-        clearLogsContainer.setOnClickListener {
-            confirmClearLogs()
-        }
-        */
     }
+
+    // ============================================
+    // ✅ NEW: BACKEND CONFIGURATION SECTION
+    // ============================================
+
+    /**
+     * Update backend info display
+     */
+    private fun updateBackendInfo() {
+        try {
+            val user = AuthManager.getCurrentUser()
+            val org = user?.workingFor ?: BackendConfig.getOrganization()
+            val backendUrl = BackendConfig.getHttpBaseUrl()
+
+            // Show organization and backend URL
+            backendInfoText.text = "$org Backend\n$backendUrl"
+
+            android.util.Log.d("SettingsActivity", "Backend info: $org - $backendUrl")
+        } catch (e: Exception) {
+            backendInfoText.text = "Backend info unavailable"
+            android.util.Log.e("SettingsActivity", "Error updating backend info", e)
+        }
+    }
+
+    /**
+     * Show detailed backend configuration dialog
+     */
+    private fun showBackendInfoDialog() {
+        try {
+            val user = AuthManager.getCurrentUser()
+            val info = BackendConfig.getOrganizationInfo()
+            val channelInfo = AvailableChannels.getOrganizationInfo()
+
+            val message = buildString {
+                append("━━━━━━━━━━━━━━━━━━━━━━\n")
+                append("BACKEND CONFIGURATION\n")
+                append("━━━━━━━━━━━━━━━━━━━━━━\n\n")
+
+                append("Organization:\n")
+                append("  ${info["organization"]}\n\n")
+
+                append("Backend Server:\n")
+                append("  ${info["backend"]}\n\n")
+
+                append("HTTP Endpoint:\n")
+                append("  ${info["httpUrl"]}\n\n")
+
+                append("WebSocket URL:\n")
+                append("  ${info["wsUrl"]}\n\n")
+
+                append("Available Channels:\n")
+                append("  $channelInfo\n\n")
+
+                if (user != null) {
+                    append("━━━━━━━━━━━━━━━━━━━━━━\n")
+                    append("USER INFORMATION\n")
+                    append("━━━━━━━━━━━━━━━━━━━━━━\n\n")
+                    append("Name: ${user.name}\n")
+                    append("Phone: +91 ${user.phone}\n")
+                    append("Area: ${user.area}\n")
+                    append("Designation: ${user.designation}\n")
+                    append("Organization: ${user.workingFor}\n\n")
+                }
+
+                append("━━━━━━━━━━━━━━━━━━━━━━\n")
+                append("Status: Connected\n")
+                append("━━━━━━━━━━━━━━━━━━━━━━")
+            }
+
+            AlertDialog.Builder(this)
+                .setTitle("Backend Configuration")
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .setNeutralButton("Test Connection") { _, _ ->
+                    testBackendConnection()
+                }
+                .setNegativeButton("View Statistics") { _, _ ->
+                    showBackendStatistics()
+                }
+                .show()
+
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error loading backend info: ${e.message}", Toast.LENGTH_LONG).show()
+            android.util.Log.e("SettingsActivity", "Error showing backend dialog", e)
+        }
+    }
+
+    /**
+     * Test backend connectivity
+     */
+    private fun testBackendConnection() {
+        val progressDialog = android.app.ProgressDialog(this)
+        progressDialog.setMessage("Testing connection to ${BackendConfig.getOrganization()} backend...")
+        progressDialog.setCancelable(false)
+        progressDialog.show()
+
+        Thread {
+            try {
+                val url = java.net.URL(BackendConfig.getHttpBaseUrl())
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.connectTimeout = 5000
+                connection.readTimeout = 5000
+                connection.requestMethod = "GET"
+
+                val responseCode = connection.responseCode
+                val responseTime = connection.headerFields["Date"]?.firstOrNull() ?: "Unknown"
+
+                runOnUiThread {
+                    progressDialog.dismiss()
+
+                    val statusEmoji = when {
+                        responseCode in 200..299 -> "✅"
+                        responseCode == 404 -> "⚠️"
+                        else -> "❌"
+                    }
+
+                    val message = buildString {
+                        append("$statusEmoji Connection Test Results\n\n")
+                        append("Backend: ${BackendConfig.getOrganization()}\n")
+                        append("URL: ${BackendConfig.getHttpBaseUrl()}\n")
+                        append("Status: HTTP $responseCode\n")
+                        append("Response Time: ${responseTime}\n\n")
+
+                        when {
+                            responseCode in 200..299 -> append("Backend is reachable and responding normally.")
+                            responseCode == 404 -> append("Backend is reachable but endpoint not found (this is normal).")
+                            else -> append("Backend responded with unexpected status code.")
+                        }
+                    }
+
+                    AlertDialog.Builder(this)
+                        .setTitle("Connection Test")
+                        .setMessage(message)
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+
+                connection.disconnect()
+
+            } catch (e: Exception) {
+                runOnUiThread {
+                    progressDialog.dismiss()
+
+                    val message = buildString {
+                        append("❌ Connection Failed\n\n")
+                        append("Backend: ${BackendConfig.getOrganization()}\n")
+                        append("URL: ${BackendConfig.getHttpBaseUrl()}\n\n")
+                        append("Error: ${e.message}\n\n")
+                        append("Possible causes:\n")
+                        append("• Network connectivity issues\n")
+                        append("• Backend server is down\n")
+                        append("• Firewall blocking connection\n")
+                        append("• Incorrect backend URL\n")
+                    }
+
+                    AlertDialog.Builder(this)
+                        .setTitle("Connection Test Failed")
+                        .setMessage(message)
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
+        }.start()
+    }
+
+    /**
+     * Show detailed backend statistics
+     */
+    private fun showBackendStatistics() {
+        try {
+            val stats = AvailableChannels.getStats()
+            val syncStats = ChannelSyncState.getStats()
+            val storageStats = SubscriptionManager.getStorageStats()
+
+            val message = buildString {
+                append("━━━━━━━━━━━━━━━━━━━━━━\n")
+                append("SYSTEM STATISTICS\n")
+                append("━━━━━━━━━━━━━━━━━━━━━━\n\n")
+
+                append("Organization:\n")
+                append("  Current: ${stats["organization"]}\n")
+                append("  Is CCL: ${stats["isCCL"]}\n")
+                append("  Is BCCL: ${stats["isBCCL"]}\n\n")
+
+                append("Available Channels:\n")
+                append("  BCCL Areas: ${stats["bcclAreas"]}\n")
+                append("  CCL Areas: ${stats["cclAreas"]}\n")
+                append("  Current Areas: ${stats["currentAreas"]}\n")
+                append("  Event Types: ${stats["eventTypes"]}\n")
+                append("  Total Channels: ${stats["totalChannels"]}\n\n")
+
+                append("Subscriptions:\n")
+                append("  Active Channels: ${storageStats.size}\n")
+                append("  Cached Events: ${storageStats.values.sum()}\n\n")
+
+                append("Synchronization:\n")
+                val syncInfo = syncStats as? Map<*, *>
+                if (syncInfo != null) {
+                    append("  Channel Count: ${syncInfo["channelCount"]}\n")
+                    append("  Total Events: ${syncInfo["totalEvents"]}\n")
+                }
+            }
+
+            AlertDialog.Builder(this)
+                .setTitle("Backend Statistics")
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show()
+
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error loading statistics: ${e.message}", Toast.LENGTH_LONG).show()
+            android.util.Log.e("SettingsActivity", "Error showing statistics", e)
+        }
+    }
+
+    // ============================================
+    // THEME MANAGEMENT
+    // ============================================
+
+    private fun showThemeDialog() {
+        val themes = arrayOf("Light", "Dark", "System Default")
+        val themeValues = arrayOf(THEME_LIGHT, THEME_DARK, THEME_SYSTEM)
+
+        val currentTheme = prefs.getString(KEY_THEME, THEME_LIGHT) ?: THEME_LIGHT
+        val currentIndex = themeValues.indexOf(currentTheme)
+
+        AlertDialog.Builder(this)
+            .setTitle("Choose Theme")
+            .setSingleChoiceItems(themes, currentIndex) { dialog, which ->
+                val selectedTheme = themeValues[which]
+                applyTheme(selectedTheme)
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun applyTheme(theme: String) {
+        prefs.edit().putString(KEY_THEME, theme).apply()
+
+        when (theme) {
+            THEME_LIGHT -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+            THEME_DARK -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+            THEME_SYSTEM -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        }
+
+        updateThemeDisplay(theme)
+        recreate()
+    }
+
+    private fun updateThemeDisplay(theme: String) {
+        themeValue.text = when (theme) {
+            THEME_LIGHT -> "Light"
+            THEME_DARK -> "Dark"
+            THEME_SYSTEM -> "System Default"
+            else -> "Light"
+        }
+    }
+
+    // ============================================
+    // STORAGE MANAGEMENT
+    // ============================================
 
     private fun updateStorageInfo() {
         val stats = SubscriptionManager.getStorageStats()
@@ -304,154 +552,8 @@ class SettingsActivity : BaseDrawerActivity() {
     }
 
     // ============================================
-    // DIAGNOSTICS - LOG MANAGEMENT
-    // COMMENTED OUT FOR TESTING BUILD
+    // HELP DIALOG
     // ============================================
-
-    /*
-    private fun showLogsDialog() {
-        val logs = PersistentLogger.getRecentLogs(200)
-
-        if (logs.isEmpty()) {
-            Toast.makeText(this, "No logs available", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val logText = logs.joinToString("\n")
-
-        val scrollView = ScrollView(this)
-        val textView = TextView(this).apply {
-            text = logText
-            textSize = 10f
-            setTextIsSelectable(true)
-            setPadding(32, 32, 32, 32)
-            typeface = android.graphics.Typeface.MONOSPACE
-        }
-        scrollView.addView(textView)
-
-        AlertDialog.Builder(this)
-            .setTitle("Recent Logs (last 200 lines)")
-            .setView(scrollView)
-            .setPositiveButton("Refresh") { _, _ ->
-                showLogsDialog()
-            }
-            .setNegativeButton("Close", null)
-            .setNeutralButton("Export") { _, _ ->
-                exportLogs()
-            }
-            .show()
-    }
-
-    private fun exportLogs() {
-        val progressDialog = android.app.ProgressDialog(this)
-        progressDialog.setMessage("Exporting logs...")
-        progressDialog.setCancelable(false)
-        progressDialog.show()
-
-        CoroutineScope(Dispatchers.Main).launch {
-            val file = withContext(Dispatchers.IO) {
-                PersistentLogger.exportLogs()
-            }
-
-            progressDialog.dismiss()
-
-            if (file != null) {
-                Toast.makeText(
-                    this@SettingsActivity,
-                    "Logs exported: ${file.name}",
-                    Toast.LENGTH_LONG
-                ).show()
-
-                // Offer to share
-                try {
-                    val uri = FileProvider.getUriForFile(
-                        this@SettingsActivity,
-                        "${packageName}.fileprovider",
-                        file
-                    )
-
-                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-
-                    startActivity(Intent.createChooser(shareIntent, "Share Logs"))
-                } catch (e: Exception) {
-                    Toast.makeText(
-                        this@SettingsActivity,
-                        "File exported but sharing failed: ${e.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            } else {
-                Toast.makeText(
-                    this@SettingsActivity,
-                    "Failed to export logs",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-    }
-
-    private fun confirmClearLogs() {
-        AlertDialog.Builder(this)
-            .setTitle("Clear Logs")
-            .setMessage("Are you sure you want to delete all log files? This cannot be undone.")
-            .setPositiveButton("Clear") { _, _ ->
-                PersistentLogger.clearLogs()
-                Toast.makeText(this, "Logs cleared", Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton("Cancel", null)
-            .setIcon(android.R.drawable.ic_dialog_alert)
-            .show()
-    }
-    */
-
-    // ============================================
-    // THEME MANAGEMENT
-    // ============================================
-
-    private fun showThemeDialog() {
-        val themes = arrayOf("Light", "Dark", "System Default")
-        val themeValues = arrayOf(THEME_LIGHT, THEME_DARK, THEME_SYSTEM)
-
-        val currentTheme = prefs.getString(KEY_THEME, THEME_LIGHT) ?: THEME_LIGHT
-        val currentIndex = themeValues.indexOf(currentTheme)
-
-        AlertDialog.Builder(this)
-            .setTitle("Choose Theme")
-            .setSingleChoiceItems(themes, currentIndex) { dialog, which ->
-                val selectedTheme = themeValues[which]
-                applyTheme(selectedTheme)
-                dialog.dismiss()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun applyTheme(theme: String) {
-        prefs.edit().putString(KEY_THEME, theme).apply()
-
-        when (theme) {
-            THEME_LIGHT -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-            THEME_DARK -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-            THEME_SYSTEM -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-        }
-
-        updateThemeDisplay(theme)
-        recreate()
-    }
-
-    private fun updateThemeDisplay(theme: String) {
-        themeValue.text = when (theme) {
-            THEME_LIGHT -> "Light"
-            THEME_DARK -> "Dark"
-            THEME_SYSTEM -> "System Default"
-            else -> "Light"
-        }
-    }
-
 
     private fun showHelpDialog() {
         val helpText = """
@@ -482,6 +584,11 @@ class SettingsActivity : BaseDrawerActivity() {
             • Clear cached events and saved messages to free up space
             • Your subscriptions and login remain intact
             • You'll receive current events after clearing
+            
+            🌐 Backend Configuration
+            • View current organization (BCCL/CCL)
+            • Test backend connectivity
+            • Check system statistics
             
             ⚠️ Battery & Notifications
             • Keep device charged for 24/7 monitoring
