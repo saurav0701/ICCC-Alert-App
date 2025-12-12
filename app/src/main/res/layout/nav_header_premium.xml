@@ -1,40 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="?attr/colorPrimary"
     android:orientation="vertical"
-    android:background="@drawable/nav_header_gradient_background"
-    android:padding="24dp"
-    android:paddingTop="40dp"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="24dp"
     android:paddingBottom="16dp"
-    android:theme="@style/ThemeOverlay.AppCompat.Dark">
+    android:gravity="center_horizontal"
+    android:theme="@style/ThemeOverlay.AppCompat.Dark"
+    android:minHeight="160dp"
+    android:fitsSystemWindows="true">
 
-    <!-- Profile Avatar with Badge -->
-    <androidx.cardview.widget.CardView
-        android:layout_width="80dp"
-        android:layout_height="80dp"
-        app:cardCornerRadius="40dp"
-        app:cardElevation="6dp"
-        android:layout_marginBottom="16dp">
+    <!-- User Avatar Circle -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="12dp"
+        app:cardCornerRadius="32dp"
+        app:cardElevation="4dp">
 
-        <ImageView
-            android:id="@+id/profile_avatar"
+        <TextView
+            android:id="@+id/user_avatar"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:src="@drawable/ic_default_avatar"
-            android:scaleType="centerCrop"
-            android:contentDescription="Profile Picture" />
-
-        <!-- Online Status Indicator -->
-        <View
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:layout_gravity="bottom|end"
-            android:layout_margin="4dp"
-            android:background="@drawable/status_indicator_online" />
-
-    </androidx.cardview.widget.CardView>
+            android:background="@color/telegram_blue_light"
+            android:gravity="center"
+            android:text="IC"
+            android:textColor="@color/white"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+    </com.google.android.material.card.MaterialCardView>
 
     <!-- User Name -->
     <TextView
@@ -42,16 +42,11 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="ICCC User"
-        android:textSize="22sp"
+        android:textColor="@color/white"
+        android:textSize="18sp"
         android:textStyle="bold"
-        android:textColor="#FFFFFF"
-        android:fontFamily="sans-serif-medium"
-        android:layout_marginBottom="4dp"
-        android:elevation="2dp"
-        android:shadowColor="#40000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="3" />
+        android:textAlignment="center"
+        android:layout_marginBottom="4dp" />
 
     <!-- User Phone -->
     <TextView
@@ -59,57 +54,37 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="+91 XXXXXXXXXX"
+        android:textColor="@color/white"
         android:textSize="14sp"
-        android:textColor="#E3F2FD"
-        android:fontFamily="sans-serif"
-        android:layout_marginBottom="8dp" />
+        android:alpha="0.9"
+        android:textAlignment="center"
+        android:layout_marginBottom="4dp" />
 
-    <!-- User Info with Icon -->
-    <LinearLayout
+    <!-- User Info (Designation • Area) -->
+    <TextView
+        android:id="@+id/user_info"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="16dp">
+        android:text="Officer • ICCC"
+        android:textColor="@color/white"
+        android:textSize="12sp"
+        android:alpha="0.7"
+        android:textAlignment="center"
+        android:layout_marginBottom="12dp" />
 
-        <ImageView
-            android:layout_width="14dp"
-            android:layout_height="14dp"
-            android:src="@drawable/ic_location"
-            android:tint="#B3E5FC"
-            android:layout_marginEnd="6dp"
-            android:contentDescription="Location" />
-
-        <TextView
-            android:id="@+id/user_info"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Engineer • Sijua"
-            android:textSize="13sp"
-            android:textColor="#B3E5FC"
-            android:fontFamily="sans-serif" />
-
-    </LinearLayout>
-
-    <!-- View Profile Button with Modern Design -->
-    <com.google.android.material.button.MaterialButton
+    <!-- View Profile Button -->
+    <TextView
         android:id="@+id/view_profile_button"
         android:layout_width="wrap_content"
-        android:layout_height="36dp"
+        android:layout_height="wrap_content"
         android:text="View Profile"
-        android:textSize="13sp"
-        android:textColor="?attr/colorPrimary"
-        android:fontFamily="sans-serif-medium"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        app:icon="@drawable/ic_arrow_forward"
-        app:iconGravity="end"
-        app:iconSize="16dp"
-        app:iconTint="?attr/colorPrimary"
-        app:cornerRadius="18dp"
-        app:backgroundTint="#FFFFFF"
-        app:strokeWidth="0dp"
-        android:elevation="3dp"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+        android:textColor="@color/white"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:background="?attr/selectableItemBackground"
+        android:padding="8dp"
+        android:drawableEnd="@android:drawable/ic_menu_edit"
+        android:drawablePadding="8dp"
+        android:drawableTint="@color/white" />
 
 </LinearLayout>

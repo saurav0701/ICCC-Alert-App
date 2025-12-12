@@ -3,10 +3,6 @@ package com.example.iccc_alert_app
 import android.content.Context
 import android.content.SharedPreferences
 
-/**
- * Centralized backend configuration based on user's organization
- * Supports both BCCL and CCL with different URLs and configurations
- */
 object BackendConfig {
     private const val PREFS_NAME = "backend_config"
     private const val KEY_ORGANIZATION = "organization"
@@ -18,8 +14,8 @@ object BackendConfig {
     private const val BCCL_WS_BASE = "ws://202.140.131.90:2222"
 
     // CCL Backend (new)
-    private const val CCL_HTTP_BASE = "http://103.215.240.243:19998"
-    private const val CCL_WS_BASE = "ws://103.215.240.243:19999"
+    private const val CCL_HTTP_BASE = "http://192.168.29.69:19998"
+    private const val CCL_WS_BASE = "ws://192.168.29.69:19999"
 
     fun initialize(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

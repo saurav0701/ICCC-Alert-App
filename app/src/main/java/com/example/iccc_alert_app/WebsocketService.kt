@@ -35,19 +35,15 @@ class WebSocketService : Service() {
 
     companion object {
         private const val TAG = "WebSocketService"
-        // ✅ REMOVED: private const val WS_URL = "ws://202.140.131.90:2222/ws"
-
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "iccc_alerts_service"
         private const val RECONNECT_DELAY = 5000L
         private const val PING_INTERVAL = 30000L
 
-        private const val GROUP_KEY_ALERTS = "com.example.iccc_alert_app.ALERTS"
-        private const val SUMMARY_NOTIFICATION_ID = 9999
-        private const val MAX_VISIBLE_NOTIFICATIONS = 25
-
         private const val ALERT_NOTIFICATION_CHANNEL_ID = "iccc_alerts"
-        private const val MAX_NOTIFICATIONS_PER_CHANNEL = 10
+
+        // ✅ OPTIMIZED: Scale processors based on CPU cores
+        private val OPTIMAL_PROCESSORS = (Runtime.getRuntime().availableProcessors()).coerceIn(4, 8)
 
         private val instanceLock = Any()
         private var instance: WebSocketService? = null
@@ -90,10 +86,6 @@ class WebSocketService : Service() {
         fun getDeviceId(context: Context): String = ClientIdManager.getOrCreateClientId(context)
     }
 
-    private val activeNotificationIds = mutableListOf<Int>()
-    private val notificationIdLock = Any()
-    private val channelNotifications = mutableMapOf<String, MutableList<Int>>() // channelId -> list of notification IDs
-
     private var webSocket: WebSocket? = null
     private lateinit var client: OkHttpClient
     private val gson = Gson()
@@ -114,14 +106,14 @@ class WebSocketService : Service() {
     private val errorCount = AtomicInteger(0)
     private val ackedCount = AtomicInteger(0)
 
+    // ✅ OPTIMIZED: Use optimal number of processors
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val processingJobs = mutableListOf<Job>()
     private val isProcessing = AtomicInteger(0)
-    private val maxConcurrentProcessors = 4
+    private val maxConcurrentProcessors = OPTIMAL_PROCESSORS
 
     private val pendingAcks = ConcurrentLinkedQueue<String>()
-    private val ackBatchSize = 10
-    private var ackBatchJob: Job? = null
+    private val ackBatchSize = 50  // ✅ OPTIMIZED: Increased batch size for bulk operations
 
     private var catchUpMonitorRunnable: Runnable? = null
     private val catchUpCheckInterval = 5000L
@@ -133,6 +125,11 @@ class WebSocketService : Service() {
 
     private var lastConnectionState = false
     private var connectionStateChangeTime = 0L
+
+    // ✅ NEW: Notification batching to reduce overhead during bulk catch-up
+    private val notificationQueue = ConcurrentLinkedQueue<Event>()
+    private var notificationBatchJob: Job? = null
+    private val notificationBatchDelay = 500L  // Batch notifications every 500ms during catch-up
 
     override fun onCreate() {
         super.onCreate()
@@ -149,10 +146,9 @@ class WebSocketService : Service() {
             instance = this
         }
 
-        Log.d(TAG, "Service created")
-        PersistentLogger.logServiceLifecycle("CREATED", "Service onCreate called")
+        Log.d(TAG, "Service created with $maxConcurrentProcessors processors")
+        PersistentLogger.logServiceLifecycle("CREATED", "Service onCreate with $maxConcurrentProcessors processors")
 
-        // ✅ Initialize BackendConfig first
         BackendConfig.initialize(this)
         val organization = BackendConfig.getOrganization()
         val wsUrl = BackendConfig.getWsUrl()
@@ -168,7 +164,6 @@ class WebSocketService : Service() {
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
 
-        // ✅ Check if device is in doze mode at startup
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val isDozing = powerManager.isDeviceIdleMode
             val isIgnoringBatteryOpt = powerManager.isIgnoringBatteryOptimizations(packageName)
@@ -206,6 +201,7 @@ class WebSocketService : Service() {
         startForeground(NOTIFICATION_ID, createNotification("Connecting to $organization..."))
         startEventProcessors()
         startAckFlusher()
+        startNotificationBatcher()  // ✅ NEW: Batch notifications
         connect()
     }
 
@@ -213,7 +209,6 @@ class WebSocketService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
 
-            // Service notification channel (low priority)
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
                 "ICCC Alert Service",
@@ -224,7 +219,6 @@ class WebSocketService : Service() {
             }
             nm.createNotificationChannel(serviceChannel)
 
-            // ✅ Alert notification channel (high priority with grouping support)
             val alertChannel = NotificationChannel(
                 ALERT_NOTIFICATION_CHANNEL_ID,
                 "ICCC Alerts",
@@ -237,7 +231,6 @@ class WebSocketService : Service() {
                 lightColor = android.graphics.Color.RED
                 setShowBadge(true)
 
-                // ✅ FIX: Only enable bubbles on Android 10+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     setAllowBubbles(true)
                 }
@@ -271,7 +264,6 @@ class WebSocketService : Service() {
             return
         }
 
-        // ✅ Use dynamic URL based on organization
         val wsUrl = getWebSocketUrl(this)
         val organization = BackendConfig.getOrganization()
 
@@ -289,7 +281,6 @@ class WebSocketService : Service() {
                 reconnectAttempts = 0
                 hasSubscribed.set(false)
 
-                // ✅ Log connection state change
                 val now = System.currentTimeMillis()
                 val downtime = if (connectionStateChangeTime > 0) (now - connectionStateChangeTime) / 1000 else 0
                 PersistentLogger.logConnection("CONNECTED", "Backend: $organization, Downtime: ${downtime}s")
@@ -327,7 +318,6 @@ class WebSocketService : Service() {
                 this@WebSocketService.webSocket = null
                 stopPingPong()
 
-                // ✅ Log disconnection
                 val now = System.currentTimeMillis()
                 PersistentLogger.logConnection("CLOSED", "Backend: $organization, Code: $code, Reason: $reason")
                 lastConnectionState = false
@@ -343,7 +333,6 @@ class WebSocketService : Service() {
                 this@WebSocketService.webSocket = null
                 stopPingPong()
 
-                // ✅ Log failure with details
                 val now = System.currentTimeMillis()
                 PersistentLogger.logError("CONNECTION", "Backend: $organization, Error: ${t.message}", t)
                 lastConnectionState = false
@@ -365,12 +354,43 @@ class WebSocketService : Service() {
         PersistentLogger.logServiceLifecycle("PROCESSORS", "Started $maxConcurrentProcessors processors")
     }
 
+    // ✅ OPTIMIZED: Increased flush frequency and batch size for bulk operations
     private fun startAckFlusher() {
         serviceScope.launch {
             while (isActive) {
-                delay(200)
+                delay(100)  // Check more frequently during bulk catch-up
                 if (pendingAcks.isNotEmpty()) {
                     flushAcks()
+                }
+            }
+        }
+    }
+
+    // ✅ NEW: Batch notifications during bulk catch-up to reduce overhead
+    private fun startNotificationBatcher() {
+        notificationBatchJob = serviceScope.launch {
+            while (isActive) {
+                delay(notificationBatchDelay)
+
+                val batch = mutableListOf<Event>()
+                while (notificationQueue.isNotEmpty() && batch.size < 10) {
+                    notificationQueue.poll()?.let { batch.add(it) }
+                }
+
+                if (batch.isNotEmpty()) {
+                    // Send only the most recent notification per channel during catch-up
+                    val latestPerChannel = batch.groupBy { "${it.area}_${it.type}" }
+                        .mapValues { it.value.last() }
+
+                    withContext(Dispatchers.Main) {
+                        latestPerChannel.values.forEach { event ->
+                            try {
+                                sendAlertNotificationImmediate(event)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Notification error: ${e.message}")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -383,11 +403,12 @@ class WebSocketService : Service() {
         }
     }
 
+    // ✅ OPTIMIZED: Larger batch size for bulk operations
     private fun flushAcks() {
         if (!isConnected || webSocket == null) return
 
         val acks = mutableListOf<String>()
-        while (pendingAcks.isNotEmpty() && acks.size < 50) {
+        while (pendingAcks.isNotEmpty() && acks.size < 100) {  // Increased to 100
             pendingAcks.poll()?.let { acks.add(it) }
         }
 
@@ -404,9 +425,11 @@ class WebSocketService : Service() {
 
         if (sent) {
             ackedCount.addAndGet(acks.size)
-            Log.d(TAG, "✅ Sent ACK for ${acks.size} events (total: ${ackedCount.get()})")
 
-            // ✅ Log periodic ACK stats
+            if (acks.size > 50) {
+                Log.d(TAG, "✅ Sent BULK ACK for ${acks.size} events (total: ${ackedCount.get()})")
+            }
+
             if (ackedCount.get() % 100 == 0) {
                 PersistentLogger.logEvent("ACK", "Total ACKs sent: ${ackedCount.get()}")
             }
@@ -417,6 +440,7 @@ class WebSocketService : Service() {
         }
     }
 
+    // ✅ OPTIMIZED: Reduced delay for faster processing during bulk catch-up
     private suspend fun processEventsLoop(processorId: Int) {
         while (serviceScope.isActive) {
             try {
@@ -429,7 +453,7 @@ class WebSocketService : Service() {
                         isProcessing.decrementAndGet()
                     }
                 } else {
-                    delay(10)
+                    delay(5)  // Reduced from 10ms for faster processing
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Processor $processorId error: ${e.message}", e)
@@ -439,6 +463,7 @@ class WebSocketService : Service() {
         }
     }
 
+    // ✅ OPTIMIZED: Streamlined event processing - minimal overhead
     private suspend fun processEventAsync(text: String) = withContext(Dispatchers.Default) {
         try {
             if (text.contains("\"status\":\"subscribed\"")) return@withContext
@@ -451,7 +476,6 @@ class WebSocketService : Service() {
                 gson.fromJson(text, Event::class.java)
             } catch (e: Exception) {
                 errorCount.incrementAndGet()
-                PersistentLogger.logError("PARSE", "Failed to parse event", e)
                 return@withContext
             }
 
@@ -486,28 +510,47 @@ class WebSocketService : Service() {
 
             if (!isNew && sequence > 0) {
                 droppedCount.incrementAndGet()
-                PersistentLogger.logEventProcessing("DUPLICATE", event.id, "seq=$sequence, channel=$channelId")
                 if (requireAck) sendAck(event.id)
                 return@withContext
             }
 
+            // ✅ CRITICAL: Store event FIRST - this is the priority
             val addedSuccessfully = SubscriptionManager.addEvent(event)
 
             if (addedSuccessfully) {
                 processedCount.incrementAndGet()
-                PersistentLogger.logEventProcessing("PROCESSED", event.id, "seq=$sequence, channel=$channelId")
 
-                withContext(Dispatchers.Main) {
-                    if (SettingsActivity.areNotificationsEnabled(this@WebSocketService)) {
-                        sendAlertNotification(event)
+                // ✅ OPTIMIZED: Queue notification for batching (doesn't block)
+                if (SettingsActivity.areNotificationsEnabled(this@WebSocketService)) {
+                    val inCatchUpMode = ChannelSyncState.isInCatchUpMode(channelId)
+
+                    if (inCatchUpMode) {
+                        // During catch-up: batch notifications
+                        notificationQueue.offer(event)
+                    } else {
+                        // Live mode: send immediately (but still async)
+                        withContext(Dispatchers.Main) {
+                            launch {
+                                try {
+                                    sendAlertNotificationImmediate(event)
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Notification error: ${e.message}")
+                                }
+                            }
+                        }
                     }
-                    sendBroadcast(Intent("com.example.iccc_alert_app.NEW_EVENT").putExtra("event_id", event.id))
+                }
+
+                // Broadcast event (lightweight operation)
+                withContext(Dispatchers.Main) {
+                    sendBroadcast(Intent("com.example.iccc_alert_app.NEW_EVENT")
+                        .putExtra("event_id", event.id))
                 }
             } else {
                 droppedCount.incrementAndGet()
-                PersistentLogger.logEventProcessing("DROPPED", event.id, "Already in cache")
             }
 
+            // ✅ Always ACK after storage decision
             if (requireAck) {
                 sendAck(event.id)
             }
@@ -527,12 +570,11 @@ class WebSocketService : Service() {
                         received=${receivedCount.get()}, queued=${eventQueue.size}, 
                         processed=${processedCount.get()}, acked=${ackedCount.get()}, 
                         dropped=${droppedCount.get()}, errors=${errorCount.get()}, 
-                        pendingAcks=${pendingAcks.size}
+                        pendingAcks=${pendingAcks.size}, notifQueue=${notificationQueue.size}
                     """.trimIndent()
 
                     Log.i(TAG, "📊 STATS: $stats")
 
-                    // ✅ Log detailed stats every 10 minutes
                     if (processedCount.get() % 100 == 0) {
                         PersistentLogger.logEvent("STATS", stats)
                     }
@@ -595,7 +637,6 @@ class WebSocketService : Service() {
 
         Log.d(TAG, "📤 Subscription to $organization: $json")
 
-        // ✅ Log subscription details
         PersistentLogger.logEvent("SUBSCRIPTION",
             "Backend: $organization, Mode: ${if (resetConsumers) "RESET" else "RESUME"}, Channels: ${filters.size}")
 
@@ -710,36 +751,24 @@ class WebSocketService : Service() {
         handler.postDelayed({ connect() }, delay)
     }
 
-    private fun sendAlertNotification(event: Event) {
+    // ✅ OPTIMIZED: Renamed for clarity - this is the actual notification sender
+    private fun sendAlertNotificationImmediate(event: Event) {
         if (event.id == null || event.areaDisplay == null || event.typeDisplay == null) return
 
         val channelId = "${event.area}_${event.type}"
 
-        // Check if user wants notifications
-        if (!SubscriptionManager.isSubscribed(channelId)) {
-            Log.d(TAG, "Skipping notification: Not subscribed to $channelId")
-            return
-        }
-
-        if (SubscriptionManager.isChannelMuted(channelId)) {
-            Log.d(TAG, "Skipping notification: Channel $channelId is muted")
-            return
-        }
-
-        if (!SettingsActivity.areNotificationsEnabled(this)) {
-            Log.d(TAG, "Skipping notification: Notifications disabled in settings")
-            return
-        }
+        if (SubscriptionManager.isChannelMuted(channelId)) return
+        if (!SettingsActivity.areNotificationsEnabled(this)) return
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                Log.w(TAG, "Notification permission not granted")
                 return
             }
         }
 
-        // Vibrate if enabled
-        if (SettingsActivity.isVibrationEnabled(this)) {
+        // Vibrate only for live events (not during catch-up)
+        val inCatchUpMode = ChannelSyncState.isInCatchUpMode(channelId)
+        if (!inCatchUpMode && SettingsActivity.isVibrationEnabled(this)) {
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
@@ -752,7 +781,6 @@ class WebSocketService : Service() {
             }
         }
 
-        // Prepare notification data
         val location = event.data["location"] as? String ?: "Unknown location"
         val eventTime = try {
             val eventTimeStr = event.data["eventTime"] as? String
@@ -767,11 +795,8 @@ class WebSocketService : Service() {
 
         val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
         val notificationId = event.id.hashCode()
-
-        // ✅ Create unique group key per channel
         val groupKey = "group_$channelId"
 
-        // Intent to open channel detail
         val intent = Intent(this, ChannelDetailActivity::class.java).apply {
             putExtra("CHANNEL_ID", channelId)
             putExtra("CHANNEL_AREA", event.areaDisplay)
@@ -786,7 +811,6 @@ class WebSocketService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        // ✅ Create individual notification with PER-CHANNEL GROUP
         val notification = NotificationCompat.Builder(this, ALERT_NOTIFICATION_CHANNEL_ID)
             .setContentTitle("${event.areaDisplay} - ${event.typeDisplay}")
             .setContentText(location)
@@ -798,160 +822,14 @@ class WebSocketService : Service() {
             .setContentIntent(pendingIntent)
             .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_LIGHTS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            // ✅ Group by channel instead of all together
             .setGroup(groupKey)
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .build()
 
         try {
-            val nm = getSystemService(NotificationManager::class.java)
-
-            // ✅ Manage per-channel notification limit
-            synchronized(notificationIdLock) {
-                // Initialize list for this channel if needed
-                if (!channelNotifications.containsKey(channelId)) {
-                    channelNotifications[channelId] = mutableListOf()
-                }
-
-                val channelNotifs = channelNotifications[channelId]!!
-
-                // Add new notification ID
-                channelNotifs.add(notificationId)
-
-                // Remove oldest notifications for THIS CHANNEL if we exceed limit
-                if (channelNotifs.size > MAX_NOTIFICATIONS_PER_CHANNEL) {
-                    val toRemove = channelNotifs.size - MAX_NOTIFICATIONS_PER_CHANNEL
-                    val oldIds = channelNotifs.take(toRemove)
-
-                    oldIds.forEach { oldId ->
-                        nm.cancel(oldId)
-                    }
-
-                    channelNotifs.removeAll(oldIds.toSet())
-
-                    Log.d(TAG, "Removed $toRemove old notifications from $channelId")
-                }
-            }
-
-            // Show individual notification
-            nm.notify(notificationId, notification)
-
-            // ✅ Update summary notification for THIS CHANNEL
-            updateChannelSummaryNotification(channelId, event.areaDisplay!!, event.typeDisplay!!)
-
-            Log.d(TAG, "✅ Notification sent for event ${event.id} ($channelId)")
-            PersistentLogger.logEvent("NOTIFICATION", "Sent for ${event.id} - ${event.areaDisplay}/${event.typeDisplay}")
-
+            getSystemService(NotificationManager::class.java).notify(notificationId, notification)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send notification: ${e.message}")
-            PersistentLogger.logError("NOTIFICATION", "Failed to send", e)
-        }
-    }
-
-    private fun updateChannelSummaryNotification(channelId: String, areaDisplay: String, typeDisplay: String) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-            // Grouping not supported on Android < 7.0
-            return
-        }
-
-        synchronized(notificationIdLock) {
-            val notifs = channelNotifications[channelId] ?: return
-            val count = notifs.size
-
-            if (count == 0) {
-                // No notifications for this channel, remove summary
-                val summaryId = channelId.hashCode()
-                getSystemService(NotificationManager::class.java).cancel(summaryId)
-                return
-            }
-
-            // Only show summary if there are 2+ notifications
-            if (count < 2) {
-                return
-            }
-
-            val groupKey = "group_$channelId"
-            val summaryId = channelId.hashCode() // Use channelId hash as summary ID
-
-            // Intent to open channel detail
-            val intent = Intent(this, ChannelDetailActivity::class.java).apply {
-                putExtra("CHANNEL_ID", channelId)
-                putExtra("CHANNEL_AREA", areaDisplay)
-                putExtra("CHANNEL_TYPE", typeDisplay)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
-
-            val pendingIntent = PendingIntent.getActivity(
-                this,
-                summaryId,
-                intent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
-
-            // Create summary notification for THIS CHANNEL
-            val summaryNotification = NotificationCompat.Builder(this, ALERT_NOTIFICATION_CHANNEL_ID)
-                .setContentTitle("$areaDisplay - $typeDisplay")
-                .setContentText("$count new alerts")
-                .setSmallIcon(R.drawable.ic_notifications)
-                .setGroup(groupKey)
-                .setGroupSummary(true)
-                .setAutoCancel(true)
-                .setContentIntent(pendingIntent)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setStyle(NotificationCompat.InboxStyle()
-                    .setBigContentTitle("$areaDisplay - $typeDisplay")
-                    .setSummaryText("$count alerts"))
-                .build()
-
-            getSystemService(NotificationManager::class.java)
-                .notify(summaryId, summaryNotification)
-        }
-    }
-    fun clearChannelNotifications(channelId: String) {
-        synchronized(notificationIdLock) {
-            val nm = getSystemService(NotificationManager::class.java)
-
-            // Get notification IDs for this channel
-            val notifs = channelNotifications[channelId]
-
-            if (notifs != null) {
-                // Cancel all individual notifications
-                notifs.forEach { id ->
-                    nm.cancel(id)
-                }
-
-                // Cancel summary
-                val summaryId = channelId.hashCode()
-                nm.cancel(summaryId)
-
-                // Clear from tracking
-                channelNotifications.remove(channelId)
-
-                Log.d(TAG, "Cleared ${notifs.size} notifications for $channelId")
-            }
-        }
-    }
-
-    fun clearAllAlertNotifications() {
-        synchronized(notificationIdLock) {
-            val nm = getSystemService(NotificationManager::class.java)
-
-            // Cancel all notifications for all channels
-            channelNotifications.forEach { (channelId, notifs) ->
-                // Cancel individual notifications
-                notifs.forEach { id ->
-                    nm.cancel(id)
-                }
-
-                // Cancel summary
-                val summaryId = channelId.hashCode()
-                nm.cancel(summaryId)
-            }
-
-            // Clear all tracking
-            channelNotifications.clear()
-
-            Log.d(TAG, "Cleared all alert notifications")
         }
     }
 
@@ -974,6 +852,9 @@ class WebSocketService : Service() {
 
         stopPingPong()
         stopCatchUpMonitoring()
+
+        // Cancel notification batcher
+        notificationBatchJob?.cancel()
 
         runBlocking {
             flushAcks()

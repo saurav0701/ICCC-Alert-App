@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Success -->
+    <color name="success_color">#4CAF50</color>
+    <color name="success_bg">#2E7D32</color>
+
+    <!-- Error -->
+    <color name="error_color">#F44336</color>
+    <color name="error_bg">#C62828</color>
+
+    <!-- Warning -->
+    <color name="warning_color">#FF9800</color>
+    <color name="warning_bg">#E65100</color>
+
+    <!-- Info -->
+    <color name="info_color">#2196F3</color>
+    <color name="info_bg">#1565C0</color>
+</resources>

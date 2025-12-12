@@ -51,7 +51,9 @@ dependencies {
     // Core Android
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    implementation(libs.material)
+
+    // ✅ UPGRADED: Material 3 (replaces old material library)
+    implementation("com.google.android.material:material:1.12.0")
 
     // RecyclerView and CardView (for non-Compose screens)
     implementation("androidx.recyclerview:recyclerview:1.3.2")
@@ -67,8 +69,9 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     implementation("com.github.chrisbanes:PhotoView:2.3.0")
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 
-    // Lifecycle & Coroutines - ADDED FOR BACKGROUND PROCESSING
+    // Lifecycle & Coroutines
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
@@ -80,7 +83,7 @@ dependencies {
     // JSON
     implementation("com.google.code.gson:gson:2.10.1")
 
-    // OpenStreetMap (osmdroid) - 100% FREE!
+    // OpenStreetMap (osmdroid)
     implementation("org.osmdroid:osmdroid-android:6.1.18")
 
     // Testing

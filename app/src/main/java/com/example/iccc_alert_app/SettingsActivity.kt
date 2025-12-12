@@ -2,24 +2,17 @@ package com.example.iccc_alert_app
 
 import android.app.AlertDialog
 import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.widget.Button
 import android.widget.RelativeLayout
-import android.widget.ScrollView
-import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.content.FileProvider
 import com.example.iccc_alert_app.auth.AuthManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.google.android.material.switchmaterial.SwitchMaterial
 
 class SettingsActivity : BaseDrawerActivity() {
 
@@ -27,16 +20,12 @@ class SettingsActivity : BaseDrawerActivity() {
 
     private lateinit var themeContainer: RelativeLayout
     private lateinit var themeValue: TextView
-    private lateinit var switchNotifications: Switch
-    private lateinit var switchVibration: Switch
+    private lateinit var switchNotifications: SwitchMaterial
+    private lateinit var switchVibration: SwitchMaterial
     private lateinit var helpContainer: RelativeLayout
     private lateinit var notificationStatusContainer: RelativeLayout
-
-    // ✅ NEW: Backend info views
     private lateinit var backendInfoContainer: RelativeLayout
     private lateinit var backendInfoText: TextView
-
-    // Storage management
     private lateinit var storageInfoText: TextView
     private lateinit var clearDataButton: Button
 
@@ -62,7 +51,7 @@ class SettingsActivity : BaseDrawerActivity() {
 
         fun getCurrentTheme(context: Context): String {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            return prefs.getString(KEY_THEME, THEME_LIGHT) ?: THEME_LIGHT
+            return prefs.getString(KEY_THEME, THEME_SYSTEM) ?: THEME_SYSTEM
         }
     }
 
@@ -79,13 +68,13 @@ class SettingsActivity : BaseDrawerActivity() {
         loadSettings()
         setupListeners()
         updateStorageInfo()
-        updateBackendInfo() // ✅ NEW
+        updateBackendInfo()
     }
 
     override fun onResume() {
         super.onResume()
         setSelectedMenuItem(R.id.nav_settings)
-        updateBackendInfo() // ✅ Refresh on resume
+        updateBackendInfo()
     }
 
     private fun initializeViews() {
@@ -95,17 +84,14 @@ class SettingsActivity : BaseDrawerActivity() {
         switchVibration = findViewById(R.id.switch_vibration)
         helpContainer = findViewById(R.id.help_container)
         notificationStatusContainer = findViewById(R.id.notification_status_container)
-
-        // ✅ NEW: Backend info views
         backendInfoContainer = findViewById(R.id.backend_info_container)
         backendInfoText = findViewById(R.id.backend_info_text)
-
         storageInfoText = findViewById(R.id.storage_info_text)
         clearDataButton = findViewById(R.id.clear_data_button)
     }
 
     private fun loadSettings() {
-        val currentTheme = prefs.getString(KEY_THEME, THEME_LIGHT) ?: THEME_LIGHT
+        val currentTheme = prefs.getString(KEY_THEME, THEME_SYSTEM) ?: THEME_SYSTEM
         updateThemeDisplay(currentTheme)
 
         val notificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS, true)
@@ -122,22 +108,14 @@ class SettingsActivity : BaseDrawerActivity() {
 
         switchNotifications.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean(KEY_NOTIFICATIONS, isChecked).apply()
-
-            if (isChecked) {
-                Toast.makeText(this, "Notifications enabled", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Notifications disabled", Toast.LENGTH_SHORT).show()
-            }
+            val message = if (isChecked) "Notifications enabled" else "Notifications disabled"
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         }
 
         switchVibration.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean(KEY_VIBRATION, isChecked).apply()
-
-            if (isChecked) {
-                Toast.makeText(this, "Vibration enabled", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Vibration disabled", Toast.LENGTH_SHORT).show()
-            }
+            val message = if (isChecked) "Vibration enabled" else "Vibration disabled"
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         }
 
         helpContainer.setOnClickListener {
@@ -148,7 +126,6 @@ class SettingsActivity : BaseDrawerActivity() {
             NotificationStatusHelper.showNotificationStatusDialog(this)
         }
 
-        // ✅ NEW: Backend info click listener
         backendInfoContainer.setOnClickListener {
             showBackendInfoDialog()
         }
@@ -159,21 +136,16 @@ class SettingsActivity : BaseDrawerActivity() {
     }
 
     // ============================================
-    // ✅ NEW: BACKEND CONFIGURATION SECTION
+    // BACKEND CONFIGURATION SECTION
     // ============================================
 
-    /**
-     * Update backend info display
-     */
     private fun updateBackendInfo() {
         try {
             val user = AuthManager.getCurrentUser()
             val org = user?.workingFor ?: BackendConfig.getOrganization()
             val backendUrl = BackendConfig.getHttpBaseUrl()
 
-            // Show organization and backend URL
-            backendInfoText.text = "$org Backend\n$backendUrl"
-
+            backendInfoText.text = "$org Backend"
             android.util.Log.d("SettingsActivity", "Backend info: $org - $backendUrl")
         } catch (e: Exception) {
             backendInfoText.text = "Backend info unavailable"
@@ -181,9 +153,6 @@ class SettingsActivity : BaseDrawerActivity() {
         }
     }
 
-    /**
-     * Show detailed backend configuration dialog
-     */
     private fun showBackendInfoDialog() {
         try {
             val user = AuthManager.getCurrentUser()
@@ -194,21 +163,11 @@ class SettingsActivity : BaseDrawerActivity() {
                 append("━━━━━━━━━━━━━━━━━━━━━━\n")
                 append("BACKEND CONFIGURATION\n")
                 append("━━━━━━━━━━━━━━━━━━━━━━\n\n")
-
-                append("Organization:\n")
-                append("  ${info["organization"]}\n\n")
-
-                append("Backend Server:\n")
-                append("  ${info["backend"]}\n\n")
-
-                append("HTTP Endpoint:\n")
-                append("  ${info["httpUrl"]}\n\n")
-
-                append("WebSocket URL:\n")
-                append("  ${info["wsUrl"]}\n\n")
-
-                append("Available Channels:\n")
-                append("  $channelInfo\n\n")
+                append("Organization:\n  ${info["organization"]}\n\n")
+                append("Backend Server:\n  ${info["backend"]}\n\n")
+//                append("HTTP Endpoint:\n  ${info["httpUrl"]}\n\n")
+//                append("WebSocket URL:\n  ${info["wsUrl"]}\n\n")
+                append("Available Channels:\n  $channelInfo\n\n")
 
                 if (user != null) {
                     append("━━━━━━━━━━━━━━━━━━━━━━\n")
@@ -230,12 +189,8 @@ class SettingsActivity : BaseDrawerActivity() {
                 .setTitle("Backend Configuration")
                 .setMessage(message)
                 .setPositiveButton("OK", null)
-                .setNeutralButton("Test Connection") { _, _ ->
-                    testBackendConnection()
-                }
-                .setNegativeButton("View Statistics") { _, _ ->
-                    showBackendStatistics()
-                }
+                .setNeutralButton("Test Connection") { _, _ -> testBackendConnection() }
+                .setNegativeButton("View Statistics") { _, _ -> showBackendStatistics() }
                 .show()
 
         } catch (e: Exception) {
@@ -244,9 +199,6 @@ class SettingsActivity : BaseDrawerActivity() {
         }
     }
 
-    /**
-     * Test backend connectivity
-     */
     private fun testBackendConnection() {
         val progressDialog = android.app.ProgressDialog(this)
         progressDialog.setMessage("Testing connection to ${BackendConfig.getOrganization()} backend...")
@@ -278,7 +230,7 @@ class SettingsActivity : BaseDrawerActivity() {
                         append("Backend: ${BackendConfig.getOrganization()}\n")
                         append("URL: ${BackendConfig.getHttpBaseUrl()}\n")
                         append("Status: HTTP $responseCode\n")
-                        append("Response Time: ${responseTime}\n\n")
+                        append("Response Time: $responseTime\n\n")
 
                         when {
                             responseCode in 200..299 -> append("Backend is reachable and responding normally.")
@@ -322,9 +274,6 @@ class SettingsActivity : BaseDrawerActivity() {
         }.start()
     }
 
-    /**
-     * Show detailed backend statistics
-     */
     private fun showBackendStatistics() {
         try {
             val stats = AvailableChannels.getStats()
@@ -335,23 +284,13 @@ class SettingsActivity : BaseDrawerActivity() {
                 append("━━━━━━━━━━━━━━━━━━━━━━\n")
                 append("SYSTEM STATISTICS\n")
                 append("━━━━━━━━━━━━━━━━━━━━━━\n\n")
-
-                append("Organization:\n")
-                append("  Current: ${stats["organization"]}\n")
-                append("  Is CCL: ${stats["isCCL"]}\n")
-                append("  Is BCCL: ${stats["isBCCL"]}\n\n")
-
-                append("Available Channels:\n")
-                append("  BCCL Areas: ${stats["bcclAreas"]}\n")
-                append("  CCL Areas: ${stats["cclAreas"]}\n")
-                append("  Current Areas: ${stats["currentAreas"]}\n")
-                append("  Event Types: ${stats["eventTypes"]}\n")
-                append("  Total Channels: ${stats["totalChannels"]}\n\n")
-
-                append("Subscriptions:\n")
-                append("  Active Channels: ${storageStats.size}\n")
+                append("Organization:\n  Current: ${stats["organization"]}\n")
+                append("  Is CCL: ${stats["isCCL"]}\n  Is BCCL: ${stats["isBCCL"]}\n\n")
+                append("Available Channels:\n  BCCL Areas: ${stats["bcclAreas"]}\n")
+                append("  CCL Areas: ${stats["cclAreas"]}\n  Current Areas: ${stats["currentAreas"]}\n")
+                append("  Event Types: ${stats["eventTypes"]}\n  Total Channels: ${stats["totalChannels"]}\n\n")
+                append("Subscriptions:\n  Active Channels: ${storageStats.size}\n")
                 append("  Cached Events: ${storageStats.values.sum()}\n\n")
-
                 append("Synchronization:\n")
                 val syncInfo = syncStats as? Map<*, *>
                 if (syncInfo != null) {
@@ -373,14 +312,14 @@ class SettingsActivity : BaseDrawerActivity() {
     }
 
     // ============================================
-    // THEME MANAGEMENT
+    // THEME MANAGEMENT - FIXED VERSION
     // ============================================
 
     private fun showThemeDialog() {
         val themes = arrayOf("Light", "Dark", "System Default")
         val themeValues = arrayOf(THEME_LIGHT, THEME_DARK, THEME_SYSTEM)
 
-        val currentTheme = prefs.getString(KEY_THEME, THEME_LIGHT) ?: THEME_LIGHT
+        val currentTheme = prefs.getString(KEY_THEME, THEME_SYSTEM) ?: THEME_SYSTEM
         val currentIndex = themeValues.indexOf(currentTheme)
 
         AlertDialog.Builder(this)
@@ -395,16 +334,27 @@ class SettingsActivity : BaseDrawerActivity() {
     }
 
     private fun applyTheme(theme: String) {
+        // Save the theme preference
         prefs.edit().putString(KEY_THEME, theme).apply()
 
+        // Apply the theme immediately
         when (theme) {
             THEME_LIGHT -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
             THEME_DARK -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
             THEME_SYSTEM -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
         }
 
+        // Update the display text
         updateThemeDisplay(theme)
-        recreate()
+
+        // Show confirmation toast
+        val themeName = when (theme) {
+            THEME_LIGHT -> "Light"
+            THEME_DARK -> "Dark"
+            THEME_SYSTEM -> "System Default"
+            else -> "Unknown"
+        }
+        Toast.makeText(this, "Theme changed to $themeName", Toast.LENGTH_SHORT).show()
     }
 
     private fun updateThemeDisplay(theme: String) {
@@ -412,7 +362,7 @@ class SettingsActivity : BaseDrawerActivity() {
             THEME_LIGHT -> "Light"
             THEME_DARK -> "Dark"
             THEME_SYSTEM -> "System Default"
-            else -> "Light"
+            else -> "System Default"
         }
     }
 
@@ -451,9 +401,7 @@ class SettingsActivity : BaseDrawerActivity() {
                         "After clearing, you'll receive current events as if you just subscribed.\n\n" +
                         "Are you sure you want to continue?"
             )
-            .setPositiveButton("Clear Data") { _, _ ->
-                performClearData()
-            }
+            .setPositiveButton("Clear Data") { _, _ -> performClearData() }
             .setNegativeButton("Cancel", null)
             .setIcon(android.R.drawable.ic_dialog_alert)
             .show()
@@ -499,32 +447,20 @@ class SettingsActivity : BaseDrawerActivity() {
                         .setPositiveButton("OK") { _, _ ->
                             updateStorageInfo()
                             WebSocketService.start(this)
-                            Toast.makeText(
-                                this,
-                                "Service restarted - receiving current events",
-                                Toast.LENGTH_LONG
-                            ).show()
+                            Toast.makeText(this, "Service restarted - receiving current events", Toast.LENGTH_LONG).show()
                         }
                         .setCancelable(false)
                         .show()
 
                 } catch (e: Exception) {
                     progressDialog.dismiss()
-                    Toast.makeText(
-                        this,
-                        "Error clearing data: ${e.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(this, "Error clearing data: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }, 1000)
 
         } catch (e: Exception) {
             progressDialog.dismiss()
-            Toast.makeText(
-                this,
-                "Error clearing data: ${e.message}",
-                Toast.LENGTH_LONG
-            ).show()
+            Toast.makeText(this, "Error clearing data: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -550,10 +486,6 @@ class SettingsActivity : BaseDrawerActivity() {
             .putString(keyChannels, json)
             .commit()
     }
-
-    // ============================================
-    // HELP DIALOG
-    // ============================================
 
     private fun showHelpDialog() {
         val helpText = """
@@ -589,6 +521,11 @@ class SettingsActivity : BaseDrawerActivity() {
             • View current organization (BCCL/CCL)
             • Test backend connectivity
             • Check system statistics
+            
+            🎨 Themes
+            • Choose Light, Dark, or System Default theme
+            • Theme changes apply immediately
+            • Your preference is saved automatically
             
             ⚠️ Battery & Notifications
             • Keep device charged for 24/7 monitoring

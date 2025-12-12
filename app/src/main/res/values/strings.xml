@@ -79,5 +79,15 @@
     <string name="no_subscriptions">No subscriptions yet</string>
     <string name="subscribe_message">Subscribe to channels to get alerts</string>
 
+    <!-- Empty State -->
+    <string name="empty_state_icon">Empty state icon</string>
+
+    <!-- Snackbar -->
+    <string name="snackbar_icon">Snackbar icon</string>
+
+    <!-- Search Suggestions -->
+    <string name="suggestion_icon">Suggestion icon</string>
+    <string name="fill_search">Fill search</string>
+
 
 </resources>

@@ -22,17 +22,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.*
 
-/**
- * Main RecyclerView Adapter for displaying channel events
- * Refactored into modular components for better maintainability
- */
 class ChannelEventsAdapter(
     private val context: Context,
     private val onBackClick: () -> Unit,
     private val onMuteClick: () -> Unit,
     private val channelArea: String,
     private val channelType: String,
-    private val channelEventType: String
+    private val channelEventType: String,
+
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private var allEvents = listOf<Event>()
@@ -53,6 +50,9 @@ class ChannelEventsAdapter(
         channelType,
         channelEventType
     )
+
+    private var showTimeline = false
+    private var currentTimelineMode = EventTimelineView.TimelineMode.DAY
 
     private val gpsEventHandler = GpsEventHandler(context, bindingHelpers)
 
@@ -152,6 +152,11 @@ class ChannelEventsAdapter(
         allEvents = newEvents
         filteredEvents = newEvents
         notifyDataSetChanged()
+
+        // Update timeline if visible
+        if (showTimeline) {
+            notifyItemChanged(0) // Refresh header with timeline
+        }
     }
 
     fun updateMuteState(muted: Boolean) {
@@ -264,9 +269,146 @@ class ChannelEventsAdapter(
             showMenuPopup(holder)
         }
 
+        // ✅ NEW: Setup Timeline
+        setupTimeline(holder)
+
         // ✅ NEW: Update filter chips display
         updateFilterChipsDisplay(holder)
     }
+
+    // Update setupTimeline() method in ChannelEventsAdapter
+
+    private fun setupTimeline(holder: EventViewHolders.HeaderViewHolder) {
+        // Initial visibility
+        holder.timelineContainer.visibility = if (showTimeline) View.VISIBLE else View.GONE
+
+        // Toggle timeline visibility
+        holder.toggleTimelineButton.setOnClickListener {
+            showTimeline = !showTimeline
+            holder.timelineContainer.visibility = if (showTimeline) View.VISIBLE else View.GONE
+
+            holder.toggleTimelineButton.setImageResource(
+                if (showTimeline) R.drawable.ic_expand_less else R.drawable.ic_expand_more
+            )
+
+            holder.toggleTimelineButton.animate()
+                .rotation(if (showTimeline) 180f else 0f)
+                .setDuration(200)
+                .start()
+
+            if (showTimeline) {
+                holder.timelineView.setEvents(filteredEvents)
+            }
+        }
+
+        holder.timelineView.setEvents(filteredEvents)
+        holder.timelineView.setTimelineMode(currentTimelineMode)
+
+        // ✅ FIXED: Handle period selection - show filtered events but DON'T replace filteredEvents
+        holder.timelineView.onPeriodSelected = { period, events ->
+            // Store original filtered events
+            val originalFiltered = filteredEvents
+
+            // Temporarily show only selected period events
+            filteredEvents = events
+            notifyDataSetChanged()
+
+            // Smooth scroll to show filtered events
+            (holder.itemView.parent as? RecyclerView)?.smoothScrollToPosition(1)
+
+            Toast.makeText(
+                context,
+                "${events.size} events in selected period (tap timeline to reset)",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            // ✅ NEW: Add reset button or auto-reset on timeline deselect
+            holder.timelineView.clearSelection()
+
+            // Allow user to see other periods by clicking timeline again
+            holder.timelineView.onPeriodSelected = { newPeriod, newEvents ->
+                if (newPeriod == period) {
+                    // Same period clicked again - reset to show all
+                    filteredEvents = originalFiltered
+                    notifyDataSetChanged()
+                    Toast.makeText(context, "Showing all events", Toast.LENGTH_SHORT).show()
+
+                    // Restore original behavior
+                    setupTimeline(holder)
+                } else {
+                    // Different period - show new period
+                    filteredEvents = newEvents
+                    notifyDataSetChanged()
+                    Toast.makeText(
+                        context,
+                        "${newEvents.size} events in selected period",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+
+        // Handle timeline mode changes
+        holder.timelineView.onTimelineModeChanged = { mode ->
+            currentTimelineMode = mode
+            updateTimelineModeButtons(holder, mode)
+
+            // ✅ FIXED: Reset to show all events when mode changes
+            applyFilters()
+            holder.timelineView.setEvents(filteredEvents)
+        }
+
+        setupTimelineModeButtons(holder)
+        updateTimelineModeButtons(holder, currentTimelineMode)
+    }
+
+    private fun setupTimelineModeButtons(holder: EventViewHolders.HeaderViewHolder) {
+        holder.hourButton.setOnClickListener {
+            holder.timelineView.setTimelineMode(EventTimelineView.TimelineMode.HOUR)
+        }
+
+        holder.dayButton.setOnClickListener {
+            holder.timelineView.setTimelineMode(EventTimelineView.TimelineMode.DAY)
+        }
+
+        holder.weekButton.setOnClickListener {
+            holder.timelineView.setTimelineMode(EventTimelineView.TimelineMode.WEEK)
+        }
+
+        holder.monthButton.setOnClickListener {
+            holder.timelineView.setTimelineMode(EventTimelineView.TimelineMode.MONTH)
+        }
+    }
+
+    private fun updateTimelineModeButtons(
+        holder: EventViewHolders.HeaderViewHolder,
+        mode: EventTimelineView.TimelineMode
+    ) {
+        // Reset all buttons
+        val buttons = listOf(
+            holder.hourButton,
+            holder.dayButton,
+            holder.weekButton,
+            holder.monthButton
+        )
+
+        buttons.forEach { button ->
+            button.setBackgroundResource(R.drawable.timeline_mode_button_normal)
+            button.setTextColor(Color.parseColor("#757575"))
+        }
+
+        // Highlight selected button
+        val selectedButton = when (mode) {
+            EventTimelineView.TimelineMode.HOUR -> holder.hourButton
+            EventTimelineView.TimelineMode.DAY -> holder.dayButton
+            EventTimelineView.TimelineMode.WEEK -> holder.weekButton
+            EventTimelineView.TimelineMode.MONTH -> holder.monthButton
+        }
+
+        selectedButton.setBackgroundResource(R.drawable.timeline_mode_button_selected)
+        selectedButton.setTextColor(Color.parseColor("#FFFFFF"))
+    }
+
 
     private fun showMenuPopup(holder: EventViewHolders.HeaderViewHolder) {
         val popup = PopupMenu(holder.itemView.context, holder.menuButton)
@@ -459,6 +601,11 @@ class ChannelEventsAdapter(
         }
 
         notifyDataSetChanged()
+
+        // ✅ Refresh timeline with filtered events
+        if (showTimeline) {
+            notifyItemChanged(0)
+        }
     }
 
     private fun handleBulkPdfDownload() {
@@ -699,6 +846,21 @@ class ChannelEventsAdapter(
             } else {
                 Toast.makeText(context, "Failed to share image", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    fun getEventAtPosition(position: Int): Event? {
+        val eventIndex = position - 1 // Account for header
+        return if (eventIndex >= 0 && eventIndex < filteredEvents.size) {
+            filteredEvents[eventIndex]
+        } else null
+    }
+
+    fun removeEvent(event: Event) {
+        val index = filteredEvents.indexOf(event)
+        if (index >= 0) {
+            filteredEvents = filteredEvents.toMutableList().apply { removeAt(index) }
+            notifyItemRemoved(index + 1) // +1 for header
         }
     }
 

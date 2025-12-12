@@ -4,73 +4,77 @@
     android:layout_height="match_parent"
     android:background="#F8F9FA">
 
-    <!-- Sticky Header Container -->
-    <FrameLayout
-        android:id="@+id/header_container"
+    <!-- ✅ NEW: SwipeRefreshLayout wraps the entire content -->
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh_layout"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:elevation="4dp" />
+        android:layout_height="match_parent">
 
-    <!-- RecyclerView for Events (Below Header) -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/events_recycler"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_below="@id/header_container"
-        android:clipToPadding="false"
-        android:paddingTop="8dp"
-        android:paddingBottom="24dp"
-        android:scrollbars="none"
-        android:overScrollMode="never" />
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
 
-    <!-- Premium Empty State -->
-    <LinearLayout
-        android:id="@+id/empty_events_view"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_below="@id/header_container"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:padding="48dp"
-        android:visibility="gone">
+            <!-- RecyclerView for Events (Includes Header as first item) -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/events_recycler"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingTop="8dp"
+                android:paddingBottom="24dp"
+                android:scrollbars="none"
+                android:overScrollMode="never" />
 
-        <FrameLayout
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:background="@drawable/empty_state_bg">
+            <!-- Premium Empty State -->
+            <LinearLayout
+                android:id="@+id/empty_events_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="48dp"
+                android:visibility="gone">
 
-            <ImageView
-                android:layout_width="64dp"
-                android:layout_height="64dp"
-                android:layout_gravity="center"
-                android:src="@drawable/ic_image_error"
-                android:tint="#BDBDBD"
-                android:contentDescription="No events" />
+                <FrameLayout
+                    android:layout_width="120dp"
+                    android:layout_height="120dp"
+                    android:background="@drawable/empty_state_bg">
 
-        </FrameLayout>
+                    <ImageView
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_image_error"
+                        android:tint="#BDBDBD"
+                        android:contentDescription="No events" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="No Events Yet"
-            android:textSize="20sp"
-            android:textColor="#1A1A1A"
-            android:fontFamily="sans-serif-medium"
-            android:letterSpacing="0.01"
-            android:layout_marginTop="24dp" />
+                </FrameLayout>
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Events will appear here as they occur"
-            android:textSize="14sp"
-            android:textColor="#757575"
-            android:fontFamily="sans-serif"
-            android:textAlignment="center"
-            android:lineSpacingExtra="2dp"
-            android:layout_marginTop="8dp" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="No Events Yet"
+                    android:textSize="20sp"
+                    android:textColor="#1A1A1A"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.01"
+                    android:layout_marginTop="24dp" />
 
-    </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Events will appear here as they occur"
+                    android:textSize="14sp"
+                    android:textColor="#757575"
+                    android:fontFamily="sans-serif"
+                    android:textAlignment="center"
+                    android:lineSpacingExtra="2dp"
+                    android:layout_marginTop="8dp" />
+
+            </LinearLayout>
+
+        </RelativeLayout>
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
 </RelativeLayout>

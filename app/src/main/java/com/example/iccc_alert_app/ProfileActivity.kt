@@ -11,13 +11,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import com.example.iccc_alert_app.auth.AuthManager
 
-/**
- * ✅ PRODUCTION-READY: Enhanced crash prevention and performance
- * - Fixed ProgressBar ClassCastException
- * - Better error handling
- * - Memory leak prevention
- * - Improved UX with loading states
- */
 class ProfileActivity : BaseDrawerActivity() {
 
     private lateinit var nameText: TextView

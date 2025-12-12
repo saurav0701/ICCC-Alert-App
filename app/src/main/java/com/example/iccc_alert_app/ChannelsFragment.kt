@@ -10,6 +10,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
 class ChannelsFragment : Fragment() {
 
@@ -17,6 +18,7 @@ class ChannelsFragment : Fragment() {
     private lateinit var emptyView: LinearLayout
     private lateinit var adapter: ChannelListAdapter
     private lateinit var activeFiltersText: TextView
+    private lateinit var swipeRefreshLayout: SwipeRefreshLayout
 
     // Filter state
     private var selectedArea: String = "All Areas"
@@ -33,10 +35,16 @@ class ChannelsFragment : Fragment() {
     ): View? {
         val view = inflater.inflate(R.layout.fragment_channels, container, false)
 
+        // Initialize views
+        swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout)
         recyclerView = view.findViewById(R.id.channels_recycler)
         emptyView = view.findViewById(R.id.empty_view)
         activeFiltersText = view.findViewById(R.id.active_filters_text)
 
+        // Setup SwipeRefreshLayout
+        setupSwipeRefresh()
+
+        // Setup adapter
         adapter = ChannelListAdapter(
             onChannelClick = { channel ->
                 val intent = Intent(requireContext(), ChannelDetailActivity::class.java)
@@ -53,10 +61,62 @@ class ChannelsFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = adapter
 
+        // Add subscription listener
         SubscriptionManager.addListener(subscriptionListener)
+
+        // Initial load
         loadChannels()
 
         return view
+    }
+
+    /**
+     * Setup pull-to-refresh functionality
+     */
+    private fun setupSwipeRefresh() {
+        // Set refresh colors to match app theme
+        swipeRefreshLayout.setColorSchemeResources(
+            R.color.colorPrimary,
+            R.color.colorAccent,
+            R.color.colorPrimaryDark
+        )
+
+        // Set refresh listener
+        swipeRefreshLayout.setOnRefreshListener {
+            refreshChannels()
+        }
+
+        // Adjust progress view positioning for better UX
+        swipeRefreshLayout.setProgressViewOffset(
+            false,
+            0,
+            (resources.displayMetrics.density * 64).toInt()
+        )
+    }
+
+    private fun refreshChannels() {
+        try {
+            // Force reload from SubscriptionManager
+            // This will include any new events received via WebSocket
+            loadChannels()
+
+            // Show success feedback
+            Toast.makeText(
+                requireContext(),
+                "Channels refreshed",
+                Toast.LENGTH_SHORT
+            ).show()
+        } catch (e: Exception) {
+            // Handle refresh error
+            Toast.makeText(
+                requireContext(),
+                "Failed to refresh channels",
+                Toast.LENGTH_SHORT
+            ).show()
+        } finally {
+            // Stop refresh animation
+            swipeRefreshLayout.isRefreshing = false
+        }
     }
 
     // Method to be called from MainActivity toolbar menu

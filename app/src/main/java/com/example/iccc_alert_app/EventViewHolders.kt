@@ -5,9 +5,6 @@ import android.widget.*
 import androidx.recyclerview.widget.RecyclerView
 import org.osmdroid.views.MapView
 
-/**
- * Container for all ViewHolder classes used in ChannelEventsAdapter
- */
 object EventViewHolders {
 
     class HeaderViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -28,6 +25,15 @@ object EventViewHolders {
         val dateFilterChip: LinearLayout = view.findViewById(R.id.date_filter_chip)
         val dateFilterChipText: TextView = view.findViewById(R.id.date_filter_chip_text)
         val dateFilterChipClose: ImageView = view.findViewById(R.id.date_filter_chip_close)
+
+        val timelineContainer: LinearLayout = view.findViewById(R.id.timeline_container)
+        val timelineView: EventTimelineView = view.findViewById(R.id.event_timeline)
+        val timelineModeButtons: LinearLayout = view.findViewById(R.id.timeline_mode_buttons)
+        val hourButton: TextView = view.findViewById(R.id.hour_mode_button)
+        val dayButton: TextView = view.findViewById(R.id.day_mode_button)
+        val weekButton: TextView = view.findViewById(R.id.week_mode_button)
+        val monthButton: TextView = view.findViewById(R.id.month_mode_button)
+        val toggleTimelineButton: ImageView = view.findViewById(R.id.toggle_timeline_button)
     }
 
     class EventViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -57,6 +63,7 @@ object EventViewHolders {
         val downloadImageButton: Button = view.findViewById(R.id.download_image_button)
         val shareImageButton: Button = view.findViewById(R.id.share_image_button)
         val downloadEventPdfButton: Button = view.findViewById(R.id.download_event_pdf_button)
+
     }
 
     class GpsEventViewHolder(view: View) : RecyclerView.ViewHolder(view) {

@@ -19,14 +19,12 @@ class MainActivity : BaseDrawerActivity() {
 
     private var currentFragment: androidx.fragment.app.Fragment? = null
 
-    // Notification permission launcher
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            // Permission granted - service already started by MyApplication
+            // Permission granted
         } else {
-            // Permission denied - show explanation
             showNotificationPermissionRationale()
         }
     }
@@ -35,16 +33,8 @@ class MainActivity : BaseDrawerActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Request notification permission first (Android 13+)
         requestNotificationPermission()
-
-        // Then request battery optimization exemption
         BatteryOptimizationHelper.requestBatteryOptimizationExemption(this)
-
-        // DON'T start service here - MyApplication already handles it!
-        // WebSocketManager is already initialized in MyApplication.onCreate()
-
-        // Initialize low battery warning
         LowBatteryWarningManager.initialize(this)
 
         supportActionBar?.title = "My Channels"
@@ -66,32 +56,28 @@ class MainActivity : BaseDrawerActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Ensure Channels tab is selected
         setSelectedMenuItem(R.id.nav_channels)
 
-        // ✅ Clear alert notifications when user opens app
+        // ✅ SIMPLIFIED: Just clear notifications, let Android handle grouping
         clearAlertNotifications()
     }
 
-    // ✅ UPDATED: Helper function to clear all channel notifications
     private fun clearAlertNotifications() {
         try {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-            // Get all active notifications
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val activeNotifications = nm.activeNotifications
 
-                // Cancel all notifications from the alerts channel
+                // Cancel all notifications except the service notification (ID 1001)
                 activeNotifications.forEach { statusBarNotification ->
-                    // Check if it's an alert notification (not the service notification)
-                    if (statusBarNotification.id != 1001) { // Skip service notification
+                    if (statusBarNotification.id != 1001) {
                         nm.cancel(statusBarNotification.id)
                     }
                 }
-            }
 
-            Log.d("MainActivity", "Cleared alert notifications")
+                Log.d("MainActivity", "Cleared ${activeNotifications.size - 1} alert notifications")
+            }
         } catch (e: Exception) {
             Log.e("MainActivity", "Error clearing notifications: ${e.message}")
         }
@@ -104,20 +90,16 @@ class MainActivity : BaseDrawerActivity() {
                     this,
                     Manifest.permission.POST_NOTIFICATIONS
                 ) == PackageManager.PERMISSION_GRANTED -> {
-                    // Permission already granted - service started by MyApplication
+                    // Permission already granted
                 }
                 shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
-                    // Show rationale before requesting
                     showNotificationPermissionRationale()
                 }
                 else -> {
-                    // Request permission
                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
         }
-        // For Android 12 and below, no permission needed
-        // Service already started by MyApplication
     }
 
     private fun showNotificationPermissionRationale() {
@@ -139,7 +121,6 @@ class MainActivity : BaseDrawerActivity() {
             }
             .setNegativeButton("Not Now") { dialog, _ ->
                 dialog.dismiss()
-                // Service already started by MyApplication
             }
             .setCancelable(false)
             .show()

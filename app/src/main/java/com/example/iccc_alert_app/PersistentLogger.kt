@@ -12,16 +12,12 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
-/**
- * Persistent file-based logger that survives app kills and doze mode
- * Writes critical events to files for debugging
- */
 object PersistentLogger {
 
     private const val TAG = "PersistentLogger"
     private const val LOG_DIR_NAME = "iccc_logs"
-    private const val MAX_LOG_FILES = 7 // Keep last 7 days
-    private const val MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB per file
+    private const val MAX_LOG_FILES = 7
+    private const val MAX_FILE_SIZE = 10 * 1024 * 1024
 
     private lateinit var context: Context
     private lateinit var logDir: File

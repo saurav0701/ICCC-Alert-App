@@ -30,8 +30,8 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:padding="8dp"
-                    android:layout_marginBottom="8dp"
+                    android:padding="10dp"
+                    android:layout_marginBottom="16dp"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     android:focusable="true">
@@ -217,16 +217,6 @@
                     android:gravity="center_vertical"
                     android:layout_marginTop="6dp">
 
-
-
-<!--                    <TextView-->
-<!--                        android:layout_width="wrap_content"-->
-<!--                        android:layout_height="wrap_content"-->
-<!--                        android:text="Current Location"-->
-<!--                        android:textSize="11sp"-->
-<!--                        android:textColor="#FFFFFF"-->
-<!--                        android:fontFamily="sans-serif"-->
-<!--                        android:layout_marginStart="6dp" />-->
 
                 </LinearLayout>
 
