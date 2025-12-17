@@ -10,10 +10,6 @@ import android.widget.Toast
 import kotlinx.coroutines.*
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Optimized GPS event handler with lightweight map preview
- * Eliminates ANR by avoiding heavy MapView instances in RecyclerView
- */
 class GpsEventHandler(
     private val context: Context,
     private val bindingHelpers: EventBindingHelpers
@@ -22,16 +18,11 @@ class GpsEventHandler(
         private const val TAG = "GpsEventHandler"
     }
 
-    // Cache for map preview images
     private val mapPreviewCache = ConcurrentHashMap<String, Bitmap>()
 
-    // Track active jobs
     private val activeJobs = ConcurrentHashMap<Int, Job>()
 
-    // ==================== GPS EVENT SETUP ====================
-
     fun setupGpsEvent(holder: EventViewHolders.GpsEventViewHolder, event: Event) {
-        // Cancel any existing job for this holder
         activeJobs[holder.hashCode()]?.cancel()
 
         holder.eventType.text = event.typeDisplay ?: "GPS Alert"
@@ -46,7 +37,6 @@ class GpsEventHandler(
         holder.vehicleNumber.text = vehicleNum
         holder.vehicleTransporter.text = transporter
 
-        // Handle alert subtype for tamper events
         val alertSubType = event.data["alertSubType"] as? String
         if (event.type == "tamper" && alertSubType != null) {
             holder.alertSubtypeContainer.visibility = View.VISIBLE
@@ -55,7 +45,6 @@ class GpsEventHandler(
             holder.alertSubtypeContainer.visibility = View.GONE
         }
 
-        // Handle geofence display
         val geofenceData = event.data["geofence"] as? Map<*, *>
         if (geofenceData != null) {
             val geofenceName = geofenceData["name"] as? String
@@ -69,7 +58,6 @@ class GpsEventHandler(
             holder.geofenceContainer.visibility = View.GONE
         }
 
-        // Use lightweight location card instead of map
         setupLocationCard(holder, event)
 
         bindingHelpers.setupPrioritySpinner(holder.gpsPrioritySpinner)
@@ -95,26 +83,17 @@ class GpsEventHandler(
         activeJobs.remove(holder.hashCode())
     }
 
-    // ==================== LIGHTWEIGHT LOCATION CARD ====================
-
-    /**
-     * Creates a simple, lightweight location preview card
-     * Much faster than rendering a MapView
-     */
     private fun setupLocationCard(holder: EventViewHolders.GpsEventViewHolder, event: Event) {
         val cacheKey = event.id ?: return
 
-        // Hide the MapView - we don't need it
         holder.mapPreview.visibility = View.GONE
         holder.mapLoadingOverlay.visibility = View.GONE
 
-        // Check cache
         if (mapPreviewCache.containsKey(cacheKey)) {
             displayLocationCard(holder, mapPreviewCache[cacheKey]!!)
             return
         }
 
-        // Generate location card asynchronously
         val job = CoroutineScope(Dispatchers.Main).launch {
             try {
                 val mapData = withContext(Dispatchers.Default) {
@@ -162,7 +141,6 @@ class GpsEventHandler(
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
-        // Background gradient
         val gradient = LinearGradient(
             0f, 0f, 0f, height.toFloat(),
             Color.parseColor("#667eea"),
@@ -175,13 +153,10 @@ class GpsEventHandler(
         }
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
-        // Semi-transparent overlay with pattern
         drawLocationPattern(canvas, width, height)
 
-        // Location icon at top
         drawLocationIcon(canvas, width / 2f, 100f)
 
-        // Coordinates
         if (mapData.alertLocation != null) {
             val lat = mapData.alertLocation.latitude
             val lng = mapData.alertLocation.longitude
@@ -203,7 +178,6 @@ class GpsEventHandler(
             )
         }
 
-        // Event type indicator
         val typePaint = Paint().apply {
             color = Color.WHITE
             textSize = 28f
@@ -216,13 +190,11 @@ class GpsEventHandler(
         val eventTypeText = when (event.type) {
             "off-route" -> "📍 Off-Route Alert"
             "tamper" -> "⚠️ Tamper Alert"
-            "overspeed" -> "⚡ Overspeed Alert"
             else -> "📍 GPS Alert"
         }
 
         canvas.drawText(eventTypeText, width / 2f, 250f, typePaint)
 
-        // "Tap to view on map" hint
         val hintPaint = Paint().apply {
             color = Color.WHITE
             textSize = 20f
@@ -266,7 +238,6 @@ class GpsEventHandler(
             canvas.drawLine(0f, y.toFloat(), width.toFloat(), y.toFloat(), patternPaint)
         }
 
-        // Draw concentric circles around center
         val centerX = width / 2f
         val centerY = height / 2f
 
@@ -367,8 +338,6 @@ class GpsEventHandler(
             }
         }
     }
-
-    // ==================== ACTION BUTTONS ====================
 
     private fun setupGpsActionButtons(holder: EventViewHolders.GpsEventViewHolder, event: Event) {
         holder.downloadGpsPdfButton.setOnClickListener {

@@ -13,9 +13,14 @@ import android.view.MenuItem
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
+import com.example.iccc_alert_app.auth.AuthManager
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 class MainActivity : BaseDrawerActivity() {
+
+    companion object {
+        private const val TAG = "MainActivity"
+    }
 
     private var currentFragment: androidx.fragment.app.Fragment? = null
 
@@ -31,6 +36,27 @@ class MainActivity : BaseDrawerActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ✅ CRITICAL: Check if user is logged in FIRST
+        if (!AuthManager.isLoggedIn()) {
+            Log.w(TAG, "User not logged in, redirecting to LoginActivity")
+            PersistentLogger.logEvent("SYSTEM", "MainActivity: User not logged in, redirecting")
+
+            val intent = Intent(this, LoginActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
+            return
+        }
+
+        // ✅ User is logged in, organization is already set from login
+        val organization = BackendConfig.getOrganization()
+        Log.d(TAG, "✅ User logged in as $organization, starting WebSocket")
+        PersistentLogger.logEvent("SYSTEM", "MainActivity: Starting WebSocket for $organization")
+
+        // ✅ NOW start WebSocket service with correct organization
+        WebSocketService.start(this)
+
         setContentView(R.layout.activity_main)
 
         requestNotificationPermission()
@@ -76,10 +102,10 @@ class MainActivity : BaseDrawerActivity() {
                     }
                 }
 
-                Log.d("MainActivity", "Cleared ${activeNotifications.size - 1} alert notifications")
+                Log.d(TAG, "Cleared ${activeNotifications.size - 1} alert notifications")
             }
         } catch (e: Exception) {
-            Log.e("MainActivity", "Error clearing notifications: ${e.message}")
+            Log.e(TAG, "Error clearing notifications: ${e.message}")
         }
     }
 

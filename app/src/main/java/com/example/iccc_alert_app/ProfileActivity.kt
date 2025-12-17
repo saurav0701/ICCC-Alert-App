@@ -23,10 +23,12 @@ class ProfileActivity : BaseDrawerActivity() {
     // ✅ FIXED: Properly typed as ProgressBar
     private lateinit var loadingView: ProgressBar
     private lateinit var contentView: View
-    private lateinit var logoutButton: Button
+    // TODO: Fix logout bugs before re-enabling
+    // private lateinit var logoutButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
 
         try {
             setContentView(R.layout.activity_profile)
@@ -64,11 +66,12 @@ class ProfileActivity : BaseDrawerActivity() {
             // ✅ FIXED: Correctly cast to ProgressBar
             loadingView = findViewById(R.id.profile_loading)
             contentView = findViewById(R.id.profile_content)
-            logoutButton = findViewById(R.id.logout_button)
 
-            logoutButton.setOnClickListener {
-                showLogoutConfirmation()
-            }
+            // TODO: Fix logout bugs before re-enabling
+            // logoutButton = findViewById(R.id.logout_button)
+            // logoutButton.setOnClickListener {
+            //     showLogoutConfirmation()
+            // }
 
         } catch (e: Exception) {
             android.util.Log.e("ProfileActivity", "Error initializing views", e)
@@ -193,9 +196,11 @@ class ProfileActivity : BaseDrawerActivity() {
         }
     }
 
+    // TODO: Fix logout bugs before re-enabling
     /**
      * ✅ IMPROVED: Better UX with clear messaging
      */
+    /*
     private fun showLogoutConfirmation() {
         try {
             AlertDialog.Builder(this)
@@ -218,10 +223,13 @@ class ProfileActivity : BaseDrawerActivity() {
             performLogout()
         }
     }
+    */
 
+    // TODO: Fix logout bugs before re-enabling
     /**
      * ✅ IMPROVED: Better error handling and user feedback
      */
+    /*
     private fun performLogout() {
         try {
             loadingView.visibility = View.VISIBLE
@@ -261,6 +269,7 @@ class ProfileActivity : BaseDrawerActivity() {
             Toast.makeText(this, "Logout failed. Please try again.", Toast.LENGTH_SHORT).show()
         }
     }
+    */
 
     /**
      * ✅ IMPROVED: Proper cleanup to prevent memory leaks

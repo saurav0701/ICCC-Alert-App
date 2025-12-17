@@ -19,6 +19,7 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var loginButton: Button
     private lateinit var registerButton: TextView
     private lateinit var progressBar: ProgressBar
+    private lateinit var statusText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,6 +34,9 @@ class LoginActivity : AppCompatActivity() {
             return
         }
 
+        // ✅ IMPORTANT: Stop WebSocket service if running (user logged out)
+        WebSocketService.stop(this)
+
         initializeViews()
         setupListeners()
     }
@@ -42,6 +46,7 @@ class LoginActivity : AppCompatActivity() {
         loginButton = findViewById(R.id.login_button)
         registerButton = findViewById(R.id.register_text)
         progressBar = findViewById(R.id.progress_bar)
+        statusText = findViewById(R.id.status_text) // Add this to your layout
 
         // Format phone number as user types
         phoneInput.addTextChangedListener(object : TextWatcher {
@@ -64,7 +69,6 @@ class LoginActivity : AppCompatActivity() {
         registerButton.setOnClickListener {
             val intent = Intent(this, RegistrationActivity::class.java)
             startActivity(intent)
-            // Add smooth transition
             overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
         }
     }
@@ -89,19 +93,26 @@ class LoginActivity : AppCompatActivity() {
 
     private fun requestLoginOTP(phone: String) {
         setLoading(true)
+        updateStatus("Checking BCCL backend...")
 
         AuthManager.requestLogin(phone) { success, message ->
             runOnUiThread {
                 setLoading(false)
+                updateStatus("")
+
                 if (success) {
-                    Toast.makeText(this, "OTP sent to WhatsApp!", Toast.LENGTH_SHORT).show()
+                    val org = BackendConfig.getOrganization()
+                    Toast.makeText(
+                        this,
+                        "✓ Connected to $org\nOTP sent to WhatsApp!",
+                        Toast.LENGTH_SHORT
+                    ).show()
 
                     val intent = Intent(this, OTPVerificationActivity::class.java).apply {
                         putExtra("phone", phone)
                         putExtra("purpose", "login")
                     }
                     startActivity(intent)
-                    // Add smooth transition
                     overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                 } else {
                     showError(message)
@@ -115,6 +126,13 @@ class LoginActivity : AppCompatActivity() {
         loginButton.isEnabled = !loading
         phoneInput.isEnabled = !loading
         registerButton.isEnabled = !loading
+    }
+
+    private fun updateStatus(message: String) {
+        if (::statusText.isInitialized) {
+            statusText.text = message
+            statusText.visibility = if (message.isEmpty()) View.GONE else View.VISIBLE
+        }
     }
 
     private fun showError(message: String) {

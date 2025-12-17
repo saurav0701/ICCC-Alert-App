@@ -39,10 +39,10 @@ class MyApplication : Application() {
         // Initialize critical components on background thread
         applicationScope.launch {
             try {
-                // ✅ Initialize BackendConfig FIRST (before AuthManager)
+                // ✅ Initialize BackendConfig FIRST (but don't set organization yet)
                 BackendConfig.initialize(this@MyApplication)
                 Log.d(TAG, "BackendConfig initialized")
-                PersistentLogger.logEvent("SYSTEM", "BackendConfig initialized - ${BackendConfig.getOrganization()}")
+                PersistentLogger.logEvent("SYSTEM", "BackendConfig initialized (org will be set after login)")
 
                 // Initialize AuthManager
                 AuthManager.initialize(this@MyApplication)
@@ -64,12 +64,11 @@ class MyApplication : Application() {
                 Log.d(TAG, "SavedMessagesManager initialized")
                 PersistentLogger.logEvent("SYSTEM", "SavedMessagesManager initialized")
 
-                // Start WebSocket service
-                launch(Dispatchers.Main) {
-                    WebSocketManager.initialize(this@MyApplication)
-                    Log.d(TAG, "WebSocketManager initialized")
-                    PersistentLogger.logEvent("SYSTEM", "WebSocketManager initialized")
-                }
+                // ❌ DO NOT START WEBSOCKET HERE
+                // Let MainActivity start it after checking if user is logged in
+                // The organization will be set during login flow
+                Log.d(TAG, "WebSocket will be started by MainActivity after login check")
+                PersistentLogger.logEvent("SYSTEM", "WebSocket start deferred to MainActivity")
 
                 Log.d(TAG, "Application initialized successfully")
                 PersistentLogger.logEvent("SYSTEM", "===== APPLICATION INITIALIZATION COMPLETE =====")

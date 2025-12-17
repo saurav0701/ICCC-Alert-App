@@ -11,6 +11,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 object AuthManager {
     private const val TAG = "AuthManager"
@@ -18,12 +19,13 @@ object AuthManager {
     private const val KEY_AUTH_TOKEN = "auth_token"
     private const val KEY_TOKEN_EXPIRY = "token_expiry"
     private const val KEY_USER_DATA = "user_data"
+    private const val REQUEST_TIMEOUT = 8L // seconds per backend
 
     private lateinit var prefs: SharedPreferences
     private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(REQUEST_TIMEOUT, TimeUnit.SECONDS)
+        .readTimeout(REQUEST_TIMEOUT, TimeUnit.SECONDS)
+        .writeTimeout(REQUEST_TIMEOUT, TimeUnit.SECONDS)
         .build()
 
     private val gson = Gson()
@@ -34,7 +36,6 @@ object AuthManager {
         BackendConfig.initialize(context)
     }
 
-    // Get device ID for multi-device support
     fun getDeviceId(context: Context): String {
         return Settings.Secure.getString(
             context.contentResolver,
@@ -42,21 +43,17 @@ object AuthManager {
         )
     }
 
-    // Check if user is logged in
     fun isLoggedIn(): Boolean {
         val token = getAuthToken()
         val expiry = prefs.getLong(KEY_TOKEN_EXPIRY, 0)
         val currentTime = System.currentTimeMillis() / 1000
-
         return !token.isNullOrEmpty() && expiry > currentTime
     }
 
-    // Get stored auth token
     fun getAuthToken(): String? {
         return prefs.getString(KEY_AUTH_TOKEN, null)
     }
 
-    // Get stored user data
     fun getCurrentUser(): User? {
         val userJson = prefs.getString(KEY_USER_DATA, null) ?: return null
         return try {
@@ -67,7 +64,6 @@ object AuthManager {
         }
     }
 
-    // Save auth data and set organization
     private fun saveAuthData(authResponse: AuthResponse) {
         prefs.edit().apply {
             putString(KEY_AUTH_TOKEN, authResponse.token)
@@ -75,27 +71,24 @@ object AuthManager {
             putString(KEY_USER_DATA, gson.toJson(authResponse.user))
             apply()
         }
-
-        // ✅ SET ORGANIZATION from user data
         BackendConfig.setOrganization(authResponse.user.workingFor)
-
         Log.d(TAG, "✓ Auth data saved for ${authResponse.user.workingFor}")
     }
 
-    // Clear auth data (logout)
     fun clearAuthData() {
         prefs.edit().clear().apply()
         BackendConfig.clearOrganization()
         Log.d(TAG, "✓ Auth data cleared")
     }
 
-    // Register new user - Step 1: Send registration data and get OTP
+    // Registration (knows organization upfront)
     fun requestRegistration(
         context: Context,
         request: RegistrationRequest,
         callback: (Boolean, String) -> Unit
     ) {
-        // ✅ Use organization-specific URL
+        // Set organization before making request
+        BackendConfig.setOrganization(request.workingFor)
         val baseUrl = BackendConfig.getHttpBaseUrl()
 
         val json = gson.toJson(request)
@@ -135,7 +128,6 @@ object AuthManager {
         })
     }
 
-    // Register new user - Step 2: Verify OTP
     fun verifyRegistration(
         context: Context,
         phone: String,
@@ -200,12 +192,61 @@ object AuthManager {
         })
     }
 
-    // Login - Step 1: Request OTP
+    /**
+     * ✅ NEW: Multi-backend login request
+     * Tries BCCL first, then CCL if not found or timeout
+     */
     fun requestLogin(
         phone: String,
         callback: (Boolean, String) -> Unit
     ) {
-        val baseUrl = BackendConfig.getHttpBaseUrl()
+        Log.d(TAG, "Starting multi-backend login for: $phone")
+
+        val callbackInvoked = AtomicBoolean(false)
+
+        // Try BCCL first
+        tryLoginOnBackend(phone, "BCCL") { bcclSuccess, bcclMessage ->
+            if (bcclSuccess) {
+                // Found on BCCL
+                if (callbackInvoked.compareAndSet(false, true)) {
+                    Log.d(TAG, "✓ User found on BCCL")
+                    BackendConfig.setOrganization("BCCL")
+                    callback(true, bcclMessage)
+                }
+            } else {
+                // Not found or error on BCCL, try CCL
+                Log.d(TAG, "BCCL failed: $bcclMessage, trying CCL...")
+
+                tryLoginOnBackend(phone, "CCL") { cclSuccess, cclMessage ->
+                    if (callbackInvoked.compareAndSet(false, true)) {
+                        if (cclSuccess) {
+                            Log.d(TAG, "✓ User found on CCL")
+                            BackendConfig.setOrganization("CCL")
+                            callback(true, cclMessage)
+                        } else {
+                            // Not found on either backend
+                            Log.d(TAG, "✗ User not found on either backend")
+                            callback(false, "User not registered. Please register first.")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * ✅ NEW: Try login on specific backend
+     */
+    private fun tryLoginOnBackend(
+        phone: String,
+        organization: String,
+        callback: (Boolean, String) -> Unit
+    ) {
+        val baseUrl = if (organization == "CCL") {
+            "http://192.168.29.70:19998"
+        } else {
+            "http://192.168.29.70:8890"
+        }
 
         val request = OTPRequest(phone = phone, purpose = "login")
         val json = gson.toJson(request)
@@ -216,27 +257,30 @@ object AuthManager {
             .post(body)
             .build()
 
-        Log.d(TAG, "Login request to: $baseUrl")
+        Log.d(TAG, "Trying login on $organization: $baseUrl")
 
         client.newCall(httpRequest).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                Log.e(TAG, "Login request failed", e)
-                callback(false, "Network error: ${e.message}")
+                Log.e(TAG, "$organization login request failed: ${e.message}")
+                callback(false, "Network error on $organization: ${e.message}")
             }
 
             override fun onResponse(call: Call, response: Response) {
                 response.use {
                     val responseBody = it.body?.string()
-                    Log.d(TAG, "Login request response: $responseBody")
+                    Log.d(TAG, "$organization response: ${it.code} - $responseBody")
 
                     if (it.isSuccessful) {
+                        // ✅ CRITICAL: Set organization as soon as we find the user
+                        BackendConfig.setOrganization(organization)
+                        Log.d(TAG, "✅ Set organization to $organization based on user lookup")
                         callback(true, "OTP sent to your WhatsApp")
                     } else {
                         val errorMsg = try {
                             val errorResponse = gson.fromJson(responseBody, ApiResponse::class.java)
-                            errorResponse.error ?: "Failed to send OTP"
+                            errorResponse.error ?: "Failed on $organization"
                         } catch (e: Exception) {
-                            "Failed to send OTP: ${it.code}"
+                            "Failed on $organization: ${it.code}"
                         }
                         callback(false, errorMsg)
                     }
@@ -245,7 +289,9 @@ object AuthManager {
         })
     }
 
-    // Login - Step 2: Verify OTP
+    /**
+     * ✅ UPDATED: Verify login uses the already-set organization
+     */
     fun verifyLogin(
         context: Context,
         phone: String,
@@ -267,6 +313,8 @@ object AuthManager {
             .url("$baseUrl/auth/login/verify")
             .post(body)
             .build()
+
+        Log.d(TAG, "Verifying login on: $baseUrl")
 
         client.newCall(httpRequest).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
@@ -310,7 +358,6 @@ object AuthManager {
         })
     }
 
-    // Logout
     fun logout(callback: (Boolean, String) -> Unit) {
         val token = getAuthToken()
         if (token == null) {
