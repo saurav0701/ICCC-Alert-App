@@ -10,12 +10,12 @@ object BackendConfig {
     private lateinit var prefs: SharedPreferences
 
     // BCCL Backend (original)
-    private const val BCCL_HTTP_BASE = "http://192.168.29.70:8890"
-    private const val BCCL_WS_BASE = "ws://192.168.29.70:2222"
+    private const val BCCL_HTTP_BASE = "http://192.168.29.69:8890"
+    private const val BCCL_WS_BASE = "ws://192.168.29.69:2222"
 
     // CCL Backend (new)
-    private const val CCL_HTTP_BASE = "http://192.168.29.70:19998"
-    private const val CCL_WS_BASE = "ws://192.168.29.70:19999"
+    private const val CCL_HTTP_BASE = "http://192.168.29.69:19998"
+    private const val CCL_WS_BASE = "ws://192.168.29.69:19999"
 
     fun initialize(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

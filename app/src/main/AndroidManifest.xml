@@ -12,11 +12,6 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
-
-    <!-- ✅ NEW: Request to be exempt from Doze/App Standby -->
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-
-    <!-- ✅ NEW: Allow service to wake device from doze for urgent work -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <!-- Storage permissions for saving files -->
@@ -54,7 +49,7 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- WebSocket Service - CRITICAL CHANGES FOR DOZE MODE -->
+        <!-- WebSocket Service -->
         <service
             android:name=".WebSocketService"
             android:enabled="true"
@@ -78,7 +73,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- ✅ NEW: Doze Mode Exemption Receiver -->
+        <!-- Doze Mode Exemption Receiver -->
         <receiver
             android:name=".DozeExemptionReceiver"
             android:enabled="true"
@@ -89,7 +84,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- Login Activity - LAUNCHER (First screen) -->
+        <!-- Login Activity - LAUNCHER -->
         <activity
             android:name=".LoginActivity"
             android:exported="true"
@@ -120,7 +115,7 @@
             android:theme="@style/Theme.ICCCAlertApp"
             android:exported="false" />
 
-        <!-- Main Activity (After successful login) -->
+        <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="false"
@@ -136,7 +131,7 @@
             android:theme="@style/Theme.ICCCAlertApp"
             android:exported="false" />
 
-        <!-- Map Activity (for GPS events) -->
+        <!-- Map Activity -->
         <activity
             android:name=".MapActivity"
             android:label="Event Location"
@@ -144,6 +139,7 @@
             android:theme="@style/Theme.ICCCAlertApp"
             android:exported="false" />
 
+        <!-- Image Viewer Activity -->
         <activity
             android:name=".ImageViewerActivity"
             android:label="Event Image"
@@ -199,6 +195,32 @@
             android:name=".SavedMessagesActivity"
             android:label="Saved Messages"
             android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:exported="false" />
+
+        <!-- Camera Streams Activity -->
+        <activity
+            android:name=".CameraStreamsActivity"
+            android:label="Camera Streams"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:exported="false" />
+
+        <!-- Camera Stream Player Activity -->
+        <activity
+            android:name=".CameraGridViewActivity"
+            android:label="Camera Grid View"
+            android:parentActivityName=".CameraStreamsActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.ICCCAlertApp"
+            android:exported="false" />
+
+        <!-- Camera Stream Player stays unspecified for landscape support -->
+        <activity
+            android:name=".CameraStreamPlayerActivity"
+            android:label="Camera Stream"
+            android:parentActivityName=".CameraStreamsActivity"
+            android:configChanges="orientation|screenSize"
             android:theme="@style/Theme.ICCCAlertApp"
             android:exported="false" />
 

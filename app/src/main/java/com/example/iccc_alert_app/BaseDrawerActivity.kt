@@ -176,6 +176,12 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
                     }
                     true
                 }
+                R.id.nav_camera_streams -> {
+                    if (this !is CameraStreamsActivity) {
+                        navigateToActivity(CameraStreamsActivity::class.java)
+                    }
+                    true
+                }
                 R.id.nav_saved_messages -> {
                     if (this !is SavedMessagesActivity) {
                         navigateToActivity(SavedMessagesActivity::class.java)
@@ -192,10 +198,10 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
             }
         }
     }
-
     private fun isCurrentActivity(itemId: Int): Boolean {
         return when (itemId) {
             R.id.nav_channels -> this is MainActivity
+            R.id.nav_camera_streams -> this is CameraStreamsActivity
             R.id.nav_saved_messages -> this is SavedMessagesActivity
             R.id.nav_settings -> this is SettingsActivity
             else -> false
@@ -253,6 +259,11 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
             R.id.nav_channels -> {
                 if (this !is MainActivity) {
                     navigateToActivity(MainActivity::class.java)
+                }
+            }
+            R.id.nav_camera_streams -> {
+                if (this !is CameraStreamsActivity) {
+                    navigateToActivity(CameraStreamsActivity::class.java)
                 }
             }
             R.id.nav_saved_messages -> {

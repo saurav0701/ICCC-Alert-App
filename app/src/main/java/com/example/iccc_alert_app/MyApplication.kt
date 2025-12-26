@@ -59,14 +59,16 @@ class MyApplication : Application() {
                 Log.d(TAG, "ChannelSyncState initialized")
                 PersistentLogger.logEvent("SYSTEM", "ChannelSyncState initialized")
 
+                // ✅ NEW: Initialize CameraManager
+                CameraManager.initialize(this@MyApplication)
+                Log.d(TAG, "CameraManager initialized")
+                PersistentLogger.logEvent("SYSTEM", "CameraManager initialized")
+
                 // Initialize SavedMessagesManager
                 SavedMessagesManager.initialize(this@MyApplication)
                 Log.d(TAG, "SavedMessagesManager initialized")
                 PersistentLogger.logEvent("SYSTEM", "SavedMessagesManager initialized")
 
-                // ❌ DO NOT START WEBSOCKET HERE
-                // Let MainActivity start it after checking if user is logged in
-                // The organization will be set during login flow
                 Log.d(TAG, "WebSocket will be started by MainActivity after login check")
                 PersistentLogger.logEvent("SYSTEM", "WebSocket start deferred to MainActivity")
 

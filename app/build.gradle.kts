@@ -68,6 +68,9 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("androidx.compose.material:material-icons-extended")
 
+    implementation("com.google.android.exoplayer:exoplayer:2.19.1")
+    implementation("com.google.android.exoplayer:exoplayer-hls:2.19.1")
+
     implementation("com.github.chrisbanes:PhotoView:2.3.0")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 

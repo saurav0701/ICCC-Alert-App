@@ -3,5 +3,7 @@
     <!-- Bottom Navigation -->
     <dimen name="bottom_navigation_height">56dp</dimen>
 
+    <dimen name="grid_spacing">8dp</dimen>
+
     <!-- If you have other dimensions, add them here too -->
 </resources>

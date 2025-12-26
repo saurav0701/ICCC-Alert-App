@@ -243,9 +243,9 @@ object AuthManager {
         callback: (Boolean, String) -> Unit
     ) {
         val baseUrl = if (organization == "CCL") {
-            "http://192.168.29.70:19998"
+            "http://192.168.29.69:19998"
         } else {
-            "http://192.168.29.70:8890"
+            "http://192.168.29.69:8890"
         }
 
         val request = OTPRequest(phone = phone, purpose = "login")

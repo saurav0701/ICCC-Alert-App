@@ -18,6 +18,11 @@
             android:title="Saved Messages"
             android:iconTint="?attr/colorPrimary" />
 
+        <item
+            android:id="@+id/nav_camera_streams"
+            android:icon="@drawable/ic_videocam"
+            android:title="Camera Streams"/>
+
     </group>
 
     <!-- Divider with improved section header -->

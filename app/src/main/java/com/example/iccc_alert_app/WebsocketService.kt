@@ -463,29 +463,63 @@ class WebSocketService : Service() {
         }
     }
 
-    // ✅ OPTIMIZED: Streamlined event processing - minimal overhead
     private suspend fun processEventAsync(text: String) = withContext(Dispatchers.Default) {
         try {
+            // Skip subscription confirmations
             if (text.contains("\"status\":\"subscribed\"")) return@withContext
             if (text.contains("\"error\"")) {
                 errorCount.incrementAndGet()
                 return@withContext
             }
 
+            // ✅ CRITICAL FIX: Parse as Event first, then check for camera data
             val event = try {
                 gson.fromJson(text, Event::class.java)
             } catch (e: Exception) {
                 errorCount.incrementAndGet()
+                Log.e(TAG, "Failed to parse message: ${e.message}")
                 return@withContext
             }
 
+            // ✅ Check if this is a camera list event (type = "camera-list")
+            if (event?.type == "camera-list" || event?.data?.containsKey("_raw_camera_json") == true) {
+                try {
+                    val rawCameraJson = event.data["_raw_camera_json"] as? String
+
+                    if (rawCameraJson != null) {
+                        // Parse the embedded camera JSON
+                        val cameraListMessage = gson.fromJson(rawCameraJson, CameraListMessage::class.java)
+
+                        if (cameraListMessage?.cameras?.isNotEmpty() == true) {
+                            Log.d(TAG, "📹 Received camera list with ${cameraListMessage.cameras.size} cameras")
+                            PersistentLogger.logEvent("CAMERA", "Received ${cameraListMessage.cameras.size} cameras")
+
+                            // Handle camera list
+                            CameraManager.handleCameraListMessage(cameraListMessage)
+
+                            // Broadcast camera update
+                            withContext(Dispatchers.Main) {
+                                sendBroadcast(Intent("com.example.iccc_alert_app.CAMERA_UPDATE"))
+                            }
+
+                            return@withContext
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to parse camera list: ${e.message}", e)
+                    PersistentLogger.logError("CAMERA", "Failed to parse camera list", e)
+                }
+                return@withContext
+            }
+
+            // Regular event processing
             if (event?.id == null || event.area == null || event.type == null) {
                 droppedCount.incrementAndGet()
                 return@withContext
             }
 
             val channelId = "${event.area}_${event.type}"
-            val requireAck = event.data["_requireAck"] as? Boolean ?: true
+            val requireAck = event.data["_requireAck"] as? Boolean ?: false // Camera events don't need ACK
 
             if (!SubscriptionManager.isSubscribed(channelId)) {
                 droppedCount.incrementAndGet()
@@ -514,21 +548,19 @@ class WebSocketService : Service() {
                 return@withContext
             }
 
-            // ✅ CRITICAL: Store event FIRST - this is the priority
+            // Store event
             val addedSuccessfully = SubscriptionManager.addEvent(event)
 
             if (addedSuccessfully) {
                 processedCount.incrementAndGet()
 
-                // ✅ OPTIMIZED: Queue notification for batching (doesn't block)
+                // Queue notification for batching
                 if (SettingsActivity.areNotificationsEnabled(this@WebSocketService)) {
                     val inCatchUpMode = ChannelSyncState.isInCatchUpMode(channelId)
 
                     if (inCatchUpMode) {
-                        // During catch-up: batch notifications
                         notificationQueue.offer(event)
                     } else {
-                        // Live mode: send immediately (but still async)
                         withContext(Dispatchers.Main) {
                             launch {
                                 try {
@@ -541,7 +573,7 @@ class WebSocketService : Service() {
                     }
                 }
 
-                // Broadcast event (lightweight operation)
+                // Broadcast event
                 withContext(Dispatchers.Main) {
                     sendBroadcast(Intent("com.example.iccc_alert_app.NEW_EVENT")
                         .putExtra("event_id", event.id))
@@ -550,7 +582,7 @@ class WebSocketService : Service() {
                 droppedCount.incrementAndGet()
             }
 
-            // ✅ Always ACK after storage decision
+            // Always ACK after storage decision
             if (requireAck) {
                 sendAck(event.id)
             }

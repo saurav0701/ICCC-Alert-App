@@ -8,6 +8,12 @@
         android:enabled="true" />
 
     <item
+        android:id="@+id/nav_camera_streams"
+        android:icon="@drawable/ic_videocam"
+        android:title="Cameras"
+        android:enabled="true" />
+
+    <item
         android:id="@+id/nav_saved_messages"
         android:icon="@drawable/ic_bookmark"
         android:title="Saved"
