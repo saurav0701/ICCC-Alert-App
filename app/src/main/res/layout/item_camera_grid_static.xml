@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/grid_card"
+    android:layout_width="match_parent"
+    android:layout_height="180dp"
+    android:layout_margin="4dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="4dp">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- Static Thumbnail Image -->
+        <ImageView
+            android:id="@+id/grid_thumbnail"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:contentDescription="Camera thumbnail" />
+
+        <!-- Gradient Overlay for Text Readability -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_gravity="bottom"
+            android:background="@drawable/gradient_overlay_bottom" />
+
+        <!-- Status Indicator (Top-Right) -->
+        <View
+            android:id="@+id/grid_status_indicator"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_margin="8dp"
+            android:layout_gravity="top|end"
+            android:background="@drawable/status_indicator_online" />
+
+        <!-- Loading Indicator (Top-Left) - NEW -->
+        <ProgressBar
+            android:id="@+id/grid_loading_indicator"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_margin="8dp"
+            android:layout_gravity="top|start"
+            android:indeterminateTint="#FFFFFF"
+            android:visibility="gone"
+            style="?android:attr/progressBarStyleSmall" />
+
+        <!-- Play Icon (Center) -->
+        <ImageView
+            android:id="@+id/grid_play_icon"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_play_circle"
+            android:alpha="0.8"
+            android:contentDescription="Play stream" />
+
+        <!-- Camera Info (Bottom) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/grid_camera_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Camera Name"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/grid_camera_area"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="AREA"
+                android:textColor="#CCCCCC"
+                android:textSize="12sp"
+                android:maxLines="1" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</androidx.cardview.widget.CardView>

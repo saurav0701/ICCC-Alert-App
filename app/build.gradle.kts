@@ -52,7 +52,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
 
-    // ✅ UPGRADED: Material 3 (replaces old material library)
+    // ✅ Material 3
     implementation("com.google.android.material:material:1.12.0")
 
     // RecyclerView and CardView (for non-Compose screens)
@@ -68,9 +68,11 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("androidx.compose.material:material-icons-extended")
 
+    // Video Players
     implementation("com.google.android.exoplayer:exoplayer:2.19.1")
     implementation("com.google.android.exoplayer:exoplayer-hls:2.19.1")
 
+    // Image Viewing
     implementation("com.github.chrisbanes:PhotoView:2.3.0")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 
@@ -86,7 +88,13 @@ dependencies {
     // JSON
     implementation("com.google.code.gson:gson:2.10.1")
 
-    // OpenStreetMap (osmdroid)
+    // ==================== MAPS ====================
+
+    // ✅ Google Maps (you already have this configured)
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.android.gms:play-services-location:21.1.0")
+
+    // OpenStreetMap (keep for GPS event maps - MapActivity)
     implementation("org.osmdroid:osmdroid-android:6.1.18")
 
     // Testing

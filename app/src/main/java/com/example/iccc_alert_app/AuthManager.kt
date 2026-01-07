@@ -192,10 +192,6 @@ object AuthManager {
         })
     }
 
-    /**
-     * ✅ NEW: Multi-backend login request
-     * Tries BCCL first, then CCL if not found or timeout
-     */
     fun requestLogin(
         phone: String,
         callback: (Boolean, String) -> Unit
@@ -234,9 +230,6 @@ object AuthManager {
         }
     }
 
-    /**
-     * ✅ NEW: Try login on specific backend
-     */
     private fun tryLoginOnBackend(
         phone: String,
         organization: String,
@@ -245,7 +238,7 @@ object AuthManager {
         val baseUrl = if (organization == "CCL") {
             "http://192.168.29.69:19998"
         } else {
-            "http://192.168.29.69:8890"
+            "http://103.208.173.227:8890"
         }
 
         val request = OTPRequest(phone = phone, purpose = "login")

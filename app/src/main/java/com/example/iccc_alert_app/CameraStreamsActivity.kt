@@ -15,7 +15,7 @@ import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.widget.SearchView
-import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import kotlinx.coroutines.*
@@ -33,7 +33,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
     private lateinit var areaSpinner: Spinner
     private lateinit var statsTextView: TextView
     private lateinit var adapter: CameraListAdapter
-    private lateinit var fabGridView: com.google.android.material.floatingactionbutton.FloatingActionButton
 
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -54,19 +53,17 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         setContentView(R.layout.activity_camera_streams)
 
         supportActionBar?.title = "Camera Streams"
+        supportActionBar?.elevation = 0f
         setSelectedMenuItem(R.id.nav_camera_streams)
 
         initializeViews()
 
-        // Load last selected area
         currentArea = getSharedPreferences("camera_prefs", Context.MODE_PRIVATE)
             .getString(PREF_LAST_AREA, "barora") ?: "barora"
 
         setupSwipeRefresh()
         setupRecyclerView()
-        setupFab()
 
-        // Register receiver
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(
                 cameraUpdateReceiver,
@@ -81,8 +78,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         }
 
         Log.d(TAG, "✅ Activity created, loading area: $currentArea")
-
-        // Initial UI setup
         refreshUI()
     }
 
@@ -92,14 +87,13 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         emptyView = findViewById(R.id.empty_cameras_view)
         areaSpinner = findViewById(R.id.area_spinner)
         statsTextView = findViewById(R.id.stats_text)
-        fabGridView = findViewById(R.id.fab_grid_view)
     }
 
     private fun setupSwipeRefresh() {
         swipeRefreshLayout.setColorSchemeResources(
             R.color.colorPrimary,
             R.color.colorAccent,
-            R.color.colorPrimaryDark
+            android.R.color.holo_green_light
         )
 
         swipeRefreshLayout.setOnRefreshListener {
@@ -109,7 +103,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
     }
 
     private fun setupAreaSpinner() {
-        // Get areas from CameraManager
         val availableAreas = CameraManager.getAreas()
 
         if (availableAreas.isEmpty()) {
@@ -136,10 +129,9 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         areaSpinner.adapter = spinnerAdapter
 
-        // Set current area selection
         val currentIndex = areas.indexOfFirst { it.equals(currentArea, ignoreCase = true) }
         if (currentIndex >= 0) {
-            areaSpinner.setSelection(currentIndex, false) // false = don't trigger listener
+            areaSpinner.setSelection(currentIndex, false)
             Log.d(TAG, "📍 Set spinner to position $currentIndex: ${areas[currentIndex]}")
         }
 
@@ -153,7 +145,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
                     Log.d(TAG, "📍 Area changed to: $currentArea")
                     loadCamerasForArea(currentArea)
                 } else if (isFirstLoad) {
-                    // Initial selection - load cameras
                     isFirstLoad = false
                     loadCamerasForArea(currentArea)
                 }
@@ -168,27 +159,17 @@ class CameraStreamsActivity : BaseDrawerActivity() {
             openCameraStream(camera)
         }
 
-        recyclerView.layoutManager = GridLayoutManager(this, 2)
+        recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
     }
 
-    private fun setupFab() {
-        fabGridView.setOnClickListener {
-            val intent = Intent(this, CameraGridViewActivity::class.java)
-            startActivity(intent)
-        }
-    }
-
-    /**
-     * Refresh UI - check if we have data, setup spinner if needed, load cameras
-     */
     private fun refreshUI() {
         activityScope.launch {
             try {
                 swipeRefreshLayout.isRefreshing = true
 
                 withContext(Dispatchers.Default) {
-                    delay(100) // Brief delay to ensure CameraManager has processed update
+                    delay(100)
                 }
 
                 if (!CameraManager.hasData()) {
@@ -198,12 +179,10 @@ class CameraStreamsActivity : BaseDrawerActivity() {
                     return@launch
                 }
 
-                // Setup spinner if not already setup
                 if (areas.isEmpty()) {
                     setupAreaSpinner()
                 }
 
-                // Load cameras for current area
                 loadCamerasForArea(currentArea)
 
             } catch (e: Exception) {
@@ -272,12 +251,15 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         intent.putExtra("CAMERA_AREA", camera.area)
         intent.putExtra("STREAM_URL", camera.getStreamURL())
         startActivity(intent)
+
+        // Add slide animation
+        overridePendingTransition(android.R.anim.slide_in_left, android.R.anim.slide_out_right)
     }
 
     private fun showWaitingForData() {
         recyclerView.visibility = View.GONE
         emptyView.visibility = View.VISIBLE
-        statsTextView.text = "Waiting for camera data..."
+        statsTextView.text = "⏳ Waiting for camera data..."
     }
 
     private fun showEmptyView(message: String = "No cameras found") {
@@ -319,9 +301,9 @@ class CameraStreamsActivity : BaseDrawerActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
-            R.id.action_grid_view -> {
-                val intent = Intent(this, CameraGridViewActivity::class.java)
-                startActivity(intent)
+            // ✅ NEW: Map view option
+            R.id.action_map_view -> {
+                openMapView()
                 true
             }
             R.id.action_filter_online -> {
@@ -334,6 +316,22 @@ class CameraStreamsActivity : BaseDrawerActivity() {
             }
             else -> super.onOptionsItemSelected(item)
         }
+    }
+
+    // ✅ NEW: Open map view
+    private fun openMapView() {
+        if (!CameraManager.hasData()) {
+            android.widget.Toast.makeText(
+                this,
+                "⏳ Loading camera data, please wait...",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        val intent = Intent(this, CameraMapActivity::class.java)
+        startActivity(intent)
+        Log.d(TAG, "🗺️ Opening camera map view")
     }
 
     private fun showOnlineOnlyForArea() {
@@ -363,7 +361,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
 
     override fun onPause() {
         super.onPause()
-        // ✅ Pause adapter when leaving
         adapter.pauseStreams()
     }
 

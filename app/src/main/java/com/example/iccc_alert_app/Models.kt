@@ -30,7 +30,6 @@ data class Channel(
     var isPinned: Boolean = false
 )
 
-// ✅ Subscription filter for specific area + eventType pair
 data class SubscriptionFilter(
     @SerializedName("area") val area: String,
     @SerializedName("eventType") val eventType: String
@@ -49,7 +48,6 @@ data class SyncStateInfo(
     @SerializedName("lastSeq") val lastSeq: Long
 )
 
-// ✅ ClientID Manager - generates and stores persistent client ID
 object ClientIdManager {
     private const val PREFS_NAME = "iccc_alert_prefs"
     private const val KEY_CLIENT_ID = "client_id"
@@ -84,10 +82,6 @@ object ClientIdManager {
         return clientId
     }
 
-    /**
-     * Gets the current client ID without creating a new one.
-     * Returns null if no client ID exists yet.
-     */
     fun getCurrentClientId(context: Context): String? {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getString(KEY_CLIENT_ID, null)
@@ -106,10 +100,6 @@ object ClientIdManager {
     }
 }
 
-/**
- * ✅ UPDATED: Dynamic channel configuration based on organization
- * Supports both BCCL and CCL with different area sets
- */
 object AvailableChannels {
 
     // BCCL Areas (original - 13 areas)
@@ -147,7 +137,6 @@ object AvailableChannels {
         "piparwar" to "Piparwar"
     )
 
-    // Common event types for both organizations
     val eventTypes = listOf(
         "cd" to "Crowd Detection",
         "vd" to "Vehicle Detection",
@@ -163,10 +152,6 @@ object AvailableChannels {
         "tamper" to "Tamper Alert"
     )
 
-    /**
-     * Get areas based on current organization
-     * Uses BackendConfig to determine BCCL vs CCL
-     */
     fun getAreas(): List<Pair<String, String>> {
         return if (BackendConfig.isCCL()) {
             cclAreas
@@ -175,12 +160,6 @@ object AvailableChannels {
         }
     }
 
-
-
-    /**
-     * Get all channels for current organization
-     * Generates area × eventType combinations
-     */
     fun getAllChannels(): List<Channel> {
         val currentAreas = getAreas()
         val channels = mutableListOf<Channel>()
@@ -207,9 +186,6 @@ object AvailableChannels {
         return channels
     }
 
-    /**
-     * Get BCCL-specific channels (for testing/migration)
-     */
     fun getBCCLChannels(): List<Channel> {
         val channels = mutableListOf<Channel>()
         for ((area, areaDisplay) in bcclAreas) {
@@ -229,9 +205,6 @@ object AvailableChannels {
         return channels
     }
 
-    /**
-     * Get CCL-specific channels (for testing/migration)
-     */
     fun getCCLChannels(): List<Channel> {
         val channels = mutableListOf<Channel>()
         for ((area, areaDisplay) in cclAreas) {
@@ -251,9 +224,6 @@ object AvailableChannels {
         return channels
     }
 
-    /**
-     * Get organization-specific statistics
-     */
     fun getOrganizationInfo(): String {
         val org = BackendConfig.getOrganization()
         val areaCount = getAreas().size
@@ -261,65 +231,38 @@ object AvailableChannels {
         return "$org - $areaCount areas, $channelCount channels"
     }
 
-    /**
-     * Check if an area exists in current organization
-     */
     fun isValidArea(area: String): Boolean {
         return getAreas().any { it.first == area }
     }
 
-    /**
-     * Get display name for an area in current organization
-     */
     fun getAreaDisplayName(area: String): String? {
         return getAreas().find { it.first == area }?.second
     }
 
-    /**
-     * Check if an area belongs to BCCL
-     */
     fun isBCCLArea(area: String): Boolean {
         return bcclAreas.any { it.first == area }
     }
 
-    /**
-     * Check if an area belongs to CCL
-     */
     fun isCCLArea(area: String): Boolean {
         return cclAreas.any { it.first == area }
     }
 
-    /**
-     * Get all area codes (internal names) for current organization
-     */
     fun getAreaCodes(): List<String> {
         return getAreas().map { it.first }
     }
 
-    /**
-     * Get all area display names for current organization
-     */
     fun getAreaDisplayNames(): List<String> {
         return getAreas().map { it.second }
     }
 
-    /**
-     * Get event type display name
-     */
     fun getEventTypeDisplayName(eventType: String): String? {
         return eventTypes.find { it.first == eventType }?.second
     }
 
-    /**
-     * Check if an event type is valid
-     */
     fun isValidEventType(eventType: String): Boolean {
         return eventTypes.any { it.first == eventType }
     }
 
-    /**
-     * Get statistics for debugging
-     */
     fun getStats(): Map<String, Any> {
         return mapOf(
             "organization" to BackendConfig.getOrganization(),
