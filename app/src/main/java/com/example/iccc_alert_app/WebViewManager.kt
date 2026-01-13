@@ -19,6 +19,8 @@ object WebViewManager {
         fun onStreamStarted()
         fun onError(description: String)
         fun onTimeout()
+        fun onBuffering()
+        fun onBufferingEnd()
     }
 
     private var timeoutHandler: Handler? = null
@@ -67,6 +69,22 @@ object WebViewManager {
                 cancelTimeout()
                 Handler(Looper.getMainLooper()).post {
                     callback.onError(error)
+                }
+            }
+
+            @android.webkit.JavascriptInterface
+            fun onBuffering() {
+                Log.d(TAG, "🔄 Buffering started")
+                Handler(Looper.getMainLooper()).post {
+                    callback.onBuffering()
+                }
+            }
+
+            @android.webkit.JavascriptInterface
+            fun onBufferingEnd() {
+                Log.d(TAG, "✅ Buffering ended")
+                Handler(Looper.getMainLooper()).post {
+                    callback.onBufferingEnd()
                 }
             }
         }, "Android")
@@ -211,10 +229,32 @@ object WebViewManager {
             return isPlaying ? 'playing' : 'paused';
         };
 
+        // Show buffering indicator
+        function showBuffering() {
+            try {
+                if (typeof Android !== 'undefined') {
+                    Android.onBuffering();
+                }
+            } catch(e) {
+                console.error('Failed to notify buffering:', e);
+            }
+        }
+
+        function hideBuffering() {
+            try {
+                if (typeof Android !== 'undefined') {
+                    Android.onBufferingEnd();
+                }
+            } catch(e) {
+                console.error('Failed to notify buffering end:', e);
+            }
+        }
+
         // Auto-recovery function
         function recoverPlayback() {
             if (isRecovering) return;
             isRecovering = true;
+            showBuffering();
             
             console.log('Attempting playback recovery...');
             
@@ -227,14 +267,17 @@ object WebViewManager {
                         video.play().then(() => {
                             console.log('Recovery successful');
                             isRecovering = false;
+                            hideBuffering();
                         }).catch(e => {
                             console.error('Recovery play failed:', e);
                             isRecovering = false;
+                            hideBuffering();
                             notifyStreamError('Recovery failed: ' + e.message);
                         });
                     }, 200);
                 } else {
                     isRecovering = false;
+                    hideBuffering();
                 }
             }, 100);
         }
@@ -292,7 +335,11 @@ object WebViewManager {
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
                                 console.log('Media error, trying to recover...');
+                                showBuffering();
                                 hls.recoverMediaError();
+                                setTimeout(() => {
+                                    hideBuffering();
+                                }, 2000);
                                 break;
                             default:
                                 console.error('❌ Fatal error:', data.details);
@@ -302,6 +349,13 @@ object WebViewManager {
                     } else if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
                         console.log('Buffer stalled, attempting recovery...');
                         recoverPlayback();
+                    } else if (data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR || 
+                               data.details === Hls.ErrorDetails.FRAG_LOAD_TIMEOUT) {
+                        console.log('Fragment load issue, showing buffering...');
+                        showBuffering();
+                        setTimeout(() => {
+                            hideBuffering();
+                        }, 2000);
                     }
                 });
                 
@@ -333,8 +387,14 @@ object WebViewManager {
         video.addEventListener('pause', function() {
             if (!video.ended && document.visibilityState === 'visible' && isPlaying && !isRecovering) {
                 console.log('Video paused unexpectedly, resuming...');
+                showBuffering();
                 setTimeout(function() {
-                    video.play().catch(e => console.log('Resume play error:', e));
+                    video.play().then(() => {
+                        hideBuffering();
+                    }).catch(e => {
+                        console.log('Resume play error:', e);
+                        hideBuffering();
+                    });
                 }, 100);
             }
         });
@@ -342,11 +402,39 @@ object WebViewManager {
         video.addEventListener('playing', function() {
             console.log('✅ Video is playing');
             isRecovering = false;
+            hideBuffering();
+        });
+
+        video.addEventListener('waiting', function() {
+            console.log('🔄 Video buffering...');
+            showBuffering();
+        });
+
+        video.addEventListener('canplay', function() {
+            console.log('✅ Video can play');
+            hideBuffering();
+        });
+
+        video.addEventListener('stalled', function() {
+            console.log('⚠️ Video stalled');
+            showBuffering();
+            setTimeout(() => {
+                if (video.readyState < 3 && isPlaying) {
+                    recoverPlayback();
+                }
+            }, 3000);
         });
 
         video.addEventListener('error', function(e) {
             console.error('❌ Video element error:', e);
-            notifyStreamError('Video playback error');
+            showBuffering();
+            setTimeout(() => {
+                if (isPlaying && !isRecovering) {
+                    recoverPlayback();
+                } else {
+                    hideBuffering();
+                }
+            }, 1000);
         });
 
         // Start stream

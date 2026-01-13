@@ -282,9 +282,7 @@ object AuthManager {
         })
     }
 
-    /**
-     * ✅ UPDATED: Verify login uses the already-set organization
-     */
+
     fun verifyLogin(
         context: Context,
         phone: String,

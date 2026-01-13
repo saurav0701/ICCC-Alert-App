@@ -41,6 +41,7 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var loadingView: FrameLayout
     private lateinit var loadingText: TextView
+    private lateinit var loadingSpinner: ProgressBar
     private lateinit var errorView: LinearLayout
     private lateinit var errorTextView: TextView
     private lateinit var retryButton: Button
@@ -131,6 +132,7 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
         webView = findViewById(R.id.webview)
         loadingView = findViewById(R.id.loading_view)
         loadingText = findViewById(R.id.loading_text)
+        loadingSpinner = findViewById(R.id.loading_spinner)
         errorView = findViewById(R.id.error_view)
         errorTextView = findViewById(R.id.error_text)
         retryButton = findViewById(R.id.retry_button)
@@ -310,6 +312,25 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
             override fun onTimeout() {
                 Log.w(TAG, "⏱️ Stream timeout")
                 showError("Camera might be offline. Please try again later.")
+            }
+
+            override fun onBuffering() {
+                Log.d(TAG, "🔄 Showing buffering indicator")
+                runOnUiThread {
+                    if (webView.visibility == View.VISIBLE && errorView.visibility == View.GONE) {
+                        loadingView.visibility = View.VISIBLE
+                        loadingText.text = "🔄 Reconnecting..."
+                    }
+                }
+            }
+
+            override fun onBufferingEnd() {
+                Log.d(TAG, "✅ Hiding buffering indicator")
+                runOnUiThread {
+                    if (errorView.visibility == View.GONE) {
+                        loadingView.visibility = View.GONE
+                    }
+                }
             }
         })
     }
