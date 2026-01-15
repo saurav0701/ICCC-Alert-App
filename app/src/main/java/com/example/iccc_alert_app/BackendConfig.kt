@@ -9,13 +9,17 @@ object BackendConfig {
 
     private lateinit var prefs: SharedPreferences
 
-    // BCCL Backend (original)
-    private const val BCCL_HTTP_BASE = "http://103.208.173.227:8890"
-    private const val BCCL_WS_BASE = "ws://103.208.173.227:2222"
+    // ✅ BCCL Backend Configuration
+    private const val BCCL_HTTP_HOST = "103.208.173.227"
+    private const val BCCL_HTTP_PORT = 8890        // ← API Server Port
+    private const val BCCL_WS_HOST = "103.208.173.227"
+    private const val BCCL_WS_PORT = 2222          // ← WebSocket Server Port
 
-    // CCL Backend (new)
-    private const val CCL_HTTP_BASE = "http://192.168.29.69:19998"
-    private const val CCL_WS_BASE = "ws://192.168.29.69:19999"
+    // ✅ CCL Backend Configuration
+    private const val CCL_HTTP_HOST = "20.207.231.162"
+    private const val CCL_HTTP_PORT = 39071        // ← API Server Port
+    private const val CCL_WS_HOST = "20.207.231.162"
+    private const val CCL_WS_PORT = 39072          // ← WebSocket Server Port
 
     fun initialize(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -29,66 +33,102 @@ object BackendConfig {
         android.util.Log.d("BackendConfig", "✅ Organization set to: $organization")
     }
 
-    /**
-     * Get current organization
-     */
     fun getOrganization(): String {
         return prefs.getString(KEY_ORGANIZATION, "BCCL") ?: "BCCL"
     }
 
-    /**
-     * Check if current organization is CCL
-     */
     fun isCCL(): Boolean {
         return getOrganization() == "CCL"
     }
 
-    /**
-     * Check if current organization is BCCL
-     */
     fun isBCCL(): Boolean {
         return getOrganization() == "BCCL"
     }
 
-    /**
-     * Get HTTP base URL for current organization
-     */
     fun getHttpBaseUrl(): String {
-        return if (isCCL()) CCL_HTTP_BASE else BCCL_HTTP_BASE
+        return if (isCCL()) {
+            "http://$CCL_HTTP_HOST:$CCL_HTTP_PORT"
+        } else {
+            "http://$BCCL_HTTP_HOST:$BCCL_HTTP_PORT"
+        }
     }
 
-    /**
-     * Get WebSocket base URL for current organization
-     */
     fun getWsBaseUrl(): String {
-        return if (isCCL()) CCL_WS_BASE else BCCL_WS_BASE
+        return if (isCCL()) {
+            "ws://$CCL_WS_HOST:$CCL_WS_PORT"
+        } else {
+            "ws://$BCCL_WS_HOST:$BCCL_WS_PORT"
+        }
     }
 
-    /**
-     * Get WebSocket URL with path
-     */
+    //20.207.231.162
+
     fun getWsUrl(): String {
         return "${getWsBaseUrl()}/ws"
     }
 
+    fun getCameraApiUrl(): String {
+        return "${getHttpBaseUrl()}/cameras"
+    }
+
     /**
-     * Clear organization (logout)
+     * ✅ Get cameras by area endpoint
      */
+    fun getCamerasByAreaUrl(area: String): String {
+        return "${getHttpBaseUrl()}/cameras/area/$area"
+    }
+
+    /**
+     * ✅ Get online cameras endpoint
+     */
+    fun getOnlineCamerasUrl(): String {
+        return "${getHttpBaseUrl()}/cameras/online"
+    }
+
+    /**
+     * ✅ Get camera stats endpoint
+     */
+    fun getCameraStatsUrl(): String {
+        return "${getHttpBaseUrl()}/cameras/stats"
+    }
+
     fun clearOrganization() {
         prefs.edit().remove(KEY_ORGANIZATION).apply()
         android.util.Log.d("BackendConfig", "Organization cleared")
     }
 
     /**
-     * Get organization display info
+     * Get complete backend configuration info
      */
     fun getOrganizationInfo(): Map<String, String> {
         val org = getOrganization()
         return mapOf(
             "organization" to org,
-            "httpUrl" to getHttpBaseUrl(),
+            "httpHost" to if (isCCL()) CCL_HTTP_HOST else BCCL_HTTP_HOST,
+            "httpPort" to if (isCCL()) CCL_HTTP_PORT.toString() else BCCL_HTTP_PORT.toString(),
+            "wsHost" to if (isCCL()) CCL_WS_HOST else BCCL_WS_HOST,
+            "wsPort" to if (isCCL()) CCL_WS_PORT.toString() else BCCL_WS_PORT.toString(),
+            "httpBaseUrl" to getHttpBaseUrl(),
             "wsUrl" to getWsUrl(),
+            "cameraApiUrl" to getCameraApiUrl(),
             "backend" to if (isCCL()) "CCL Backend" else "BCCL Backend"
         )
+    }
+
+    /**
+     * Log current configuration
+     */
+    fun logConfiguration() {
+        val info = getOrganizationInfo()
+        android.util.Log.d("BackendConfig", """
+            ========================================
+            Backend Configuration
+            ========================================
+            Organization: ${info["organization"]}
+            HTTP API: ${info["httpBaseUrl"]}
+            WebSocket: ${info["wsUrl"]}
+            Camera API: ${info["cameraApiUrl"]}
+            ========================================
+        """.trimIndent())
     }
 }

@@ -593,23 +593,52 @@ class SavedMessagesAdapter(
     }
 
     private fun getHttpUrlForArea(area: String): String {
-        return when (area.lowercase()) {
+        val normalizedArea = area.lowercase().replace(" ", "").replace("_", "")
+
+        // Check if CCL backend
+        if (BackendConfig.isCCL()) {
+            return when (normalizedArea) {
+                "barkasayal" -> "https://barkasayal.cclai.in/api"
+                "argada" -> "https://argada.cclai.in/api"
+                "northkaranpura" -> "https://nk.cclai.in/api"
+                "bokarokargali" -> "https://bk.cclai.in/api"
+                "kathara" -> "https://kathara.cclai.in/api"
+                "giridih" -> "https://giridih.cclai.in/api"
+                "amrapali" -> "https://amrapali.cclai.in/api"
+                "magadh" -> "https://magadh.cclai.in/api"
+                "rajhara" -> "https://rajhara.cclai.in/api"
+                "kuju" -> "https://kuju.cclai.in/api"
+                "hazaribagh" -> "https://hazaribagh.cclai.in/api"
+                "rajrappa" -> "https://rajrappa.cclai.in/api"
+                "dhori" -> "https://dhori.cclai.in/api"
+                "piparwar" -> "https://piparwar.cclai.in/api"
+                else -> {
+                    Log.w(TAG, "Unknown CCL area: $area, using default")
+                    "https://barkasayal.cclai.in/api"
+                }
+            }
+        }
+
+        // BCCL backend
+        return when (normalizedArea) {
             "sijua", "katras" -> "http://a5va.bccliccc.in:10050"
             "kusunda" -> "http://a6va.bccliccc.in:5050"
             "bastacolla" -> "http://a9va.bccliccc.in:5050"
             "lodna" -> "http://a10va.bccliccc.in:5050"
             "govindpur" -> "http://103.208.173.163:5050"
             "barora" -> "http://103.208.173.131:5050"
-            "block 2" -> "http://103.208.173.147:5050"
-            "pb area" -> "http://103.208.173.195:5050"
-            "wj" -> "http://103.208.173.211:5050"
+            "block2" -> "http://103.208.173.147:5050"
+            "pbarea" -> "http://103.208.173.195:5050"
+            "wjarea" -> "http://103.208.173.211:5050"
             "ccwo" -> "http://103.208.173.179:5050"
-            "cv area" -> "http://103.210.88.211:5050"
+            "cvarea" -> "http://103.210.88.211:5050"
             "ej" -> "http://103.210.88.194:5050"
-            else -> "http://a5va.bccliccc.in:10050"
+            else -> {
+                Log.w(TAG, "Unknown BCCL area: $area, using default")
+                "http://a5va.bccliccc.in:10050"
+            }
         }
     }
-
     private fun openMapView(event: Event) {
         val gpsEvent = event.toGpsEvent()
         if (gpsEvent == null) {

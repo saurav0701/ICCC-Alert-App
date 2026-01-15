@@ -2,7 +2,8 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFFF">
+    android:background="#FFFFFF"
+    android:fitsSystemWindows="true">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -21,9 +22,10 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
+                android:paddingTop="24dp"
                 android:background="#FFFFFF">
 
-                <!-- Back Button Row -->
+                <!-- Back Button Row - Added top padding for status bar -->
                 <LinearLayout
                     android:id="@+id/map_back_button"
                     android:layout_width="wrap_content"
@@ -31,6 +33,7 @@
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
                     android:padding="10dp"
+                    android:layout_marginTop="8dp"
                     android:layout_marginBottom="16dp"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
@@ -207,16 +210,6 @@
                         android:textColor="#FFFFFF"
                         android:fontFamily="sans-serif"
                         android:layout_marginStart="6dp" />
-
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginTop="6dp">
-
 
                 </LinearLayout>
 

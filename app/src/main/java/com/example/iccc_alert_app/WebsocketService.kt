@@ -465,14 +465,14 @@ class WebSocketService : Service() {
 
     private suspend fun processEventAsync(text: String) = withContext(Dispatchers.Default) {
         try {
-            // Skip subscription confirmations
+            // Skip subscription confirmations and errors
             if (text.contains("\"status\":\"subscribed\"")) return@withContext
             if (text.contains("\"error\"")) {
                 errorCount.incrementAndGet()
                 return@withContext
             }
 
-            // ✅ CRITICAL FIX: Parse as Event first, then check for camera data
+            // ✅ Parse as Event
             val event = try {
                 gson.fromJson(text, Event::class.java)
             } catch (e: Exception) {
@@ -481,52 +481,23 @@ class WebSocketService : Service() {
                 return@withContext
             }
 
-            // ✅ Check if this is a camera list event (type = "camera-list")
-            if (event?.type == "camera-list" || event?.data?.containsKey("_raw_camera_json") == true) {
-                try {
-                    val rawCameraJson = event.data["_raw_camera_json"] as? String
-
-                    if (rawCameraJson != null) {
-                        // Parse the embedded camera JSON
-                        val cameraListMessage = gson.fromJson(rawCameraJson, CameraListMessage::class.java)
-
-                        if (cameraListMessage?.cameras?.isNotEmpty() == true) {
-                            Log.d(TAG, "📹 Received camera list with ${cameraListMessage.cameras.size} cameras")
-                            PersistentLogger.logEvent("CAMERA", "Received ${cameraListMessage.cameras.size} cameras")
-
-                            // Handle camera list
-                            CameraManager.handleCameraListMessage(cameraListMessage)
-
-                            // Broadcast camera update
-                            withContext(Dispatchers.Main) {
-                                sendBroadcast(Intent("com.example.iccc_alert_app.CAMERA_UPDATE"))
-                            }
-
-                            return@withContext
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to parse camera list: ${e.message}", e)
-                    PersistentLogger.logError("CAMERA", "Failed to parse camera list", e)
-                }
-                return@withContext
-            }
-
-            // Regular event processing
+            // ✅ Validate it's a real event
             if (event?.id == null || event.area == null || event.type == null) {
                 droppedCount.incrementAndGet()
                 return@withContext
             }
 
             val channelId = "${event.area}_${event.type}"
-            val requireAck = event.data["_requireAck"] as? Boolean ?: false // Camera events don't need ACK
 
+            // ✅ Check if subscribed
             if (!SubscriptionManager.isSubscribed(channelId)) {
                 droppedCount.incrementAndGet()
-                if (requireAck) sendAck(event.id)
                 return@withContext
             }
 
+            val requireAck = event.data["_requireAck"] as? Boolean ?: true
+
+            // ✅ Extract sequence
             val sequence = try {
                 when (val seqValue = event.data["_seq"]) {
                     is Number -> seqValue.toLong()
@@ -535,6 +506,7 @@ class WebSocketService : Service() {
                 }
             } catch (e: Exception) { 0L }
 
+            // ✅ CRITICAL: Record at sync state (deduplication happens here)
             val isNew = ChannelSyncState.recordEventReceived(
                 channelId = channelId,
                 eventId = event.id,
@@ -542,19 +514,20 @@ class WebSocketService : Service() {
                 seq = sequence
             )
 
-            if (!isNew && sequence > 0) {
+            // ✅ If duplicate at sync level, skip
+            if (!isNew) {
                 droppedCount.incrementAndGet()
                 if (requireAck) sendAck(event.id)
                 return@withContext
             }
 
-            // Store event
+            // ✅ CRITICAL: Add to SubscriptionManager (this will check again for in-memory cache duplicates)
             val addedSuccessfully = SubscriptionManager.addEvent(event)
 
             if (addedSuccessfully) {
                 processedCount.incrementAndGet()
 
-                // Queue notification for batching
+                // Send notification (batched during catch-up)
                 if (SettingsActivity.areNotificationsEnabled(this@WebSocketService)) {
                     val inCatchUpMode = ChannelSyncState.isInCatchUpMode(channelId)
 
@@ -578,11 +551,14 @@ class WebSocketService : Service() {
                     sendBroadcast(Intent("com.example.iccc_alert_app.NEW_EVENT")
                         .putExtra("event_id", event.id))
                 }
+
+                Log.d(TAG, "✅ Event ${event.id} processed for $channelId")
             } else {
                 droppedCount.incrementAndGet()
+                Log.w(TAG, "⏭️ Event ${event.id} already in cache")
             }
 
-            // Always ACK after storage decision
+            // Always ACK
             if (requireAck) {
                 sendAck(event.id)
             }
@@ -627,7 +603,6 @@ class WebSocketService : Service() {
         val now = System.currentTimeMillis()
         if (hasSubscribed.get() && (now - lastSubscriptionTime) < 5000) {
             Log.w(TAG, "Skipping duplicate subscription (sent ${now - lastSubscriptionTime}ms ago)")
-            PersistentLogger.logEvent("SUBSCRIPTION", "Skipped - duplicate within 5s")
             return
         }
 
@@ -636,8 +611,10 @@ class WebSocketService : Service() {
 
         val filters = subscriptions.map { SubscriptionFilter(area = it.area, eventType = it.eventType) }
 
+        // ✅ CRITICAL: Enable catch-up mode for all channels BEFORE sending subscription
         subscriptions.forEach { sub ->
-            ChannelSyncState.enableCatchUpMode("${sub.area}_${sub.eventType}")
+            val channelId = "${sub.area}_${sub.eventType}"
+            ChannelSyncState.enableCatchUpMode(channelId)
         }
 
         var hasSyncState = false
@@ -667,27 +644,18 @@ class WebSocketService : Service() {
         val json = gson.toJson(request)
         val organization = BackendConfig.getOrganization()
 
-        Log.d(TAG, "📤 Subscription to $organization: $json")
-
-        PersistentLogger.logEvent("SUBSCRIPTION",
-            "Backend: $organization, Mode: ${if (resetConsumers) "RESET" else "RESUME"}, Channels: ${filters.size}")
-
-        if (resetConsumers) {
-            Log.w(TAG, "⚠️ RESET MODE: Will delete old consumers and start fresh")
-            PersistentLogger.logEvent("SUBSCRIPTION", "RESET MODE - deleting old consumers")
-        } else {
-            Log.i(TAG, "✅ RESUME MODE: Will resume from last known sequences")
-            PersistentLogger.logEvent("SUBSCRIPTION", "RESUME MODE - ${syncState.size} channels with state")
-        }
+        Log.d(TAG, "📤 Subscription to $organization: channels=${filters.size}, reset=$resetConsumers")
 
         if (webSocket?.send(json) == true) {
             hasSubscribed.set(true)
             lastSubscriptionTime = now
-            Log.d(TAG, "✅ Subscription sent to $organization (reset=$resetConsumers)")
-            PersistentLogger.logEvent("SUBSCRIPTION", "Sent successfully to $organization")
+            Log.d(TAG, "✅ Subscription sent - all channels in CATCH-UP mode")
+            PersistentLogger.logEvent("SUBSCRIPTION", "Sent successfully (${filters.size} channels)")
+
+            // ✅ Start monitoring catch-up progress
             startCatchUpMonitoring()
         } else {
-            PersistentLogger.logError("SUBSCRIPTION", "Failed to send to $organization")
+            PersistentLogger.logError("SUBSCRIPTION", "Failed to send")
         }
     }
 
@@ -710,17 +678,23 @@ class WebSocketService : Service() {
 
                     if (ChannelSyncState.isInCatchUpMode(channelId)) {
                         activeCatchUps++
-                        val progress = ChannelSyncState.getCatchUpProgress(channelId)
 
-                        if (progress > 0 && eventQueue.isEmpty() && isProcessing.get() == 0) {
+                        // Check if catch-up is done:
+                        // - Event queue empty
+                        // - No pending processors
+                        // - Stable for 3 checks
+                        if (eventQueue.isEmpty() && isProcessing.get() == 0) {
                             val count = (consecutiveEmptyChecks[channelId] ?: 0) + 1
                             consecutiveEmptyChecks[channelId] = count
 
-                            if (count >= stableEmptyThreshold) {
+                            if (count >= 3) {
+                                // ✅ Catch-up complete
                                 ChannelSyncState.disableCatchUpMode(channelId)
                                 consecutiveEmptyChecks.remove(channelId)
-                                Log.i(TAG, "✅ Catch-up complete for $channelId ($progress events)")
-                                PersistentLogger.logCatchUp("Complete: $channelId - $progress events")
+
+                                val syncInfo = ChannelSyncState.getSyncInfo(channelId)
+                                Log.i(TAG, "✅ Catch-up COMPLETE for $channelId (total: ${syncInfo?.totalEvents})")
+                                PersistentLogger.logCatchUp("Complete: $channelId - ${syncInfo?.totalEvents} events")
                             } else {
                                 allComplete = false
                             }
@@ -737,12 +711,12 @@ class WebSocketService : Service() {
                     consecutiveEmptyChecks.clear()
                     stopCatchUpMonitoring()
                 } else if (activeCatchUps > 0) {
-                    handler.postDelayed(this, catchUpCheckInterval)
+                    handler.postDelayed(this, 5000)  // Check every 5 seconds
                 }
             }
         }
 
-        handler.postDelayed(catchUpMonitorRunnable!!, catchUpCheckInterval)
+        handler.postDelayed(catchUpMonitorRunnable!!, 5000)
     }
 
     private fun stopCatchUpMonitoring() {

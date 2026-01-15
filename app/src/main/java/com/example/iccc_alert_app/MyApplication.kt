@@ -22,7 +22,6 @@ class MyApplication : Application() {
 
         Log.d(TAG, "Application starting")
 
-        // ✅ Initialize PersistentLogger FIRST
         try {
             PersistentLogger.initialize(this)
             PersistentLogger.logEvent("SYSTEM", "===== APPLICATION STARTED =====")
@@ -33,38 +32,31 @@ class MyApplication : Application() {
             Log.e(TAG, "Failed to initialize PersistentLogger", e)
         }
 
-        // Apply saved theme
         applySavedTheme()
 
-        // Initialize critical components on background thread
         applicationScope.launch {
             try {
-                // ✅ Initialize BackendConfig FIRST (but don't set organization yet)
                 BackendConfig.initialize(this@MyApplication)
                 Log.d(TAG, "BackendConfig initialized")
                 PersistentLogger.logEvent("SYSTEM", "BackendConfig initialized (org will be set after login)")
 
-                // Initialize AuthManager
                 AuthManager.initialize(this@MyApplication)
                 Log.d(TAG, "AuthManager initialized")
                 PersistentLogger.logEvent("SYSTEM", "AuthManager initialized")
 
-                // Initialize SubscriptionManager
                 SubscriptionManager.initialize(this@MyApplication)
                 Log.d(TAG, "SubscriptionManager initialized")
                 PersistentLogger.logEvent("SYSTEM", "SubscriptionManager initialized")
 
-                // Initialize ChannelSyncState
                 ChannelSyncState.initialize(this@MyApplication)
                 Log.d(TAG, "ChannelSyncState initialized")
                 PersistentLogger.logEvent("SYSTEM", "ChannelSyncState initialized")
 
-                // ✅ NEW: Initialize CameraManager
-                CameraManager.initialize(this@MyApplication)
-                Log.d(TAG, "CameraManager initialized")
-                PersistentLogger.logEvent("SYSTEM", "CameraManager initialized")
+                // ✅ CRITICAL FIX: Only initialize context, DON'T start polling
+                CameraManager.initializeContext(this@MyApplication)
+                Log.d(TAG, "CameraManager context initialized (polling deferred)")
+                PersistentLogger.logEvent("SYSTEM", "CameraManager context ready (waiting for login)")
 
-                // Initialize SavedMessagesManager
                 SavedMessagesManager.initialize(this@MyApplication)
                 Log.d(TAG, "SavedMessagesManager initialized")
                 PersistentLogger.logEvent("SYSTEM", "SavedMessagesManager initialized")

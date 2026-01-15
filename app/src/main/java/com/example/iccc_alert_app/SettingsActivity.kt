@@ -189,7 +189,7 @@ class SettingsActivity : BaseDrawerActivity() {
                 .setTitle("Backend Configuration")
                 .setMessage(message)
                 .setPositiveButton("OK", null)
-                .setNeutralButton("Test Connection") { _, _ -> testBackendConnection() }
+//                .setNeutralButton("Test Connection") { _, _ -> testBackendConnection() }
                 .setNegativeButton("View Statistics") { _, _ -> showBackendStatistics() }
                 .show()
 
@@ -311,9 +311,6 @@ class SettingsActivity : BaseDrawerActivity() {
         }
     }
 
-    // ============================================
-    // THEME MANAGEMENT - FIXED VERSION
-    // ============================================
 
     private fun showThemeDialog() {
         val themes = arrayOf("Light", "Dark", "System Default")
@@ -413,19 +410,26 @@ class SettingsActivity : BaseDrawerActivity() {
         progressDialog.setCancelable(false)
         progressDialog.show()
 
+        // Save subscriptions before clearing
         val subscriptions = SubscriptionManager.getSubscriptions()
 
         try {
+            // Stop WebSocket service first
             WebSocketService.stop(this)
 
             Handler(Looper.getMainLooper()).postDelayed({
                 try {
-                    clearEventData()
-                    SavedMessagesManager.clearAll()
-                    ChannelSyncState.clearAll()
-                    ClientIdManager.resetClientId(this)
+                    // ✅ Clear all data using the correct methods
+                    SubscriptionManager.clearAllEvents()    // Clear events but keep subscriptions
+                    SavedMessagesManager.clearAll()         // Clear saved messages
+                    ChannelSyncState.clearAll()             // Clear sync state
+                    ClientIdManager.resetClientId(this)     // Reset client ID
+
+                    // Restore subscriptions (they were preserved by clearAllEvents)
+                    // But restore again to be safe
                     restoreSubscriptions(subscriptions)
 
+                    // Re-initialize managers
                     SubscriptionManager.initialize(this)
                     ChannelSyncState.initialize(this)
                     SavedMessagesManager.initialize(this)
@@ -455,15 +459,16 @@ class SettingsActivity : BaseDrawerActivity() {
                 } catch (e: Exception) {
                     progressDialog.dismiss()
                     Toast.makeText(this, "Error clearing data: ${e.message}", Toast.LENGTH_LONG).show()
+                    android.util.Log.e("SettingsActivity", "Error in clear data", e)
                 }
             }, 1000)
 
         } catch (e: Exception) {
             progressDialog.dismiss()
             Toast.makeText(this, "Error clearing data: ${e.message}", Toast.LENGTH_LONG).show()
+            android.util.Log.e("SettingsActivity", "Error stopping service", e)
         }
     }
-
     private fun clearEventData() {
         val prefsName = "subscriptions"
         val keyEvents = "events"

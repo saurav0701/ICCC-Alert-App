@@ -89,11 +89,13 @@ class OTPVerificationActivity : AppCompatActivity() {
                 if (success && authResponse != null) {
                     Toast.makeText(this, "Verification successful!", Toast.LENGTH_SHORT).show()
 
+                    // ✅ Start camera manager now that organization is known
+                    CameraManager.startAfterLogin()
+
                     val intent = Intent(this, MainActivity::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     }
                     startActivity(intent)
-                    // Add smooth transition
                     overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
                     finish()
                 } else {
@@ -174,7 +176,6 @@ class OTPVerificationActivity : AppCompatActivity() {
 
     override fun finish() {
         super.finish()
-        // Add transition when back button pressed
         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
     }
 }

@@ -49,12 +49,15 @@ class MainActivity : BaseDrawerActivity() {
             return
         }
 
-        // ✅ User is logged in, organization is already set from login
+        // ✅ User is logged in, organization is already set
         val organization = BackendConfig.getOrganization()
-        Log.d(TAG, "✅ User logged in as $organization, starting WebSocket")
-        PersistentLogger.logEvent("SYSTEM", "MainActivity: Starting WebSocket for $organization")
+        Log.d(TAG, "✅ User logged in as $organization")
+        PersistentLogger.logEvent("SYSTEM", "MainActivity: Starting services for $organization")
 
-        // ✅ NOW start WebSocket service with correct organization
+        // ✅ NOW start camera manager (organization is known)
+        CameraManager.startAfterLogin()
+
+        // ✅ Start WebSocket service
         WebSocketService.start(this)
 
         setContentView(R.layout.activity_main)
@@ -84,7 +87,6 @@ class MainActivity : BaseDrawerActivity() {
         super.onResume()
         setSelectedMenuItem(R.id.nav_channels)
 
-        // ✅ SIMPLIFIED: Just clear notifications, let Android handle grouping
         clearAlertNotifications()
     }
 
@@ -95,7 +97,6 @@ class MainActivity : BaseDrawerActivity() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val activeNotifications = nm.activeNotifications
 
-                // Cancel all notifications except the service notification (ID 1001)
                 activeNotifications.forEach { statusBarNotification ->
                     if (statusBarNotification.id != 1001) {
                         nm.cancel(statusBarNotification.id)

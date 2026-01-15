@@ -212,12 +212,7 @@ class MapActivity : AppCompatActivity() {
         val geofenceOverlays = mutableListOf<GeofenceOverlay>()
         val boundingPoints = mutableListOf<GeoPoint>()
 
-        // Event type specific logic:
-        // OFF-ROUTE: alertLocation = where vehicle went off-route (outside geofence)
-        // TAMPER: alertLocation = where tamper occurred (can be anywhere, geofence optional)
-        // OVERSPEED: alertLocation = where overspeed was detected
-
-        // Always show alert location (primary marker) - THIS IS THE KEY FOR TAMPER EVENTS
+        // Always show alert location (primary marker)
         event.data?.alertLocation?.let { loc ->
             val position = GeoPoint(loc.lat, loc.lng)
             val (title, iconRes) = when (event.type) {
@@ -237,25 +232,25 @@ class MapActivity : AppCompatActivity() {
             )
             boundingPoints.add(position)
 
-            // For tamper events without geofence, add padding points around alert location
-            // This ensures the map zooms appropriately
-            if (event.type == "tamper" && event.data.geofence == null) {
+            // ✅ FIX: Add padding points for ALL events without geofence (not just tamper)
+            if (event.data.geofence == null) {
                 // Add padding points (approximately 200 meters in each direction)
                 boundingPoints.add(GeoPoint(position.latitude + 0.002, position.longitude))
                 boundingPoints.add(GeoPoint(position.latitude - 0.002, position.longitude))
                 boundingPoints.add(GeoPoint(position.latitude, position.longitude + 0.002))
                 boundingPoints.add(GeoPoint(position.latitude, position.longitude - 0.002))
+
+                Log.d(TAG, "✅ Added padding points for ${event.type} event without geofence")
             }
         }
 
         // Show current location only if different from alert location
         event.data?.currentLocation?.let { loc ->
             val alert = event.data.alertLocation
-            // Check if current location is significantly different (more than 10 meters)
             val isDifferent = if (alert != null) {
                 val latDiff = Math.abs(loc.lat - alert.lat)
                 val lngDiff = Math.abs(loc.lng - alert.lng)
-                latDiff > 0.0001 || lngDiff > 0.0001 // ~11 meters
+                latDiff > 0.0001 || lngDiff > 0.0001
             } else {
                 true
             }
@@ -274,19 +269,15 @@ class MapActivity : AppCompatActivity() {
             }
         }
 
-        // Prepare geofence overlays (for context)
-        // Note: For tamper events, geofence is optional - just for reference if available
+        // Prepare geofence overlays (optional - for context only)
         event.data?.geofence?.let { geofence ->
             Log.d(TAG, "Processing geofence: id=${geofence.id}, name=${geofence.name}, type=${geofence.type}, geoJsonType=${geofence.geojson?.type}")
 
             val coordinates = geofence.geojson?.getCoordinatesAsList()
             if (!coordinates.isNullOrEmpty()) {
-                // Get colors from attributes
                 val color = parseColor(geofence.attributes?.color)
                 val strokeColor = parseColor(geofence.attributes?.polylineColor) ?: color
-
-                // Determine stroke width based on geofence type
-                val strokeWidth = if (geofence.type == "P") 8f else 5f // Path = thicker
+                val strokeWidth = if (geofence.type == "P") 8f else 5f
 
                 Log.d(TAG, "Geofence coordinates: ${coordinates.size} points, color: ${geofence.attributes?.color}, geoJsonType: ${geofence.geojson?.type}")
 
@@ -297,7 +288,7 @@ class MapActivity : AppCompatActivity() {
                         geofenceOverlays.add(
                             GeofenceOverlay.CircleOverlay(
                                 center = position,
-                                radius = 100.0, // 100m radius
+                                radius = 100.0,
                                 fillColor = Color.argb(50, Color.red(color), Color.green(color), Color.blue(color)),
                                 strokeColor = strokeColor,
                                 strokeWidth = 3f,
@@ -306,7 +297,6 @@ class MapActivity : AppCompatActivity() {
                             )
                         )
                         boundingPoints.add(position)
-                        // Add padding points
                         boundingPoints.add(GeoPoint(position.latitude + 0.002, position.longitude))
                         boundingPoints.add(GeoPoint(position.latitude - 0.002, position.longitude))
 
@@ -315,16 +305,15 @@ class MapActivity : AppCompatActivity() {
                     "LineString" -> {
                         val points = coordinates.map { GeoPoint(it[1], it[0]) }
 
-                        // Priority: 1. polylineColor, 2. attributes.color, 3. yellow for type P, 4. default blue
                         val lineColor = when {
                             geofence.attributes?.polylineColor != null ->
                                 parseColor(geofence.attributes.polylineColor)
                             geofence.attributes?.color != null ->
                                 parseColor(geofence.attributes.color)
                             geofence.type == "P" ->
-                                Color.parseColor("#FFC107") // Yellow fallback for paths
+                                Color.parseColor("#FFC107")
                             else ->
-                                Color.parseColor("#3388ff") // Default blue
+                                Color.parseColor("#3388ff")
                         }
 
                         geofenceOverlays.add(
@@ -365,10 +354,10 @@ class MapActivity : AppCompatActivity() {
             } else {
                 Log.w(TAG, "Geofence has no valid coordinates: ${geofence.name}")
             }
-        } ?: Log.d(TAG, "No geofence data for ${event.type} event (this is OK for tamper events)")
+        } ?: Log.d(TAG, "No geofence data for ${event.type} event (alert location will be displayed)")
 
         // Determine center point priority:
-        // 1. Alert location (where the event happened - CRITICAL for tamper)
+        // 1. Alert location (where the event happened)
         // 2. Current location (if alert location missing)
         val centerPoint = event.data?.alertLocation?.let { GeoPoint(it.lat, it.lng) }
             ?: event.data?.currentLocation?.let { GeoPoint(it.lat, it.lng) }

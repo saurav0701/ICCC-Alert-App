@@ -2,12 +2,7 @@ package com.example.iccc_alert_app
 
 import android.content.Context
 import android.content.ContentValues
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Typeface
+import android.graphics.*
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.os.Build
@@ -18,48 +13,55 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.osmdroid.util.GeoPoint
 import java.io.File
 import java.io.FileOutputStream
-import java.io.OutputStream
 import java.text.SimpleDateFormat
-import org.osmdroid.util.GeoPoint
 import java.util.*
 
 class PdfGenerator(private val context: Context) {
 
     private val client = OkHttpClient()
     private val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-    private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+    private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    private val dateTimeFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
     private val eventTimeParser = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
     private val fileNameFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
 
     companion object {
         private const val TAG = "PdfGenerator"
-        private const val PAGE_WIDTH = 595
-        private const val PAGE_HEIGHT = 842
-        private const val MARGIN = 40
+
+        // Page dimensions (A4 Landscape for better table view)
+        private const val PAGE_WIDTH = 11f * 72  // 792 points
+        private const val PAGE_HEIGHT = 8.5f * 72  // 612 points
+        private const val MARGIN = 30f
         private const val CONTENT_WIDTH = PAGE_WIDTH - (2 * MARGIN)
 
-        // ✅ IMPROVED: Larger table image size for better quality
-        private const val ROW_HEIGHT = 120f  // Increased from 100f
-        private const val IMAGE_SIZE = 100   // Increased from 80
-        private const val COL_SNO_WIDTH = 50f
-        private const val COL_TYPE_WIDTH = 130f  // Slightly reduced to make room for image
-        private const val COL_DATETIME_WIDTH = 130f  // Slightly reduced
-        private const val COL_IMAGE_WIDTH = 205f  // Increased for larger images
+        // Enhanced table dimensions
+        private const val ROW_HEIGHT = 135f
+        private const val IMAGE_SIZE = 115  // Larger images
 
-        // Premium Color Palette (unchanged)
-        private const val COLOR_PRIMARY = "#2C3E50"
-        private const val COLOR_SECONDARY = "#3498DB"
-        private const val COLOR_ACCENT = "#E74C3C"
-        private const val COLOR_SUCCESS = "#27AE60"
-        private const val COLOR_WARNING = "#F39C12"
-        private const val COLOR_TEXT_PRIMARY = "#2C3E50"
-        private const val COLOR_TEXT_SECONDARY = "#7F8C8D"
-        private const val COLOR_BACKGROUND = "#ECF0F1"
+        // Optimized column widths for landscape
+        private const val COL_SNO_WIDTH = 50f
+        private const val COL_TYPE_WIDTH = 115f
+        private const val COL_LOCATION_WIDTH = 190f
+        private const val COL_DATETIME_WIDTH = 115f
+        private const val COL_IMAGE_WIDTH = 262f  // Remaining space
+
+        // Premium color palette
+        private const val COLOR_PRIMARY = "#1976D2"  // Material Blue
+        private const val COLOR_PRIMARY_LIGHT = "#E3F2FD"
+        private const val COLOR_ACCENT = "#FF5722"
+        private const val COLOR_SUCCESS = "#4CAF50"
+        private const val COLOR_WARNING = "#FF9800"
+        private const val COLOR_TEXT_PRIMARY = "#212121"
+        private const val COLOR_TEXT_SECONDARY = "#757575"
+        private const val COLOR_BACKGROUND = "#FAFAFA"
         private const val COLOR_CARD_BG = "#FFFFFF"
-        private const val COLOR_BORDER = "#BDC3C7"
-        private const val COLOR_TABLE_HEADER = "#34495E"
+        private const val COLOR_BORDER = "#E0E0E0"
+        private const val COLOR_TABLE_HEADER = "#1976D2"
+
+        private const val EVENTS_PER_PAGE = 3
     }
 
     suspend fun generateSingleEventPdf(
@@ -68,65 +70,68 @@ class PdfGenerator(private val context: Context) {
         channelType: String
     ): File? = withContext(Dispatchers.IO) {
         try {
+            Log.d(TAG, "📄 Generating single event PDF...")
+
             val pdfDocument = PdfDocument()
-            val pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, 1).create()
+
+            // Use portrait A4 for single event (more traditional)
+            val pageWidth = 595  // A4 width in points
+            val pageHeight = 842  // A4 height in points
+
+            val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create()
             val page = pdfDocument.startPage(pageInfo)
             val canvas = page.canvas
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
             // Draw premium background
-            drawPremiumBackground(canvas, paint)
+            paint.color = Color.WHITE
+            canvas.drawRect(0f, 0f, pageWidth.toFloat(), pageHeight.toFloat(), paint)
 
-            var yPosition = MARGIN.toFloat() + 20
+            var yPosition = MARGIN + 20
 
-            // Header Section with gradient effect
-            drawHeaderSection(canvas, paint, yPosition, "Event Report")
-            yPosition += 80
-
-            // Channel Information Card
-            yPosition = drawChannelInfoCard(canvas, paint, channelArea, channelType, yPosition)
-            yPosition += 30
+            // Header Section
+            drawSingleEventHeader(canvas, paint, channelArea, channelType, yPosition)
+            yPosition = 130f
 
             // Event Details Card
-            yPosition = drawEventDetailsCard(canvas, paint, event, yPosition)
-            yPosition += 25
+            yPosition = drawSingleEventDetailsCard(canvas, paint, event, yPosition, pageWidth.toFloat())
+            yPosition += 20
 
-
-            val bitmap = if (event.type == "off-route" || event.type == "tamper" || event.type == "overspeed") {
-                // For GPS events, try to capture map preview
-                captureMapPreview(event) ?: loadEventImage(event)
-            } else {
-                // For regular events, load event image
-                loadEventImage(event)
+            // Load and draw image/map with high quality
+            val bitmap = when (event.type) {
+                "off-route", "tamper", "overspeed" -> {
+                    captureMapPreview(event) ?: loadEventImage(event)
+                }
+                else -> loadEventImage(event)
             }
 
             if (bitmap != null) {
-                yPosition = drawImageWithShadow(canvas, paint, bitmap, yPosition)
+                Log.d(TAG, "Original bitmap size: ${bitmap.width}x${bitmap.height}, config: ${bitmap.config}")
+                yPosition = drawLargeImageHighQuality(canvas, paint, bitmap, yPosition, pageWidth.toFloat())
             } else {
-                yPosition = drawImagePlaceholder(canvas, paint, yPosition, 320)
+                Log.w(TAG, "No bitmap available for event")
+                yPosition = drawImagePlaceholder(canvas, paint, yPosition, 350f, pageWidth.toFloat())
             }
 
             // Footer
-            drawFooter(canvas, paint, 1, 1)
+            drawSingleEventFooter(canvas, paint, pageWidth.toFloat(), pageHeight.toFloat())
 
             pdfDocument.finishPage(page)
 
-            val fileName = "event_report_${fileNameFormat.format(Date())}.pdf"
-
-            // Save to Downloads folder using MediaStore
+            val fileName = "Event_${event.id}_${fileNameFormat.format(Date())}.pdf"
             val uri = saveToDownloads(pdfDocument, fileName)
             pdfDocument.close()
 
             if (uri != null) {
-                Log.d(TAG, "Premium PDF saved to Downloads: $fileName")
-                // Return a dummy file with the name for compatibility
+                Log.d(TAG, "✅ Single event PDF saved: $fileName")
                 File(fileName)
             } else {
+                Log.e(TAG, "❌ Failed to save single event PDF")
                 null
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error generating PDF: ${e.message}", e)
+            Log.e(TAG, "❌ Error generating single event PDF: ${e.message}", e)
             null
         }
     }
@@ -137,268 +142,832 @@ class PdfGenerator(private val context: Context) {
         channelType: String
     ): File? = withContext(Dispatchers.IO) {
         try {
+            if (events.isEmpty()) {
+                Log.e(TAG, "No events to generate PDF")
+                return@withContext null
+            }
+
+            Log.d(TAG, "📄 Generating PDF for ${events.size} events...")
+
             val pdfDocument = PdfDocument()
             var pageNumber = 1
-            var currentPage: PdfDocument.Page? = null
-            var canvas: Canvas? = null
-            var yPosition = MARGIN.toFloat()
-            var tableHeaderDrawn = false
+            val totalPages = (events.size + EVENTS_PER_PAGE - 1) / EVENTS_PER_PAGE
 
-            val rowsPerPage = 6
-            val totalPages = (events.size / rowsPerPage) + if (events.size % rowsPerPage > 0) 1 else 0
+            events.chunked(EVENTS_PER_PAGE).forEach { pageEvents ->
+                val pageInfo = PdfDocument.PageInfo.Builder(
+                    PAGE_WIDTH.toInt(),
+                    PAGE_HEIGHT.toInt(),
+                    pageNumber
+                ).create()
 
-            fun startNewPage() {
-                currentPage?.let {
-                    drawFooter(canvas!!, Paint(Paint.ANTI_ALIAS_FLAG), pageNumber - 1, totalPages)
-                    pdfDocument.finishPage(it)
-                }
-                val pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNumber++).create()
-                currentPage = pdfDocument.startPage(pageInfo)
-                canvas = currentPage!!.canvas
-
+                val page = pdfDocument.startPage(pageInfo)
+                val canvas = page.canvas
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-                drawPremiumBackground(canvas!!, paint)
 
-                yPosition = MARGIN.toFloat() + 20
-                tableHeaderDrawn = false
-            }
+                // Draw premium background
+                drawPremiumBackground(canvas, paint)
 
-            startNewPage()
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+                var yPosition = MARGIN + 20
 
-            // Title Section
-            drawHeaderSection(canvas!!, paint, yPosition, "Events Report - $channelArea")
-            yPosition += 80
+                // Draw enhanced header
+                drawEnhancedHeader(
+                    canvas, paint, channelArea, channelType,
+                    events.size, yPosition
+                )
+                yPosition = 170f  // Header takes 170pt
 
-            // Summary info
-            paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
-            paint.textSize = 11f
-            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-            canvas!!.drawText("Channel: $channelArea - $channelType | Total Events: ${events.size}",
-                MARGIN.toFloat(), yPosition, paint)
-            yPosition += 25
+                // Draw each event row
+                pageEvents.forEachIndexed { index, event ->
+                    val eventNumber = (pageNumber - 1) * EVENTS_PER_PAGE + index + 1
+                    yPosition = drawEnhancedEventRow(
+                        canvas, paint, event, eventNumber, yPosition
+                    )
 
-            // Draw table header
-            drawTableHeader(canvas!!, paint, yPosition)
-            yPosition += 35f
-            tableHeaderDrawn = true
-
-            // Draw each event as a table row
-            events.forEachIndexed { index, event ->
-                // Check if we need a new page
-                if (yPosition + ROW_HEIGHT > PAGE_HEIGHT - MARGIN - 50) {
-                    startNewPage()
-                    yPosition += 60
-                    drawTableHeader(canvas!!, paint, yPosition)
-                    yPosition += 35f
-                    tableHeaderDrawn = true
+                    // Draw separator line between events
+                    if (index < pageEvents.size - 1) {
+                        paint.color = Color.parseColor(COLOR_BORDER)
+                        paint.strokeWidth = 0.5f
+                        canvas.drawLine(
+                            MARGIN, yPosition,
+                            PAGE_WIDTH - MARGIN, yPosition,
+                            paint
+                        )
+                    }
                 }
 
-                // Call drawTableRow as suspend function
-                yPosition = drawTableRow(canvas!!, paint, event, yPosition, index + 1)
+                // Draw enhanced footer
+                drawEnhancedFooter(canvas, paint, pageNumber, totalPages)
+
+                pdfDocument.finishPage(page)
+                pageNumber++
             }
 
-            currentPage?.let {
-                drawFooter(canvas!!, paint, pageNumber - 1, totalPages)
-                pdfDocument.finishPage(it)
-            }
-
-            val fileName = "events_table_${channelArea}_${fileNameFormat.format(Date())}.pdf"
-
+            val fileName = "Events_${channelArea}_${fileNameFormat.format(Date())}.pdf"
             val uri = saveToDownloads(pdfDocument, fileName)
             pdfDocument.close()
 
             if (uri != null) {
-                Log.d(TAG, "Tabular PDF saved to Downloads: $fileName")
+                Log.d(TAG, "✅ PDF saved successfully: $fileName")
                 File(fileName)
             } else {
+                Log.e(TAG, "❌ Failed to save PDF")
                 null
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error generating bulk PDF: ${e.message}", e)
+            Log.e(TAG, "❌ Error generating PDF: ${e.message}", e)
             null
         }
     }
 
-    private fun drawTableHeader(canvas: Canvas, paint: Paint, yStart: Float) {
-        var x = MARGIN.toFloat()
+    private fun drawSingleEventHeader(
+        canvas: Canvas,
+        paint: Paint,
+        channelArea: String,
+        channelType: String,
+        yStart: Float
+    ) {
+        var y = yStart
 
-        // Draw header background
-        paint.color = Color.parseColor(COLOR_TABLE_HEADER)
-        canvas.drawRect(x, yStart, (PAGE_WIDTH - MARGIN).toFloat(), yStart + 30f, paint)
+        // Header background with gradient effect
+        paint.color = Color.parseColor(COLOR_PRIMARY)
+        canvas.drawRect(0f, 0f, 595f, y + 60, paint)
 
-        // Header text
+        // Accent line
+        paint.color = Color.parseColor(COLOR_ACCENT)
+        paint.strokeWidth = 4f
+        canvas.drawLine(MARGIN, y + 55, 595f - MARGIN, y + 55, paint)
+
+        // Title
         paint.color = Color.WHITE
-        paint.textSize = 11f
+        paint.textSize = 24f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.style = Paint.Style.FILL
+        canvas.drawText("Event Report", MARGIN, y + 25, paint)
 
-        val textY = yStart + 19f
-
-        // S.No
-        paint.textAlign = Paint.Align.CENTER
-        canvas.drawText("S.No", x + COL_SNO_WIDTH / 2, textY, paint)
-        x += COL_SNO_WIDTH
-
-        // Vertical divider
-        paint.color = Color.WHITE
-        paint.alpha = 100
-        canvas.drawLine(x, yStart, x, yStart + 30f, paint)
+        // Subtitle
+        paint.textSize = 12f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        paint.alpha = 200
+        canvas.drawText("$channelType - $channelArea", MARGIN, y + 45, paint)
         paint.alpha = 255
-        paint.color = Color.WHITE
 
-        // Event Type
-        canvas.drawText("Event Type", x + COL_TYPE_WIDTH / 2, textY, paint)
-        x += COL_TYPE_WIDTH
-
-        // Vertical divider
-        paint.color = Color.WHITE
-        paint.alpha = 100
-        canvas.drawLine(x, yStart, x, yStart + 30f, paint)
-        paint.alpha = 255
-        paint.color = Color.WHITE
-
-        // Date & Time
-        canvas.drawText("Date & Time", x + COL_DATETIME_WIDTH / 2, textY, paint)
-        x += COL_DATETIME_WIDTH
-
-        // Vertical divider
-        paint.color = Color.WHITE
-        paint.alpha = 100
-        canvas.drawLine(x, yStart, x, yStart + 30f, paint)
-        paint.alpha = 255
-        paint.color = Color.WHITE
-
-        // Event Image
-        canvas.drawText("Event Image", x + COL_IMAGE_WIDTH / 2, textY, paint)
-
+        // Date (right aligned)
+        val dateText = dateTimeFormat.format(Date())
+        paint.textAlign = Paint.Align.RIGHT
+        canvas.drawText(dateText, 595f - MARGIN, y + 45, paint)
         paint.textAlign = Paint.Align.LEFT
     }
 
-    private suspend fun drawTableRow(canvas: Canvas, paint: Paint, event: Event,
-                                     yStart: Float, rowNumber: Int): Float {
-        var x = MARGIN.toFloat()
-        val rowEnd = yStart + ROW_HEIGHT
+    private fun drawSingleEventDetailsCard(
+        canvas: Canvas,
+        paint: Paint,
+        event: Event,
+        yStart: Float,
+        pageWidth: Float
+    ): Float {
+        var y = yStart
+        val cardHeight = 200f  // Reduced from 220f for better spacing
+        val cardLeft = MARGIN
+        val cardRight = pageWidth - MARGIN
 
-        // Draw row border
+        // Card shadow
+        paint.color = Color.argb(30, 0, 0, 0)
+        canvas.drawRoundRect(cardLeft + 3, y + 3, cardRight + 3, y + cardHeight + 3, 8f, 8f, paint)
+
+        // Card background
+        paint.color = Color.WHITE
+        canvas.drawRoundRect(cardLeft, y, cardRight, y + cardHeight, 8f, 8f, paint)
+
+        // Card border
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 1f
         paint.color = Color.parseColor(COLOR_BORDER)
-        canvas.drawRect(MARGIN.toFloat(), yStart, (PAGE_WIDTH - MARGIN).toFloat(), rowEnd, paint)
+        canvas.drawRoundRect(cardLeft, y, cardRight, y + cardHeight, 8f, 8f, paint)
         paint.style = Paint.Style.FILL
 
-        // Alternate row background
-        if (rowNumber % 2 == 0) {
-            paint.color = Color.parseColor("#F8F9FA")
-            paint.alpha = 128
-            canvas.drawRect(MARGIN.toFloat(), yStart, (PAGE_WIDTH - MARGIN).toFloat(), rowEnd, paint)
-            paint.alpha = 255
-        }
+        y += 20
 
-        val textY = yStart + ROW_HEIGHT / 2 + 5
+        // Event type badge
+        val eventType = event.typeDisplay ?: event.type ?: "Unknown"
+        val (icon, badgeColor) = getEventTypeIconAndColor(event.type ?: "")
 
-        // S.No
-        paint.color = Color.parseColor(COLOR_TEXT_PRIMARY)
-        paint.textSize = 12f
+        val badgeText = eventType  // Remove icon from badge text
+        paint.textSize = 13f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.textAlign = Paint.Align.CENTER
-        canvas.drawText(rowNumber.toString(), x + COL_SNO_WIDTH / 2, textY, paint)
-        x += COL_SNO_WIDTH
+        val badgeWidth = paint.measureText(badgeText) + 24
 
-        // Vertical divider
-        paint.style = Paint.Style.STROKE
-        paint.color = Color.parseColor(COLOR_BORDER)
-        canvas.drawLine(x, yStart, x, rowEnd, paint)
-        paint.style = Paint.Style.FILL
+        // Badge background
+        paint.color = Color.parseColor(badgeColor)
+        paint.alpha = 40  // Slightly more opacity
+        val badgeRect = RectF(cardLeft + 20, y - 2, cardLeft + 20 + badgeWidth, y + 20)
+        canvas.drawRoundRect(badgeRect, 10f, 10f, paint)
+        paint.alpha = 255
 
-        // Event Type
-        paint.textAlign = Paint.Align.LEFT
-        paint.textSize = 10f
+        // Badge text
+        paint.color = Color.parseColor(badgeColor)
+        canvas.drawText(badgeText, cardLeft + 32, y + 13, paint)
+
+        y += 35
+
+        // Location section
+        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
+        paint.textSize = 9f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("LOCATION", cardLeft + 20, y, paint)
+
+        y += 16
+        paint.color = Color.BLACK
+        paint.textSize = 13f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        val eventType = event.typeDisplay ?: "Unknown Event"
-        val wrappedType = wrapText(eventType, COL_TYPE_WIDTH - 10, paint)
-        var typeY = yStart + (ROW_HEIGHT - (wrappedType.size * 12)) / 2 + 12
-        wrappedType.forEach { line ->
-            canvas.drawText(line, x + 5, typeY, paint)
-            typeY += 12
+        val location = event.data["location"] as? String ?: "Unknown"
+        val locationLines = wrapText(location, pageWidth - MARGIN * 2 - 40, paint)
+        locationLines.take(2).forEach { line ->
+            canvas.drawText(line, cardLeft + 20, y, paint)
+            y += 16
         }
-        x += COL_TYPE_WIDTH
 
-        // Vertical divider
-        paint.style = Paint.Style.STROKE
-        paint.color = Color.parseColor(COLOR_BORDER)
-        canvas.drawLine(x, yStart, x, rowEnd, paint)
-        paint.style = Paint.Style.FILL
+        y += 8
 
-        // Date & Time
+        // GPS coordinates if available
+        val alertLoc = extractAlertLocation(event.data)
+        if (alertLoc != null) {
+            paint.textSize = 10f
+            paint.color = Color.parseColor(COLOR_PRIMARY)
+            val coordText = String.format("%.6f, %.6f", alertLoc.latitude, alertLoc.longitude)
+            canvas.drawText(coordText, cardLeft + 20, y, paint)
+            y += 20
+        } else {
+            y += 10
+        }
+
+        // Date & Time section
+        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
+        paint.textSize = 9f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("DATE & TIME", cardLeft + 20, y, paint)
+
+        y += 16
         val eventDate = getEventDate(event)
+        paint.color = Color.BLACK
+        paint.textSize = 13f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
         val dateStr = dateFormat.format(eventDate)
         val timeStr = timeFormat.format(eventDate)
+        canvas.drawText("$dateStr at $timeStr", cardLeft + 20, y, paint)
 
-        var dateY = yStart + (ROW_HEIGHT / 2) - 5
-        paint.textSize = 9f
-        canvas.drawText(dateStr, x + 5, dateY, paint)
-        dateY += 14
-        canvas.drawText(timeStr, x + 5, dateY, paint)
-        x += COL_DATETIME_WIDTH
+        y += 20
 
-        // Vertical divider
+        // Vehicle number for GPS events
+        if (event.type in listOf("off-route", "tamper", "overspeed")) {
+            val vehicleNum = event.data["vehicleNumber"] as? String
+            if (vehicleNum != null) {
+                paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
+                paint.textSize = 9f
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                canvas.drawText("VEHICLE", cardLeft + 20, y, paint)
+
+                y += 16
+                paint.color = Color.BLACK
+                paint.textSize = 13f
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                canvas.drawText(vehicleNum, cardLeft + 20, y, paint)
+            }
+        }
+
+        return yStart + cardHeight
+    }
+
+    private fun drawLargeImageHighQuality(
+        canvas: Canvas,
+        paint: Paint,
+        bitmap: Bitmap,
+        yStart: Float,
+        pageWidth: Float
+    ): Float {
+        val maxWidth = (pageWidth - MARGIN * 2 - 40).toInt()
+        val maxHeight = 400
+
+        // Calculate scaled dimensions maintaining aspect ratio
+        val aspectRatio = bitmap.width.toFloat() / bitmap.height
+        var newWidth = maxWidth
+        var newHeight = (newWidth / aspectRatio).toInt()
+
+        if (newHeight > maxHeight) {
+            newHeight = maxHeight
+            newWidth = (newHeight * aspectRatio).toInt()
+        }
+
+        Log.d(TAG, "Scaling bitmap from ${bitmap.width}x${bitmap.height} to ${newWidth}x${newHeight}")
+
+        val imgX = MARGIN + 20
+        val imgY = yStart
+
+        // Create matrix for high-quality scaling
+        val matrix = Matrix()
+        val scaleX = newWidth.toFloat() / bitmap.width
+        val scaleY = newHeight.toFloat() / bitmap.height
+        matrix.setScale(scaleX, scaleY)
+
+        // Create high-quality scaled bitmap using matrix
+        val scaledBitmap = Bitmap.createBitmap(
+            bitmap,
+            0, 0,
+            bitmap.width, bitmap.height,
+            matrix,
+            true  // filter = true for high quality
+        )
+
+        Log.d(TAG, "Scaled bitmap created: ${scaledBitmap.width}x${scaledBitmap.height}")
+
+        // Image shadow
+        paint.color = Color.argb(30, 0, 0, 0)
+        val shadowRect = RectF(imgX + 3, imgY + 3, imgX + scaledBitmap.width + 3, imgY + scaledBitmap.height + 3)
+        canvas.drawRoundRect(shadowRect, 8f, 8f, paint)
+
+        // Reset paint for image drawing with maximum quality
+        paint.reset()
+        paint.isAntiAlias = true
+        paint.isFilterBitmap = true
+        paint.isDither = false
+
+        canvas.save()
+
+        // Clip to rounded rectangle
+        val path = Path()
+        val imageRect = RectF(imgX, imgY, imgX + scaledBitmap.width.toFloat(), imgY + scaledBitmap.height.toFloat())
+        path.addRoundRect(imageRect, 8f, 8f, Path.Direction.CW)
+        canvas.clipPath(path)
+
+        // Draw bitmap directly at position (no additional scaling)
+        canvas.drawBitmap(scaledBitmap, imgX, imgY, paint)
+
+        canvas.restore()
+
+        // Image border
         paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1.5f
         paint.color = Color.parseColor(COLOR_BORDER)
-        canvas.drawLine(x, yStart, x, rowEnd, paint)
+        canvas.drawRoundRect(imageRect, 8f, 8f, paint)
         paint.style = Paint.Style.FILL
 
-        // ✅ IMPROVED: Event Image with better quality rendering
+        Log.d(TAG, "Image drawn successfully at position ($imgX, $imgY)")
+
+        return imgY + scaledBitmap.height + 20
+    }
+
+    private fun drawLargeImage(
+        canvas: Canvas,
+        paint: Paint,
+        bitmap: Bitmap,
+        yStart: Float,
+        pageWidth: Float
+    ): Float {
+        val maxWidth = (pageWidth - MARGIN * 2 - 40).toInt()
+        val maxHeight = 400  // Slightly reduced for better fit
+
+        // Calculate scaled dimensions maintaining aspect ratio
+        val aspectRatio = bitmap.width.toFloat() / bitmap.height
+        var newWidth = maxWidth
+        var newHeight = (newWidth / aspectRatio).toInt()
+
+        if (newHeight > maxHeight) {
+            newHeight = maxHeight
+            newWidth = (newHeight * aspectRatio).toInt()
+        }
+
+        val imgX = MARGIN + 20
+        val imgY = yStart
+
+        // Create high-quality scaled bitmap
+        val scaledBitmap = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+
+        // Image shadow
+        paint.color = Color.argb(30, 0, 0, 0)
+        val shadowRect = RectF(imgX + 3, imgY + 3, imgX + newWidth + 3, imgY + newHeight + 3)
+        canvas.drawRoundRect(shadowRect, 8f, 8f, paint)
+
+        // Enable high-quality rendering
+        paint.isAntiAlias = true
+        paint.isFilterBitmap = true
+        paint.isDither = false
+
+        canvas.save()
+
+        // Clip to rounded rectangle
+        val path = Path()
+        val imageRect = RectF(imgX, imgY, imgX + newWidth.toFloat(), imgY + newHeight.toFloat())
+        path.addRoundRect(imageRect, 8f, 8f, Path.Direction.CW)
+        canvas.clipPath(path)
+
+        // Draw bitmap with high quality paint
+        canvas.drawBitmap(scaledBitmap, imgX, imgY, paint)
+
+        canvas.restore()
+
+        // Image border
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1.5f
+        paint.color = Color.parseColor(COLOR_BORDER)
+        canvas.drawRoundRect(imageRect, 8f, 8f, paint)
+        paint.style = Paint.Style.FILL
+
+        return imgY + newHeight + 20
+    }
+
+    private fun drawImagePlaceholder(
+        canvas: Canvas,
+        paint: Paint,
+        yStart: Float,
+        height: Float,
+        pageWidth: Float
+    ): Float {
+        val imgX = MARGIN + 20
+        val imgWidth = pageWidth - MARGIN * 2 - 40
+
+        paint.color = Color.parseColor("#F5F5F5")
+        val rect = RectF(imgX, yStart, imgX + imgWidth, yStart + height)
+        canvas.drawRoundRect(rect, 8f, 8f, paint)
+
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1f
+        paint.color = Color.parseColor(COLOR_BORDER)
+        canvas.drawRoundRect(rect, 8f, 8f, paint)
+        paint.style = Paint.Style.FILL
+
+        val placeholderText = "Image Unavailable"
+        paint.textSize = 14f
+        paint.color = Color.GRAY
+        paint.textAlign = Paint.Align.CENTER
+        canvas.drawText(placeholderText, imgX + imgWidth / 2, yStart + height / 2, paint)
+        paint.textAlign = Paint.Align.LEFT
+
+        return yStart + height + 20
+    }
+
+    private fun drawSingleEventFooter(
+        canvas: Canvas,
+        paint: Paint,
+        pageWidth: Float,
+        pageHeight: Float
+    ) {
+        val footerY = pageHeight - 40
+
+        // Separator line
+        paint.color = Color.parseColor(COLOR_BORDER)
+        paint.strokeWidth = 1f
+        canvas.drawLine(MARGIN, footerY, pageWidth - MARGIN, footerY, paint)
+
+        // Footer text
+        paint.textSize = 9f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
+
+        canvas.drawText("ICCC Event Manager", MARGIN, footerY + 15, paint)
+
+        paint.textAlign = Paint.Align.CENTER
+        canvas.drawText("Generated on ${dateTimeFormat.format(Date())}", pageWidth / 2, footerY + 15, paint)
+
+        paint.textAlign = Paint.Align.RIGHT
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
+        canvas.drawText("Confidential", pageWidth - MARGIN, footerY + 15, paint)
+        paint.textAlign = Paint.Align.LEFT
+    }
+
+    private fun getEventTypeIconAndColor(type: String): Pair<String, String> {
+        return when (type.lowercase()) {
+            "cd" -> Pair("🔥", "#FF5722")
+            "id" -> Pair("🚪", "#F44336")
+            "ct" -> Pair("👥", "#E91E63")
+            "sh" -> Pair("🛡️", "#FF9800")
+            "vd" -> Pair("🚗", "#2196F3")
+            "pd" -> Pair("👤", "#4CAF50")
+            "vc" -> Pair("📊", "#FFC107")
+            "ii" -> Pair("🔍", "#9C27B0")
+            "ls" -> Pair("📉", "#00BCD4")
+            "off-route" -> Pair("🗺️", "#FF5722")
+            "tamper" -> Pair("⚠️", "#F44336")
+            "overspeed" -> Pair("⚡", "#FF9800")
+            else -> Pair("❓", "#9E9E9E")
+        }
+    }
+
+    private fun drawPremiumBackground(canvas: Canvas, paint: Paint) {
+        paint.color = Color.WHITE
+        canvas.drawRect(0f, 0f, PAGE_WIDTH, PAGE_HEIGHT, paint)
+    }
+
+    private fun drawEnhancedHeader(
+        canvas: Canvas,
+        paint: Paint,
+        channelArea: String,
+        channelType: String,
+        totalEvents: Int,
+        yStart: Float
+    ) {
+        var y = yStart
+
+        // Top bar background - light blue like iOS
+        paint.color = Color.parseColor("#E3F2FD")
+        canvas.drawRect(MARGIN, y, PAGE_WIDTH - MARGIN, y + 80, paint)
+
+        // Company text (left side) - bold blue
+        y += 20
+        paint.color = Color.parseColor(COLOR_PRIMARY)
+        paint.textSize = 14f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("ICCC Event Manager", MARGIN + 15, y, paint)
+
+        // Generated date (right side)
+        val dateText = "Generated: ${dateTimeFormat.format(Date())}"
+        paint.textSize = 10f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
+        paint.textAlign = Paint.Align.RIGHT
+        canvas.drawText(dateText, PAGE_WIDTH - MARGIN - 15, y, paint)
+        paint.textAlign = Paint.Align.LEFT
+
+        y += 30
+
+        // Main title (centered)
+        val titleText = "Events Report"
+        paint.textSize = 20f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.color = Color.BLACK
+        val titleWidth = paint.measureText(titleText)
+        canvas.drawText(titleText, (PAGE_WIDTH - titleWidth) / 2, y, paint)
+
+        y += 25
+
+        // Channel info (centered)
+        val channelText = "$channelType - $channelArea"
+        paint.textSize = 12f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
+        val channelWidth = paint.measureText(channelText)
+        canvas.drawText(channelText, (PAGE_WIDTH - channelWidth) / 2, y, paint)
+
+        y += 25
+
+        // Event count badge (centered) - matching iOS style
+        val countText = "Total Events: $totalEvents"
+        paint.textSize = 11f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val countWidth = paint.measureText(countText)
+        val badgeWidth = countWidth + 30
+        val badgeX = (PAGE_WIDTH - badgeWidth) / 2
+        val badgeY = y - 7
+
+        // Badge background - light blue
+        paint.color = Color.parseColor("#E3F2FD")
+        val badgeRect = RectF(badgeX, badgeY, badgeX + badgeWidth, badgeY + 22)
+        canvas.drawRoundRect(badgeRect, 6f, 6f, paint)
+
+        // Badge text - blue
+        paint.color = Color.parseColor(COLOR_PRIMARY)
+        canvas.drawText(countText, badgeX + 15, y + 8, paint)
+
+        y += 25
+
+        // Separator line - blue with shadow (matching iOS)
+        paint.color = Color.parseColor(COLOR_PRIMARY)
+        paint.strokeWidth = 2f
+        canvas.drawLine(MARGIN, y, PAGE_WIDTH - MARGIN, y, paint)
+
+        // Shadow line
+        paint.color = Color.parseColor(COLOR_PRIMARY)
+        paint.alpha = 76
+        paint.strokeWidth = 1f
+        canvas.drawLine(MARGIN, y + 2, PAGE_WIDTH - MARGIN, y + 2, paint)
+        paint.alpha = 255
+    }
+
+    private suspend fun drawEnhancedEventRow(
+        canvas: Canvas,
+        paint: Paint,
+        event: Event,
+        eventNumber: Int,
+        startY: Float
+    ): Float {
+        var currentX = MARGIN
+        val rowEnd = startY + ROW_HEIGHT
+
+        // Alternating row background
+        if (eventNumber % 2 == 0) {
+            paint.color = Color.parseColor("#F8F9FA")
+            canvas.drawRect(MARGIN, startY, PAGE_WIDTH - MARGIN, rowEnd, paint)
+        }
+
+        // Subtle top shadow
+        val shadowGradient = LinearGradient(
+            0f, startY, 0f, startY + 4,
+            intArrayOf(Color.parseColor("#10000000"), Color.TRANSPARENT),
+            null, Shader.TileMode.CLAMP
+        )
+        paint.shader = shadowGradient
+        canvas.drawRect(MARGIN, startY, PAGE_WIDTH - MARGIN, startY + 4, paint)
+        paint.shader = null
+
+        // Column 1: Event Number with circular badge
+        val numberText = "#$eventNumber"
+        paint.textSize = 14f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.color = Color.parseColor(COLOR_PRIMARY)
+
+        val circleDiameter = 36f
+        val circleX = currentX + (COL_SNO_WIDTH - circleDiameter) / 2
+        val circleY = startY + (ROW_HEIGHT - circleDiameter) / 2
+
+        // Circle background
+        paint.color = Color.parseColor(COLOR_PRIMARY_LIGHT)
+        canvas.drawCircle(circleX + circleDiameter / 2, circleY + circleDiameter / 2, circleDiameter / 2, paint)
+
+        // Number text
+        paint.color = Color.parseColor(COLOR_PRIMARY)
+        val numberWidth = paint.measureText(numberText)
+        paint.textAlign = Paint.Align.CENTER
+        canvas.drawText(
+            numberText,
+            currentX + COL_SNO_WIDTH / 2,
+            startY + ROW_HEIGHT / 2 + 5,
+            paint
+        )
+        paint.textAlign = Paint.Align.LEFT
+        currentX += COL_SNO_WIDTH
+
+        // Vertical separator
+        drawVerticalLine(canvas, paint, currentX, startY + 5, ROW_HEIGHT - 10)
+        currentX += 8
+
+        // Column 2: Event Type
+        val eventType = event.typeDisplay ?: event.type ?: "Unknown"
+        paint.textSize = 11f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.color = Color.parseColor(COLOR_TEXT_PRIMARY)
+
+        val typeLines = wrapText(eventType, COL_TYPE_WIDTH - 16, paint)
+        var typeY = startY + (ROW_HEIGHT - (typeLines.size * 14)) / 2 + 14
+        typeLines.forEach { line ->
+            canvas.drawText(line, currentX, typeY, paint)
+            typeY += 14
+        }
+
+        // Vehicle number for GPS events
+        if (event.type in listOf("off-route", "tamper", "overspeed")) {
+            val vehicleNum = event.data["vehicleNumber"] as? String
+            if (vehicleNum != null) {
+                paint.textSize = 9f
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                paint.color = Color.parseColor(COLOR_PRIMARY)
+                canvas.drawText("🚗 $vehicleNum", currentX, typeY + 5, paint)
+            }
+        }
+
+        currentX += COL_TYPE_WIDTH
+
+        // Vertical separator
+        drawVerticalLine(canvas, paint, currentX, startY + 5, ROW_HEIGHT - 10)
+        currentX += 8
+
+        // Column 3: Location
+        paint.textSize = 9f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
+        canvas.drawText("LOCATION", currentX, startY + 10, paint)
+
+        paint.textSize = 10f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        paint.color = Color.BLACK
+        val location = event.data["location"] as? String ?: "Unknown"
+        val locationLines = wrapText(location, COL_LOCATION_WIDTH - 16, paint)
+        var locY = startY + 25
+        locationLines.take(2).forEach { line ->
+            canvas.drawText(line, currentX, locY, paint)
+            locY += 12
+        }
+
+        // GPS coordinates for GPS events
+        val alertLoc = extractAlertLocation(event.data)
+        if (alertLoc != null) {
+            paint.textSize = 9f
+            paint.color = Color.parseColor(COLOR_PRIMARY)
+            val coordText = String.format("📍 %.6f, %.6f", alertLoc.latitude, alertLoc.longitude)
+            canvas.drawText(coordText, currentX, startY + 75, paint)
+        }
+
+        currentX += COL_LOCATION_WIDTH
+
+        // Vertical separator
+        drawVerticalLine(canvas, paint, currentX, startY + 5, ROW_HEIGHT - 10)
+        currentX += 8
+
+        // Column 4: Date & Time
+        paint.textSize = 9f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
+        canvas.drawText("DATE & TIME", currentX, startY + 10, paint)
+
+        val eventDate = getEventDate(event)
+        paint.textSize = 10f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        paint.color = Color.BLACK
+
+        val dateStr = "📅 ${dateFormat.format(eventDate)}"
+        val timeStr = "🕒 ${timeFormat.format(eventDate)}"
+
+        canvas.drawText(dateStr, currentX, startY + 30, paint)
+
+        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
+        canvas.drawText(timeStr, currentX, startY + 50, paint)
+
+        currentX += COL_DATETIME_WIDTH
+
+        // Vertical separator
+        drawVerticalLine(canvas, paint, currentX, startY + 5, ROW_HEIGHT - 10)
+        currentX += 8
+
+        // Column 5: Image/Map
+        val imageRect = RectF(
+            currentX,
+            startY + 8,
+            currentX + COL_IMAGE_WIDTH - 16,
+            startY + ROW_HEIGHT - 8
+        )
+
+        // Image border
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1f
+        paint.color = Color.parseColor(COLOR_BORDER)
+        canvas.drawRoundRect(imageRect, 4f, 4f, paint)
+        paint.style = Paint.Style.FILL
+
+        // Load and draw image
         val bitmap = when (event.type) {
             "off-route", "tamper", "overspeed" -> {
                 captureMapPreview(event) ?: loadEventImage(event)
             }
-            else -> {
-                loadEventImage(event)
-            }
+            else -> loadEventImage(event)
         }
 
-        val imgX = x + 10
-        val imgY = yStart + (ROW_HEIGHT - IMAGE_SIZE) / 2
-
         if (bitmap != null) {
-            val scaledBitmap = scaleBitmapToFit(bitmap, IMAGE_SIZE, IMAGE_SIZE)
-
-            // ✅ Enable high-quality rendering
-            paint.isAntiAlias = true
-            paint.isFilterBitmap = true
-
-            // Draw image border
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 1f
-            paint.color = Color.parseColor(COLOR_BORDER)
-            canvas.drawRect(imgX, imgY, imgX + scaledBitmap.width,
-                imgY + scaledBitmap.height, paint)
-            paint.style = Paint.Style.FILL
-
-            // ✅ Draw image with high-quality paint
-            canvas.save()
-            canvas.drawBitmap(scaledBitmap, imgX, imgY, paint)
-            canvas.restore()
+            drawImageInRect(canvas, paint, bitmap, imageRect)
         } else {
             // Placeholder
-            paint.color = Color.parseColor("#ECF0F1")
-            canvas.drawRect(imgX, imgY, imgX + IMAGE_SIZE, imgY + IMAGE_SIZE, paint)
+            paint.color = Color.parseColor("#F5F5F5")
+            canvas.drawRoundRect(imageRect, 4f, 4f, paint)
 
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 1f
-            paint.color = Color.parseColor(COLOR_BORDER)
-            canvas.drawRect(imgX, imgY, imgX + IMAGE_SIZE, imgY + IMAGE_SIZE, paint)
-            paint.style = Paint.Style.FILL
-
-            paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
-            paint.textSize = 8f
+            val placeholderText = if (event.isGpsEvent) "🗺️ Map unavailable" else "📷 Image unavailable"
+            paint.textSize = 9f
+            paint.color = Color.GRAY
             paint.textAlign = Paint.Align.CENTER
-            canvas.drawText("No Image", imgX + IMAGE_SIZE / 2, imgY + IMAGE_SIZE / 2, paint)
+            canvas.drawText(
+                placeholderText,
+                imageRect.centerX(),
+                imageRect.centerY(),
+                paint
+            )
             paint.textAlign = Paint.Align.LEFT
         }
 
+        // Row border
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1f
+        paint.color = Color.parseColor(COLOR_BORDER)
+        canvas.drawRect(MARGIN, startY, PAGE_WIDTH - MARGIN, rowEnd, paint)
+        paint.style = Paint.Style.FILL
+
         return rowEnd
+    }
+
+    private fun drawImageInRect(canvas: Canvas, paint: Paint, bitmap: Bitmap, rect: RectF) {
+        // Calculate aspect-fit dimensions
+        val aspectRatio = bitmap.width.toFloat() / bitmap.height
+        val rectAspect = rect.width() / rect.height()
+
+        var drawRect = RectF(rect)
+        if (aspectRatio > rectAspect) {
+            // Image is wider
+            val newHeight = rect.width() / aspectRatio
+            drawRect.top += (rect.height() - newHeight) / 2
+            drawRect.bottom = drawRect.top + newHeight
+        } else {
+            // Image is taller
+            val newWidth = rect.height() * aspectRatio
+            drawRect.left += (rect.width() - newWidth) / 2
+            drawRect.right = drawRect.left + newWidth
+        }
+
+        // Create high-quality scaled bitmap
+        val targetWidth = drawRect.width().toInt()
+        val targetHeight = drawRect.height().toInt()
+        val scaledBitmap = Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
+
+        canvas.save()
+
+        // Clip to rounded rectangle
+        val path = Path()
+        path.addRoundRect(drawRect, 4f, 4f, Path.Direction.CW)
+        canvas.clipPath(path)
+
+        // Enable high-quality rendering
+        paint.isAntiAlias = true
+        paint.isFilterBitmap = true
+        paint.isDither = false
+
+        canvas.drawBitmap(scaledBitmap, drawRect.left, drawRect.top, paint)
+
+        canvas.restore()
+    }
+
+    private fun drawEnhancedFooter(
+        canvas: Canvas,
+        paint: Paint,
+        pageNumber: Int,
+        totalPages: Int
+    ) {
+        val footerY = PAGE_HEIGHT - 45
+
+        // Background bar
+        paint.color = Color.parseColor("#FAFAFA")
+        canvas.drawRect(MARGIN, footerY - 5, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 5, paint)
+
+        // Separator line
+        paint.color = Color.parseColor(COLOR_PRIMARY)
+        paint.alpha = 128
+        paint.strokeWidth = 1.5f
+        canvas.drawLine(MARGIN, footerY, PAGE_WIDTH - MARGIN, footerY, paint)
+        paint.alpha = 255
+
+        // Page number (left)
+        val pageText = "Page $pageNumber of $totalPages"
+        paint.textSize = 10f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
+        canvas.drawText(pageText, MARGIN + 10, footerY + 12, paint)
+
+        // Company text (center)
+        val companyText = "ICCC Event Manager"
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        paint.color = Color.parseColor(COLOR_PRIMARY)
+        val companyWidth = paint.measureText(companyText)
+        canvas.drawText(companyText, (PAGE_WIDTH - companyWidth) / 2, footerY + 12, paint)
+
+        // Confidential text (right)
+        val confidentialText = "Confidential"
+        paint.textSize = 9f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
+        paint.color = Color.GRAY
+        paint.textAlign = Paint.Align.RIGHT
+        canvas.drawText(confidentialText, PAGE_WIDTH - MARGIN - 10, footerY + 12, paint)
+        paint.textAlign = Paint.Align.LEFT
+    }
+
+    private fun drawVerticalLine(canvas: Canvas, paint: Paint, x: Float, y: Float, height: Float) {
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1f
+        paint.color = Color.parseColor(COLOR_BORDER)
+        canvas.drawLine(x, y, x, y + height, paint)
+        paint.style = Paint.Style.FILL
     }
 
     private fun wrapText(text: String, maxWidth: Float, paint: Paint): List<String> {
@@ -422,514 +991,15 @@ class PdfGenerator(private val context: Context) {
             lines.add(currentLine)
         }
 
-        return lines.take(3) // Max 3 lines to fit in row
+        return lines.take(3)
     }
 
-    private fun drawPremiumBackground(canvas: Canvas, paint: Paint) {
-        paint.color = Color.parseColor("#F8F9FA")
-        canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), PAGE_HEIGHT.toFloat(), paint)
-    }
-
-    private fun drawHeaderSection(canvas: Canvas, paint: Paint, yStart: Float, title: String) {
-        paint.color = Color.parseColor(COLOR_PRIMARY)
-        canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), yStart + 60, paint)
-
-        paint.color = Color.parseColor(COLOR_SECONDARY)
-        paint.strokeWidth = 4f
-        canvas.drawLine(MARGIN.toFloat(), yStart + 55, (PAGE_WIDTH - MARGIN).toFloat(), yStart + 55, paint)
-
-        paint.color = Color.WHITE
-        paint.textSize = 24f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.style = Paint.Style.FILL
-        canvas.drawText(title, MARGIN.toFloat(), yStart + 30, paint)
-
-        paint.textSize = 11f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        paint.alpha = 200
-        canvas.drawText("Generated on ${dateFormat.format(Date())}", MARGIN.toFloat(), yStart + 50, paint)
-        paint.alpha = 255
-    }
-
-    private fun drawChannelInfoCard(canvas: Canvas, paint: Paint, area: String, type: String, yStart: Float): Float {
-        var y = yStart
-
-        drawCardShadow(canvas, paint, MARGIN.toFloat(), y, (PAGE_WIDTH - MARGIN).toFloat(), y + 70)
-
-        paint.color = Color.WHITE
-        canvas.drawRoundRect(MARGIN.toFloat(), y, (PAGE_WIDTH - MARGIN).toFloat(), y + 70, 8f, 8f, paint)
-
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 1f
-        paint.color = Color.parseColor(COLOR_BORDER)
-        canvas.drawRoundRect(MARGIN.toFloat(), y, (PAGE_WIDTH - MARGIN).toFloat(), y + 70, 8f, 8f, paint)
-        paint.style = Paint.Style.FILL
-
-        y += 25
-
-        paint.color = Color.parseColor(COLOR_SECONDARY)
-        paint.alpha = 30
-        canvas.drawCircle((MARGIN + 25).toFloat(), y + 5, 18f, paint)
-        paint.alpha = 255
-
-        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
-        paint.textSize = 11f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        canvas.drawText("CHANNEL INFORMATION", (MARGIN + 50).toFloat(), y, paint)
-
-        y += 22
-
-        paint.color = Color.parseColor(COLOR_TEXT_PRIMARY)
-        paint.textSize = 16f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText("$area - $type", (MARGIN + 50).toFloat(), y, paint)
-
-        return yStart + 70
-    }
-
-    private fun drawEventDetailsCard(canvas: Canvas, paint: Paint, event: Event, yStart: Float): Float {
-        var y = yStart
-        val cardHeight = 180f
-
-        drawCardShadow(canvas, paint, MARGIN.toFloat(), y, (PAGE_WIDTH - MARGIN).toFloat(), y + cardHeight)
-
-        paint.color = Color.WHITE
-        canvas.drawRoundRect(MARGIN.toFloat(), y, (PAGE_WIDTH - MARGIN).toFloat(), y + cardHeight, 8f, 8f, paint)
-
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 1f
-        paint.color = Color.parseColor(COLOR_BORDER)
-        canvas.drawRoundRect(MARGIN.toFloat(), y, (PAGE_WIDTH - MARGIN).toFloat(), y + cardHeight, 8f, 8f, paint)
-        paint.style = Paint.Style.FILL
-
-        y += 25
-
-        val eventType = event.typeDisplay ?: "Unknown Event"
-        drawBadge(canvas, paint, (MARGIN + 20).toFloat(), y - 8, eventType, COLOR_ACCENT)
-        y += 30
-
-        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
-        paint.textSize = 11f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        canvas.drawText("LOCATION", (MARGIN + 20).toFloat(), y, paint)
-
-        y += 18
-        paint.color = Color.parseColor(COLOR_TEXT_PRIMARY)
-        paint.textSize = 14f
-        val location = event.data["location"] as? String ?: "Unknown"
-        canvas.drawText(location, (MARGIN + 20).toFloat(), y, paint)
-
-        y += 25
-
-        val eventDate = getEventDate(event)
-
-        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
-        paint.textSize = 11f
-        canvas.drawText("DATE & TIME", (MARGIN + 20).toFloat(), y, paint)
-
-        y += 18
-        paint.color = Color.parseColor(COLOR_TEXT_PRIMARY)
-        paint.textSize = 14f
-        val dateStr = dateFormat.format(eventDate)
-        val timeStr = timeFormat.format(eventDate)
-        canvas.drawText("$dateStr at $timeStr", (MARGIN + 20).toFloat(), y, paint)
-
-        event.id?.let { eventId ->
-            if (SavedMessagesManager.isMessageSaved(eventId)) {
-                val savedMessage = SavedMessagesManager.getSavedMessages().find { it.eventId == eventId }
-                savedMessage?.let {
-                    y += 25
-                    drawStatusBadge(canvas, paint, (MARGIN + 20).toFloat(), y - 8, it.priority.displayName)
-
-                    if (it.comment.isNotEmpty()) {
-                        y += 25
-                        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
-                        paint.textSize = 11f
-                        canvas.drawText("NOTE", (MARGIN + 20).toFloat(), y, paint)
-
-                        y += 18
-                        paint.color = Color.parseColor(COLOR_TEXT_PRIMARY)
-                        paint.textSize = 12f
-                        canvas.drawText(it.comment.take(50) + if (it.comment.length > 50) "..." else "",
-                            (MARGIN + 20).toFloat(), y, paint)
-                    }
-                }
-            }
-        }
-
-        return yStart + cardHeight
-    }
-
-    private fun drawImageWithShadow(canvas: Canvas, paint: Paint, bitmap: Bitmap,
-                                    yStart: Float, maxHeight: Int = 400): Float {  // Increased from 320
-        val scaledBitmap = scaleBitmapToFit(bitmap, CONTENT_WIDTH - 40, maxHeight)
-        val imgX = MARGIN + 20f
-        val imgY = yStart
-
-        // Shadow
-        paint.color = Color.parseColor("#000000")
-        paint.alpha = 20
-        canvas.drawRoundRect(imgX + 2, imgY + 2, imgX + scaledBitmap.width + 2,
-            imgY + scaledBitmap.height + 2, 6f, 6f, paint)
-        paint.alpha = 255
-
-        // ✅ Enable anti-aliasing and filtering for better quality
-        paint.isAntiAlias = true
-        paint.isFilterBitmap = true
-
-        canvas.save()
-        val path = android.graphics.Path()
-        path.addRoundRect(android.graphics.RectF(imgX, imgY, imgX + scaledBitmap.width,
-            imgY + scaledBitmap.height), 6f, 6f, android.graphics.Path.Direction.CW)
-        canvas.clipPath(path)
-
-        // ✅ Draw with high-quality paint
-        canvas.drawBitmap(scaledBitmap, imgX, imgY, paint)
-        canvas.restore()
-
-        return imgY + scaledBitmap.height + 20
-    }
-
-    private fun drawImagePlaceholder(canvas: Canvas, paint: Paint, yStart: Float, height: Int): Float {
-        val imgX = MARGIN + 20f
-        val imgWidth = CONTENT_WIDTH - 40f
-
-        paint.color = Color.parseColor("#ECF0F1")
-        canvas.drawRoundRect(imgX, yStart, imgX + imgWidth, yStart + height, 6f, 6f, paint)
-
-        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
-        paint.textSize = 12f
-        paint.textAlign = Paint.Align.CENTER
-        canvas.drawText("Image Unavailable", imgX + imgWidth / 2, yStart + height / 2, paint)
-        paint.textAlign = Paint.Align.LEFT
-
-        return yStart + height + 20
-    }
-
-    private fun drawBadge(canvas: Canvas, paint: Paint, x: Float, y: Float, text: String, color: String) {
-        paint.color = Color.parseColor(color)
-        paint.alpha = 30
-        val textWidth = paint.measureText(text) + 20
-        canvas.drawRoundRect(x, y, x + textWidth, y + 20, 10f, 10f, paint)
-
-        paint.alpha = 255
-        paint.color = Color.parseColor(color)
-        paint.textSize = 11f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText(text, x + 10, y + 14, paint)
-    }
-
-    private fun drawStatusBadge(canvas: Canvas, paint: Paint, x: Float, y: Float, status: String) {
-        val color = when (status.lowercase()) {
-            "high" -> COLOR_ACCENT
-            "medium", "moderate" -> COLOR_WARNING
-            else -> COLOR_SUCCESS
-        }
-        drawBadge(canvas, paint, x, y, "Priority: $status", color)
-    }
-
-    private fun drawCardShadow(canvas: Canvas, paint: Paint, left: Float, top: Float,
-                               right: Float, bottom: Float) {
-        paint.color = Color.parseColor("#000000")
-        paint.alpha = 15
-        canvas.drawRoundRect(left + 2, top + 2, right + 2, bottom + 2, 8f, 8f, paint)
-        paint.alpha = 255
-    }
-
-    private fun drawFooter(canvas: Canvas, paint: Paint, currentPage: Int, totalPages: Int) {
-        val y = PAGE_HEIGHT - 25f
-
-        paint.color = Color.parseColor(COLOR_BORDER)
-        paint.strokeWidth = 1f
-        canvas.drawLine(MARGIN.toFloat(), y - 15, (PAGE_WIDTH - MARGIN).toFloat(), y - 15, paint)
-
-        paint.style = Paint.Style.FILL
-        paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
-        paint.textSize = 10f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        paint.textAlign = Paint.Align.CENTER
-        canvas.drawText("Page $currentPage of $totalPages", (PAGE_WIDTH / 2).toFloat(), y, paint)
-
-        paint.textAlign = Paint.Align.LEFT
-        canvas.drawText("ICCC Alert System", MARGIN.toFloat(), y, paint)
-
-        paint.textAlign = Paint.Align.RIGHT
-        canvas.drawText("Confidential", (PAGE_WIDTH - MARGIN).toFloat(), y, paint)
-        paint.textAlign = Paint.Align.LEFT
-    }
-
-    private fun loadEventImage(event: Event): Bitmap? {
-        return try {
-            val area = event.area ?: return null
-            val eventId = event.id ?: return null
-            val httpUrl = getHttpUrlForArea(area)
-            val imageUrl = "$httpUrl/va/event/?id=$eventId"
-
-            val request = Request.Builder().url(imageUrl).build()
-            val response = client.newCall(request).execute()
-
-            if (response.isSuccessful) {
-                val inputStream = response.body?.byteStream()
-
-                // ✅ Use BitmapFactory.Options for high-quality decoding
-                val options = BitmapFactory.Options().apply {
-                    inPreferredConfig = Bitmap.Config.ARGB_8888  // Best quality
-                    inScaled = false  // Don't scale during decode
-                    inDither = false  // No dithering
-                    inPreferQualityOverSpeed = true  // Prefer quality
-                }
-
-                val bitmap = BitmapFactory.decodeStream(inputStream, null, options)
-                bitmap
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error loading image for PDF: ${e.message}")
-            null
-        }
-    }
-
-    private suspend fun captureMapPreview(event: Event): Bitmap? = withContext(Dispatchers.Default) {
-        try {
-            // Check if it's a GPS event
-            if (event.type != "off-route" && event.type != "tamper" && event.type != "overspeed") {
-                return@withContext null
-            }
-
-            // Extract map data (same as before)
-            val alertLoc = (event.data["alertLocation"] as? Map<*, *>)?.let {
-                val lat = (it["lat"] as? Number)?.toDouble() ?: return@withContext null
-                val lng = (it["lng"] as? Number)?.toDouble() ?: return@withContext null
-                GeoPoint(lat, lng)
-            } ?: return@withContext null
-
-            // Extract geofence data (same as before - code unchanged)
-            val geofenceMap = event.data["geofence"] as? Map<*, *>
-            val geofencePoints = mutableListOf<GeoPoint>()
-            var geofenceType: String? = null
-            var geofenceColor = "#3388ff"
-
-            if (geofenceMap != null) {
-                val geojsonMap = geofenceMap["geojson"] as? Map<*, *>
-                val type = geojsonMap?.get("type") as? String
-                val coordinates = geojsonMap?.get("coordinates")
-
-                val attributesMap = geofenceMap["attributes"] as? Map<*, *>
-                val color = attributesMap?.get("color") as? String
-                val polylineColor = attributesMap?.get("polylineColor") as? String
-                geofenceColor = polylineColor ?: color ?: "#3388ff"
-
-                if (type != null && coordinates != null) {
-                    geofenceType = type
-                    val points = when (type) {
-                        "Point" -> {
-                            val coord = coordinates as? List<*> ?: return@withContext null
-                            listOf(GeoPoint(
-                                (coord[1] as? Number)?.toDouble() ?: return@withContext null,
-                                (coord[0] as? Number)?.toDouble() ?: return@withContext null
-                            ))
-                        }
-                        "LineString" -> {
-                            val coords = coordinates as? List<*> ?: return@withContext null
-                            coords.mapNotNull { coordPair ->
-                                val pair = coordPair as? List<*> ?: return@mapNotNull null
-                                if (pair.size < 2) return@mapNotNull null
-                                GeoPoint(
-                                    (pair[1] as? Number)?.toDouble() ?: return@mapNotNull null,
-                                    (pair[0] as? Number)?.toDouble() ?: return@mapNotNull null
-                                )
-                            }
-                        }
-                        "Polygon" -> {
-                            val rings = coordinates as? List<*> ?: return@withContext null
-                            val outerRing = rings.firstOrNull() as? List<*> ?: return@withContext null
-                            outerRing.mapNotNull { coordPair ->
-                                val pair = coordPair as? List<*> ?: return@mapNotNull null
-                                if (pair.size < 2) return@mapNotNull null
-                                GeoPoint(
-                                    (pair[1] as? Number)?.toDouble() ?: return@mapNotNull null,
-                                    (pair[0] as? Number)?.toDouble() ?: return@mapNotNull null
-                                )
-                            }
-                        }
-                        else -> emptyList()
-                    }
-                    geofencePoints.addAll(points)
-                }
-            }
-
-            // ✅ IMPROVED: Create higher resolution bitmap
-            val mapWidth = 800   // Increased from 500
-            val mapHeight = 500  // Increased from 300
-            val bitmap = Bitmap.createBitmap(mapWidth, mapHeight, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-
-            // ✅ Enable high-quality rendering
-            paint.isAntiAlias = true
-            paint.isFilterBitmap = true
-
-            // Draw background
-            paint.color = Color.parseColor("#F5F7FA")
-            canvas.drawRect(0f, 0f, mapWidth.toFloat(), mapHeight.toFloat(), paint)
-
-            // Calculate bounds and scale (same logic as before)
-            val allPoints = mutableListOf(alertLoc)
-            allPoints.addAll(geofencePoints)
-
-            val minLat = allPoints.minOf { it.latitude }
-            val maxLat = allPoints.maxOf { it.latitude }
-            val minLng = allPoints.minOf { it.longitude }
-            val maxLng = allPoints.maxOf { it.longitude }
-
-            val latRange = maxLat - minLat
-            val lngRange = maxLng - minLng
-
-            val padding = 0.2
-            val paddedLatRange = latRange * (1 + padding)
-            val paddedLngRange = lngRange * (1 + padding)
-
-            val centerLat = (minLat + maxLat) / 2
-            val centerLng = (minLng + maxLng) / 2
-
-            val mapPadding = 60f  // Increased from 40f
-            val scaleX = (mapWidth - 2 * mapPadding) / paddedLngRange
-            val scaleY = (mapHeight - 2 * mapPadding) / paddedLatRange
-            val scale = minOf(scaleX, scaleY)
-
-            fun toCanvasX(lng: Double): Float {
-                return ((lng - centerLng) * scale + mapWidth / 2).toFloat()
-            }
-
-            fun toCanvasY(lat: Double): Float {
-                return (mapHeight / 2 - (lat - centerLat) * scale).toFloat()
-            }
-
-            // Draw geofence (rendering logic same as before but with better quality)
-            if (geofencePoints.isNotEmpty() && geofenceType != null) {
-                val geoColor = try {
-                    Color.parseColor(if (geofenceColor.startsWith("#")) geofenceColor else "#$geofenceColor")
-                } catch (e: Exception) {
-                    Color.parseColor("#3388ff")
-                }
-
-                when (geofenceType) {
-                    "LineString" -> {
-                        paint.color = geoColor
-                        paint.strokeWidth = 5f  // Increased from 4f
-                        paint.style = Paint.Style.STROKE
-                        paint.strokeCap = Paint.Cap.ROUND
-                        paint.strokeJoin = Paint.Join.ROUND
-                        val path = android.graphics.Path()
-                        geofencePoints.forEachIndexed { index, point ->
-                            val x = toCanvasX(point.longitude)
-                            val y = toCanvasY(point.latitude)
-                            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                        }
-                        canvas.drawPath(path, paint)
-                    }
-                    "Polygon" -> {
-                        // Fill
-                        paint.color = Color.argb(30, Color.red(geoColor), Color.green(geoColor), Color.blue(geoColor))
-                        paint.style = Paint.Style.FILL
-                        val path = android.graphics.Path()
-                        geofencePoints.forEachIndexed { index, point ->
-                            val x = toCanvasX(point.longitude)
-                            val y = toCanvasY(point.latitude)
-                            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                        }
-                        path.close()
-                        canvas.drawPath(path, paint)
-
-                        // Stroke
-                        paint.color = geoColor
-                        paint.strokeWidth = 4f  // Increased from 3f
-                        paint.style = Paint.Style.STROKE
-                        paint.strokeCap = Paint.Cap.ROUND
-                        paint.strokeJoin = Paint.Join.ROUND
-                        canvas.drawPath(path, paint)
-                    }
-                    "Point" -> {
-                        val point = geofencePoints.first()
-                        val x = toCanvasX(point.longitude)
-                        val y = toCanvasY(point.latitude)
-
-                        // Fill
-                        paint.color = Color.argb(50, Color.red(geoColor), Color.green(geoColor), Color.blue(geoColor))
-                        paint.style = Paint.Style.FILL
-                        canvas.drawCircle(x, y, 40f, paint)  // Increased from 30f
-
-                        // Stroke
-                        paint.color = geoColor
-                        paint.strokeWidth = 3f  // Increased from 2f
-                        paint.style = Paint.Style.STROKE
-                        canvas.drawCircle(x, y, 40f, paint)
-                    }
-                }
-            }
-
-            // ✅ IMPROVED: Draw alert location marker with better quality
-            paint.style = Paint.Style.FILL
-            val alertX = toCanvasX(alertLoc.longitude)
-            val alertY = toCanvasY(alertLoc.latitude)
-
-            // Marker shadow
-            paint.color = Color.argb(100, 0, 0, 0)
-            canvas.drawCircle(alertX + 3, alertY + 3, 16f, paint)  // Increased from 12f
-
-            // Marker
-            paint.color = Color.parseColor("#FF5722")
-            canvas.drawCircle(alertX, alertY, 16f, paint)  // Increased from 12f
-
-            // Marker border
-            paint.color = Color.WHITE
-            paint.strokeWidth = 3f  // Increased from 2f
-            paint.style = Paint.Style.STROKE
-            canvas.drawCircle(alertX, alertY, 16f, paint)
-
-            // ✅ IMPROVED: Add labels with better rendering
-            paint.style = Paint.Style.FILL
-            paint.color = Color.WHITE
-            paint.textSize = 14f  // Increased from 11f
-            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-
-            // Alert label
-            val labelText = "Alert Location"
-            val labelWidth = paint.measureText(labelText) + 24
-            val labelX = alertX - labelWidth / 2
-            val labelY = alertY - 30
-
-            paint.color = Color.parseColor("#FF5722")
-            canvas.drawRoundRect(labelX, labelY - 18, labelX + labelWidth, labelY + 6, 5f, 5f, paint)
-
-            paint.color = Color.WHITE
-            paint.textAlign = Paint.Align.CENTER
-            canvas.drawText(labelText, alertX, labelY, paint)
-            paint.textAlign = Paint.Align.LEFT
-
-            bitmap
-        } catch (e: Exception) {
-            Log.e(TAG, "Error capturing map preview: ${e.message}", e)
-            null
-        }
-    }
-
-    private fun scaleBitmapToFit(bitmap: Bitmap, maxWidth: Int, maxHeight: Int): Bitmap {
-        val aspectRatio = bitmap.width.toFloat() / bitmap.height.toFloat()
-        var newWidth = maxWidth
-        var newHeight = (newWidth / aspectRatio).toInt()
-
-        if (newHeight > maxHeight) {
-            newHeight = maxHeight
-            newWidth = (newHeight * aspectRatio).toInt()
-        }
-
-        // ✅ Use FILTER_BITMAP flag for better quality
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-        paint.isFilterBitmap = true
-
-        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+    private fun extractAlertLocation(data: Map<String, Any>?): GeoPoint? {
+        if (data == null) return null
+        val alertLoc = data["alertLocation"] as? Map<*, *> ?: return null
+        val lat = (alertLoc["lat"] as? Number)?.toDouble() ?: return null
+        val lng = (alertLoc["lng"] as? Number)?.toDouble() ?: return null
+        return GeoPoint(lat, lng)
     }
 
     private fun getEventDate(event: Event): Date {
@@ -945,21 +1015,317 @@ class PdfGenerator(private val context: Context) {
         }
     }
 
+    private fun loadEventImage(event: Event): Bitmap? {
+        return try {
+            val area = event.area ?: return null
+            val eventId = event.id ?: return null
+            val httpUrl = getHttpUrlForArea(area)
+            val imageUrl = "$httpUrl/va/event/?id=$eventId"
+
+            Log.d(TAG, "Loading image: $imageUrl")
+
+            val request = Request.Builder()
+                .url(imageUrl)
+                .addHeader("Accept", "image/*")
+                .build()
+
+            val response = client.newCall(request).execute()
+
+            if (response.isSuccessful) {
+                val bytes = response.body?.bytes() ?: return null
+
+                // Decode with high quality settings
+                val options = BitmapFactory.Options().apply {
+                    inPreferredConfig = Bitmap.Config.ARGB_8888
+                    inScaled = false
+                    inDither = false
+                    inPreferQualityOverSpeed = true
+                    inMutable = false
+                }
+
+                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+
+                if (bitmap != null) {
+                    Log.d(TAG, "✅ Image loaded successfully: ${bitmap.width}x${bitmap.height}")
+                } else {
+                    Log.e(TAG, "❌ Failed to decode image")
+                }
+
+                bitmap
+            } else {
+                Log.e(TAG, "Failed to load image: ${response.code}")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading image: ${e.message}", e)
+            null
+        }
+    }
+
+    private suspend fun captureMapPreview(event: Event): Bitmap? = withContext(Dispatchers.Default) {
+        try {
+            val alertLoc = extractAlertLocation(event.data) ?: return@withContext null
+
+            // High resolution for better quality
+            val mapWidth = 800
+            val mapHeight = 500
+            val bitmap = Bitmap.createBitmap(mapWidth, mapHeight, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                isFilterBitmap = true
+            }
+
+            // Background
+            paint.color = Color.parseColor("#F5F7FA")
+            canvas.drawRect(0f, 0f, mapWidth.toFloat(), mapHeight.toFloat(), paint)
+
+            // Extract geofence data
+            val geofenceData = extractGeofenceData(event.data)
+
+            // Calculate bounds
+            val allPoints = mutableListOf(alertLoc)
+            geofenceData?.points?.let { allPoints.addAll(it) }
+
+            val minLat = allPoints.minOf { it.latitude }
+            val maxLat = allPoints.maxOf { it.latitude }
+            val minLng = allPoints.minOf { it.longitude }
+            val maxLng = allPoints.maxOf { it.longitude }
+
+            val latRange = maxLat - minLat
+            val lngRange = maxLng - minLng
+
+            val padding = 0.5
+            val paddedLatRange = latRange * (1 + padding)
+            val paddedLngRange = lngRange * (1 + padding)
+
+            val centerLat = (minLat + maxLat) / 2
+            val centerLng = (minLng + maxLng) / 2
+
+            val mapPadding = 60f
+            val scaleX = (mapWidth - 2 * mapPadding) / paddedLngRange
+            val scaleY = (mapHeight - 2 * mapPadding) / paddedLatRange
+            val scale = minOf(scaleX, scaleY)
+
+            fun toCanvasX(lng: Double): Float {
+                return ((lng - centerLng) * scale + mapWidth / 2).toFloat()
+            }
+
+            fun toCanvasY(lat: Double): Float {
+                return (mapHeight / 2 - (lat - centerLat) * scale).toFloat()
+            }
+
+            // Draw geofence
+            geofenceData?.let { geoData ->
+                val color = try {
+                    Color.parseColor(if (geoData.color.startsWith("#")) geoData.color else "#${geoData.color}")
+                } catch (e: Exception) {
+                    Color.parseColor("#3388ff")
+                }
+
+                when (geoData.type) {
+                    "LineString" -> {
+                        paint.color = color
+                        paint.strokeWidth = 5f
+                        paint.style = Paint.Style.STROKE
+                        paint.strokeCap = Paint.Cap.ROUND
+
+                        val path = Path()
+                        geoData.points.forEachIndexed { index, point ->
+                            val x = toCanvasX(point.longitude)
+                            val y = toCanvasY(point.latitude)
+                            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                        }
+                        canvas.drawPath(path, paint)
+                    }
+                    "Polygon" -> {
+                        // Fill
+                        paint.color = Color.argb(30, Color.red(color), Color.green(color), Color.blue(color))
+                        paint.style = Paint.Style.FILL
+
+                        val path = Path()
+                        geoData.points.forEachIndexed { index, point ->
+                            val x = toCanvasX(point.longitude)
+                            val y = toCanvasY(point.latitude)
+                            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                        }
+                        path.close()
+                        canvas.drawPath(path, paint)
+
+                        // Stroke
+                        paint.color = color
+                        paint.strokeWidth = 4f
+                        paint.style = Paint.Style.STROKE
+                        canvas.drawPath(path, paint)
+                    }
+                    "Point" -> {
+                        val point = geoData.points.first()
+                        val x = toCanvasX(point.longitude)
+                        val y = toCanvasY(point.latitude)
+
+                        paint.color = Color.argb(50, Color.red(color), Color.green(color), Color.blue(color))
+                        paint.style = Paint.Style.FILL
+                        canvas.drawCircle(x, y, 40f, paint)
+
+                        paint.color = color
+                        paint.strokeWidth = 3f
+                        paint.style = Paint.Style.STROKE
+                        canvas.drawCircle(x, y, 40f, paint)
+                    }
+                }
+            }
+
+            // Draw alert pin (on top)
+            val alertX = toCanvasX(alertLoc.longitude)
+            val alertY = toCanvasY(alertLoc.latitude)
+
+            paint.style = Paint.Style.FILL
+
+            // Pin shadow
+            paint.color = Color.argb(100, 0, 0, 0)
+            canvas.drawCircle(alertX + 3, alertY + 3, 16f, paint)
+
+            // Red pin
+            paint.color = Color.RED
+            canvas.drawCircle(alertX, alertY, 16f, paint)
+
+            // White center
+            paint.color = Color.WHITE
+            canvas.drawCircle(alertX, alertY, 8f, paint)
+
+            // Coordinates label
+            val coordText = String.format("%.6f, %.6f", alertLoc.latitude, alertLoc.longitude)
+            paint.textSize = 12f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            paint.color = Color.WHITE
+            paint.setShadowLayer(3f, 0f, 0f, Color.BLACK)
+
+            val textWidth = paint.measureText(coordText)
+            val textBgRect = RectF(
+                alertX - textWidth / 2 - 8,
+                alertY + 20,
+                alertX + textWidth / 2 + 8,
+                alertY + 40
+            )
+
+            paint.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+            paint.color = Color.argb(153, 0, 0, 0)
+            paint.style = Paint.Style.FILL
+            canvas.drawRoundRect(textBgRect, 4f, 4f, paint)
+
+            paint.color = Color.WHITE
+            paint.textAlign = Paint.Align.CENTER
+            canvas.drawText(coordText, alertX, alertY + 35, paint)
+            paint.textAlign = Paint.Align.LEFT
+            paint.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+
+            bitmap
+        } catch (e: Exception) {
+            Log.e(TAG, "Error capturing map preview: ${e.message}", e)
+            null
+        }
+    }
+
+    private data class GeofenceData(
+        val points: List<GeoPoint>,
+        val type: String,
+        val color: String
+    )
+
+    private fun extractGeofenceData(data: Map<String, Any>?): GeofenceData? {
+        if (data == null) return null
+
+        val geofenceMap = data["geofence"] as? Map<*, *> ?: return null
+        val geojsonMap = geofenceMap["geojson"] as? Map<*, *> ?: return null
+        val type = geojsonMap["type"] as? String ?: return null
+        val coordinates = geojsonMap["coordinates"] ?: return null
+
+        val attributesMap = geofenceMap["attributes"] as? Map<*, *>
+        val color = attributesMap?.get("color") as? String
+        val polylineColor = attributesMap?.get("polylineColor") as? String
+        val finalColor = polylineColor ?: color ?: "#3388ff"
+
+        val points = when (type) {
+            "Point" -> {
+                val coord = coordinates as? List<*> ?: return null
+                listOf(GeoPoint(
+                    (coord[1] as? Number)?.toDouble() ?: return null,
+                    (coord[0] as? Number)?.toDouble() ?: return null
+                ))
+            }
+            "LineString" -> {
+                val coords = coordinates as? List<*> ?: return null
+                coords.mapNotNull { coordPair ->
+                    val pair = coordPair as? List<*> ?: return@mapNotNull null
+                    if (pair.size < 2) return@mapNotNull null
+                    GeoPoint(
+                        (pair[1] as? Number)?.toDouble() ?: return@mapNotNull null,
+                        (pair[0] as? Number)?.toDouble() ?: return@mapNotNull null
+                    )
+                }
+            }
+            "Polygon" -> {
+                val rings = coordinates as? List<*> ?: return null
+                val outerRing = rings.firstOrNull() as? List<*> ?: return null
+                outerRing.mapNotNull { coordPair ->
+                    val pair = coordPair as? List<*> ?: return@mapNotNull null
+                    if (pair.size < 2) return@mapNotNull null
+                    GeoPoint(
+                        (pair[1] as? Number)?.toDouble() ?: return@mapNotNull null,
+                        (pair[0] as? Number)?.toDouble() ?: return@mapNotNull null
+                    )
+                }
+            }
+            else -> return null
+        }
+
+        if (points.isEmpty()) return null
+
+        return GeofenceData(points, type, finalColor)
+    }
+
     private fun getHttpUrlForArea(area: String): String {
-        return when (area.lowercase()) {
+        val normalizedArea = area.lowercase().replace(" ", "").replace("_", "")
+
+        if (BackendConfig.isCCL()) {
+            return when (normalizedArea) {
+                "barkasayal" -> "https://barkasayal.cclai.in/api"
+                "argada" -> "https://argada.cclai.in/api"
+                "northkaranpura" -> "https://nk.cclai.in/api"
+                "bokarokargali" -> "https://bk.cclai.in/api"
+                "kathara" -> "https://kathara.cclai.in/api"
+                "giridih" -> "https://giridih.cclai.in/api"
+                "amrapali" -> "https://amrapali.cclai.in/api"
+                "magadh" -> "https://magadh.cclai.in/api"
+                "rajhara" -> "https://rajhara.cclai.in/api"
+                "kuju" -> "https://kuju.cclai.in/api"
+                "hazaribagh" -> "https://hazaribagh.cclai.in/api"
+                "rajrappa" -> "https://rajrappa.cclai.in/api"
+                "dhori" -> "https://dhori.cclai.in/api"
+                "piparwar" -> "https://piparwar.cclai.in/api"
+                else -> {
+                    Log.w(TAG, "Unknown CCL area: $area, using default")
+                    "https://barkasayal.cclai.in/api"
+                }
+            }
+        }
+
+        return when (normalizedArea) {
             "sijua", "katras" -> "http://a5va.bccliccc.in:10050"
             "kusunda" -> "http://a6va.bccliccc.in:5050"
             "bastacolla" -> "http://a9va.bccliccc.in:5050"
             "lodna" -> "http://a10va.bccliccc.in:5050"
             "govindpur" -> "http://103.208.173.163:5050"
             "barora" -> "http://103.208.173.131:5050"
-            "block 2" -> "http://103.208.173.147:5050"
-            "pb area" -> "http://103.208.173.195:5050"
-            "wj" -> "http://103.208.173.211:5050"
+            "block2" -> "http://103.208.173.147:5050"
+            "pbarea" -> "http://103.208.173.195:5050"
+            "wjarea" -> "http://103.208.173.211:5050"
             "ccwo" -> "http://103.208.173.179:5050"
-            "cv area" -> "http://103.210.88.211:5050"
+            "cvarea" -> "http://103.210.88.211:5050"
             "ej" -> "http://103.210.88.194:5050"
-            else -> "http://a5va.bccliccc.in:10050"
+            else -> {
+                Log.w(TAG, "Unknown BCCL area: $area, using default")
+                "http://a5va.bccliccc.in:10050"
+            }
         }
     }
 
@@ -1003,7 +1369,6 @@ class PdfGenerator(private val context: Context) {
                     pdfDocument.writeTo(outputStream)
                 }
 
-                // Return URI for the file
                 Uri.fromFile(file)
             }
         } catch (e: Exception) {
@@ -1011,4 +1376,8 @@ class PdfGenerator(private val context: Context) {
             null
         }
     }
+
+    // Helper property to check if event is GPS type
+    private val Event.isGpsEvent: Boolean
+        get() = type in listOf("off-route", "tamper", "overspeed")
 }

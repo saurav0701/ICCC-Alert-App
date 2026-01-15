@@ -16,11 +16,15 @@ data class CameraInfo(
     @SerializedName("longitude") val longitude: String = "",
     @SerializedName("status") val status: String = "offline",
     @SerializedName("groupId") val groupId: Int = 0,
-    @SerializedName("area") val area: String = "",
+    @SerializedName("area") private val _area: String = "",  // ✅ Changed to private
     @SerializedName("transporter") val transporter: String = "",
     @SerializedName("location") val location: String = "",
     @SerializedName("lastUpdate") val lastUpdate: String = ""
 ) {
+
+    // ✅ NEW: Computed property that automatically sets area from groupId if missing
+    val area: String
+        get() = if (_area.isNotEmpty()) _area else getAreaNameForGroup(groupId)
 
     fun isOnline(): Boolean = status == "online"
 
@@ -31,7 +35,13 @@ data class CameraInfo(
             format.timeZone = TimeZone.getTimeZone("UTC")
             format.parse(lastUpdate)
         } catch (e: Exception) {
-            null
+            // Try alternative format without 'T' and 'Z'
+            try {
+                val altFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                altFormat.parse(lastUpdate)
+            } catch (e2: Exception) {
+                null
+            }
         }
     }
 
@@ -39,10 +49,14 @@ data class CameraInfo(
         return getLastUpdateDate()?.time ?: System.currentTimeMillis()
     }
 
+    /**
+     * ✅ Get stream URL - automatically uses correct backend
+     */
     fun getStreamURL(): String {
         val serverURL = getServerURLForGroup(groupId)
         if (serverURL.isEmpty()) {
-            android.util.Log.w("CameraInfo", "No server URL configured for groupId: $groupId (camera: $name)")
+            android.util.Log.w("CameraInfo",
+                "No stream server for groupId: $groupId (${BackendConfig.getOrganization()})")
             return ""
         }
         return "$serverURL/$id/index.m3u8"
@@ -72,41 +86,89 @@ data class CameraInfo(
 
     companion object {
 
+
         fun getServerURLForGroup(groupId: Int): String {
-            return when (groupId) {
-                5 -> "http://103.208.173.131:8888"
-                6 -> "http://103.208.173.147:8888"
-                7 -> "http://103.208.173.163:8888"
-                8 -> "http://a5va.bccliccc.in:8888"  // KATRAS
-                9 -> "http://a5va.bccliccc.in:8888"  // SIJUA
-                10 -> "http://a6va.bccliccc.in:8888" // KUSUNDA
-                11 -> "http://103.208.173.195:8888"  // PB Area
-                12 -> "http://a9va.bccliccc.in:8888" // BASTACOLLA
-                13 -> "http://a10va.bccliccc.in:8888" // LODNA
-                14 -> "http://103.210.88.195:8888"   // EJ Area
-                15 -> "http://103.210.88.211:8888"   // CV Area
-                16 -> "http://103.208.173.179:8888"  // CCWO Area
-                22 -> "http://103.208.173.211:8888"  // WJ Area
-                else -> ""
+            return if (BackendConfig.isCCL()) {
+                // CCL - HTTPS streams
+                when (groupId) {
+                    1 -> "https://barkasayal.cclai.in/stream"
+                    2 -> "https://argada.cclai.in/stream"
+                    3 -> "https://nk.cclai.in/stream"
+                    4 -> "https://bk.cclai.in/stream"
+                    5 -> "https://kathara.cclai.in/stream"
+                    6 -> "https://giridih.cclai.in/stream"
+                    7 -> "https://amrapali.cclai.in/stream"
+                    8 -> "https://magadh.cclai.in/stream"
+                    9 -> "https://rajhara.cclai.in/stream"
+                    10 -> "https://kuju.cclai.in/stream"
+                    11 -> "https://hazaribagh.cclai.in/stream"
+                    12 -> "https://rajrappa.cclai.in/stream"
+                    13 -> "https://dhori.cclai.in/stream"
+                    14 -> "https://piparwar.cclai.in/stream"
+                    else -> ""
+                }
+            } else {
+                // BCCL - HTTP streams
+                when (groupId) {
+                    5 -> "http://103.208.173.131:8888"      // BARORA
+                    6 -> "http://103.208.173.147:8888"      // BLOCK2
+                    7 -> "http://103.208.173.163:8888"      // GOVINDPUR
+                    8 -> "http://a5va.bccliccc.in:8888"     // KATRAS
+                    9 -> "http://a5va.bccliccc.in:8888"     // SIJUA
+                    10 -> "http://a6va.bccliccc.in:8888"    // KUSUNDA
+                    11 -> "http://103.208.173.195:8888"     // PB Area
+                    12 -> "http://a9va.bccliccc.in:8888"    // BASTACOLLA
+                    13 -> "http://a10va.bccliccc.in:8888"   // LODNA
+                    14 -> "http://103.210.88.195:8888"      // EJ Area
+                    15 -> "http://103.210.88.211:8888"      // CV Area
+                    16 -> "http://103.208.173.179:8888"     // CCWO Area
+                    22 -> "http://103.208.173.211:8888"     // WJ Area
+                    else -> ""
+                }
             }
         }
 
+        /**
+         * ✅ Get area name for group ID based on organization
+         */
         fun getAreaNameForGroup(groupId: Int): String {
-            return when (groupId) {
-                5 -> "BARORA"
-                6 -> "BLOCK2"
-                7 -> "GOVINDPUR"
-                8 -> "KATRAS"
-                9 -> "SIJUA"
-                10 -> "KUSUNDA"
-                11 -> "PB Area"
-                12 -> "BASTACOLLA"
-                13 -> "LODNA"
-                14 -> "EJ Area"
-                15 -> "CV Area"
-                16 -> "CCWO Area"
-                22 -> "WJ Area"
-                else -> "Unknown"
+            return if (BackendConfig.isCCL()) {
+                // CCL area names
+                when (groupId) {
+                    1 -> "barka sayal"
+                    2 -> "argada"
+                    3 -> "north karanpura"
+                    4 -> "bokaro & kargali"
+                    5 -> "kathara"
+                    6 -> "giridih"
+                    7 -> "amrapali & chandragupta"
+                    8 -> "magadh & sanghmitra"
+                    9 -> "rajhara"
+                    10 -> "kuju"
+                    11 -> "hazaribagh"
+                    12 -> "rajrappa"
+                    13 -> "dhori"
+                    14 -> "piparwar"
+                    else -> "unknown"
+                }
+            } else {
+                // BCCL area names
+                when (groupId) {
+                    5 -> "barora"
+                    6 -> "block2"
+                    7 -> "govindpur"
+                    8 -> "katras"
+                    9 -> "sijua"
+                    10 -> "kusunda"
+                    11 -> "pb area"
+                    12 -> "bastacolla"
+                    13 -> "lodna"
+                    14 -> "ej area"
+                    15 -> "cv area"
+                    16 -> "ccwo area"
+                    22 -> "wj area"
+                    else -> "unknown"
+                }
             }
         }
     }

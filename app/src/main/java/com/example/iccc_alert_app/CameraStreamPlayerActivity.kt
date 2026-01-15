@@ -74,17 +74,17 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
 
     private val broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            Log.d(TAG, "📡 Broadcast received: ${intent?.action}")
+            Log.d(TAG, "Broadcast received: ${intent?.action}")
             if (intent?.action == ACTION_MEDIA_CONTROL) {
                 val controlType = intent.getIntExtra(EXTRA_CONTROL_TYPE, 0)
-                Log.d(TAG, "🎮 Control type: $controlType")
+                Log.d(TAG, "Control type: $controlType")
                 when (controlType) {
                     CONTROL_TYPE_PAUSE -> {
-                        Log.d(TAG, "⏸️ Pause command received")
+                        Log.d(TAG, "Pause command received")
                         pipController.pauseStream()
                     }
                     CONTROL_TYPE_PLAY -> {
-                        Log.d(TAG, "▶️ Play command received")
+                        Log.d(TAG, "Play command received")
                         pipController.playStream()
                     }
                 }
@@ -105,7 +105,7 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
         cameraArea = intent.getStringExtra("CAMERA_AREA") ?: ""
         streamUrl = intent.getStringExtra("STREAM_URL") ?: ""
 
-        Log.d(TAG, "🎥 Opening stream: $streamUrl")
+        Log.d(TAG, "Opening stream: $streamUrl")
 
         initializeViews()
         initializeControllers()
@@ -117,7 +117,7 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
         } else {
             registerReceiver(broadcastReceiver, intentFilter)
         }
-        Log.d(TAG, "📡 Broadcast receiver registered for PiP controls")
+        Log.d(TAG, "Broadcast receiver registered for PiP controls")
 
         if (streamUrl.isEmpty()) {
             showError("Invalid stream URL")
@@ -195,7 +195,7 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
 
         pipButton.setOnClickListener {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                Log.d(TAG, "📺 PiP button clicked")
+                Log.d(TAG, "PiP button clicked")
                 pipController.enterPipMode()
             } else {
                 Toast.makeText(this, "PiP requires Android 8.0+", Toast.LENGTH_SHORT).show()
@@ -290,12 +290,11 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
     private fun setupWebView() {
         WebViewManager.setup(webView, object : WebViewManager.WebViewCallback {
             override fun onPageLoaded() {
-                Log.d(TAG, "📄 Page loaded, waiting for stream...")
-                // Don't hide loading yet - wait for stream to actually start
+                Log.d(TAG, "Page loaded, waiting for stream...")
             }
 
             override fun onStreamStarted() {
-                Log.d(TAG, "✅ Stream started successfully")
+                Log.d(TAG, "Stream started successfully")
                 cancelTimeout()
                 hideControlsHandler.postDelayed({
                     showPlayer()
@@ -304,28 +303,28 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
             }
 
             override fun onError(description: String) {
-                Log.e(TAG, "❌ Stream error: $description")
+                Log.e(TAG, "Stream error: $description")
                 cancelTimeout()
                 showError(description)
             }
 
             override fun onTimeout() {
-                Log.w(TAG, "⏱️ Stream timeout")
-                showError("Camera might be offline. Please try again later.")
+                Log.w(TAG, "Stream timeout")
+                showError("Connection timeout. Camera may be offline.")
             }
 
             override fun onBuffering() {
-                Log.d(TAG, "🔄 Showing buffering indicator")
+                Log.d(TAG, "Showing buffering indicator")
                 runOnUiThread {
                     if (webView.visibility == View.VISIBLE && errorView.visibility == View.GONE) {
                         loadingView.visibility = View.VISIBLE
-                        loadingText.text = "🔄 Reconnecting..."
+                        loadingText.text = "Reconnecting..."
                     }
                 }
             }
 
             override fun onBufferingEnd() {
-                Log.d(TAG, "✅ Hiding buffering indicator")
+                Log.d(TAG, "Hiding buffering indicator")
                 runOnUiThread {
                     if (errorView.visibility == View.GONE) {
                         loadingView.visibility = View.GONE
@@ -337,7 +336,7 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
 
     private fun loadStream() {
         showLoading()
-        loadingText.text = "🎬 Connecting to camera..."
+        loadingText.text = "Connecting to camera..."
         startStreamTimeout()
         WebViewManager.loadHlsStream(webView, streamUrl)
     }
@@ -345,8 +344,8 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
     private fun startStreamTimeout() {
         cancelTimeout()
         timeoutRunnable = Runnable {
-            Log.w(TAG, "⏱️ Stream loading timeout after ${STREAM_TIMEOUT_MS}ms")
-            showError("Camera might be offline.\nPlease try again later.")
+            Log.w(TAG, "Stream loading timeout after ${STREAM_TIMEOUT_MS}ms")
+            showError("Connection timeout. Please try again.")
         }
         timeoutHandler.postDelayed(timeoutRunnable!!, STREAM_TIMEOUT_MS)
     }
@@ -378,7 +377,40 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
         errorView.visibility = View.VISIBLE
         webView.visibility = View.GONE
         zoomControlBar.visibility = View.GONE
-        errorTextView.text = message
+
+        // Remove ALL emojis and provide professional error messages
+        val cleanMessage = message.replace(Regex("[^\\p{L}\\p{N}\\p{P}\\p{Z}]"), "").trim()
+
+        val professionalMessage = when {
+            cleanMessage.contains("timeout", ignoreCase = true) ||
+                    cleanMessage.contains("not responding", ignoreCase = true) ->
+                "Connection Timeout\n\nThe camera is not responding. Please verify the camera is online and try again."
+
+            cleanMessage.contains("offline", ignoreCase = true) ||
+                    cleanMessage.contains("unavailable", ignoreCase = true) ->
+                "Camera Offline\n\nThis camera is currently offline. Please try again later."
+
+            cleanMessage.contains("network", ignoreCase = true) ||
+                    cleanMessage.contains("connection", ignoreCase = true) ->
+                "Network Error\n\nPlease check your internet connection and try again."
+
+            cleanMessage.contains("failed", ignoreCase = true) ->
+                "Connection Failed\n\nUnable to connect to camera stream. Please verify camera status and try again."
+
+            cleanMessage.isEmpty() ->
+                "Connection Error\n\nUnable to load camera stream. Please try again."
+
+            else -> {
+                // Clean any remaining message of emojis
+                if (cleanMessage.length > 100) {
+                    "Connection Error\n\nUnable to connect to camera. Please try again later."
+                } else {
+                    cleanMessage
+                }
+            }
+        }
+
+        errorTextView.text = professionalMessage
         topControlBar.visibility = View.VISIBLE
     }
 
@@ -449,13 +481,13 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
         pipController.onPipModeChanged(isInPictureInPictureMode, topControlBar, zoomControlBar)
 
         if (isInPictureInPictureMode) {
-            Log.d(TAG, "📺 Entered PiP - disabling heartbeat")
+            Log.d(TAG, "Entered PiP - disabling heartbeat")
             webView.evaluateJavascript(
                 "(function() { window.isPipMode = true; })();",
                 null
             )
         } else {
-            Log.d(TAG, "🖥️ Exited PiP - re-enabling heartbeat")
+            Log.d(TAG, "Exited PiP - re-enabling heartbeat")
             webView.evaluateJavascript(
                 "(function() { window.isPipMode = false; })();",
                 null
@@ -466,10 +498,10 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         if (!isInPipMode) {
-            Log.d(TAG, "⏸️ Pausing WebView (not in PiP)")
+            Log.d(TAG, "Pausing WebView (not in PiP)")
             webView.onPause()
         } else {
-            Log.d(TAG, "▶️ Keeping WebView active (in PiP)")
+            Log.d(TAG, "Keeping WebView active (in PiP)")
         }
         cancelControlsHide()
     }
@@ -477,7 +509,7 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (!isInPipMode) {
-            Log.d(TAG, "▶️ Resuming WebView")
+            Log.d(TAG, "Resuming WebView")
             webView.onResume()
         }
         if (isFullscreen) scheduleControlsHide()
@@ -486,10 +518,10 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
     override fun onStop() {
         super.onStop()
         if (!isInPipMode) {
-            Log.d(TAG, "🛑 Stopping - cleaning up WebView")
+            Log.d(TAG, "Stopping - cleaning up WebView")
             WebViewManager.cleanup(webView)
         } else {
-            Log.d(TAG, "📺 In PiP mode - keeping WebView alive")
+            Log.d(TAG, "In PiP mode - keeping WebView alive")
         }
     }
 
@@ -497,7 +529,7 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
         super.onDestroy()
         try {
             unregisterReceiver(broadcastReceiver)
-            Log.d(TAG, "📡 Broadcast receiver unregistered")
+            Log.d(TAG, "Broadcast receiver unregistered")
         } catch (e: Exception) {
             Log.e(TAG, "Error unregistering receiver: ${e.message}")
         }

@@ -10,6 +10,7 @@ import com.google.gson.reflect.TypeToken
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 object SubscriptionManager {
 
@@ -18,9 +19,19 @@ object SubscriptionManager {
     private const val KEY_CHANNELS = "channels"
     private const val KEY_EVENTS = "events"
     private const val KEY_UNREAD = "unread"
-    private const val KEY_LAST_RUNTIME_CHECK = "last_runtime_check"  // ✅ NEW
-    private const val KEY_SERVICE_STARTED_AT = "service_started_at"   // ✅ NEW
-    private const val SAVE_DELAY_MS = 500L
+    private const val KEY_LAST_RUNTIME_CHECK = "last_runtime_check"
+    private const val KEY_SERVICE_STARTED_AT = "service_started_at"
+
+    // ✅ CRITICAL: Use adaptive save intervals - frequent saves only during high load
+    private const val SAVE_DELAY_NORMAL = 1000L      // 1 second for normal operation
+    private const val SAVE_DELAY_HIGHLOAD = 2000L    // 2 seconds during high event rate
+    private const val SAVE_DELAY_CATCHUP = 1500L     // 1.5 seconds during catch-up
+    private const val HIGH_LOAD_THRESHOLD = 100       // Events in queue = high load
+
+    // ✅ NEW: Event retention with NO hard limits during live operation
+    private const val MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000L  // 7 days
+    private const val MAX_EVENTS_PER_CHANNEL_STORAGE = 10000  // Only for storage optimization after 7 days
+    private const val CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000L  // Every 6 hours
 
     private lateinit var prefs: SharedPreferences
     private lateinit var context: Context
@@ -34,8 +45,14 @@ object SubscriptionManager {
     private val saveEventsPending = AtomicBoolean(false)
     private val saveUnreadPending = AtomicBoolean(false)
 
+    // ✅ CRITICAL: Track unsaved changes count to force save when necessary
+    private val unsavedEventCount = AtomicInteger(0)
+    private const val FORCE_SAVE_THRESHOLD = 50  // Force save every 50 unsaved events
+
+    // ✅ CRITICAL: Deduplication during catch-up ONLY
     private val recentEventIds = ConcurrentHashMap.newKeySet<String>()
     private val eventTimestamps = ConcurrentHashMap<String, Long>()
+    private var inCatchUpMode = false
 
     private var wasAppKilled = false
 
@@ -43,64 +60,44 @@ object SubscriptionManager {
         context = ctx.applicationContext
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        // ✅ FIXED: Better app kill detection
         wasAppKilled = detectAppKillOrBackgroundClear()
 
         loadEventsCache()
         loadUnreadCache()
 
         if (wasAppKilled) {
-            Log.w(TAG, """
-                ⚠️ APP WAS KILLED OR CLEARED FROM BACKGROUND:
-                - Clearing recent event IDs for catch-up
-                - Sync will resume from last known sequences
-                - Server will re-deliver missed events
-            """.trimIndent())
-
+            Log.w(TAG, "⚠️ APP WAS KILLED - Clearing recent event IDs for catch-up")
             recentEventIds.clear()
             eventTimestamps.clear()
+            inCatchUpMode = true
         } else {
             buildRecentEventIds()
         }
 
-        // ✅ Mark that we're now running
         markServiceRunning()
-
         startRecentEventCleanup()
-        startRuntimeChecker()  // ✅ NEW
+        startRuntimeChecker()
+        startEventCleanup()
 
         Log.d(TAG, "SubscriptionManager initialized (wasKilled=$wasAppKilled, recentIds=${recentEventIds.size})")
     }
 
-    // ✅ FIXED: Detect both app kills AND background clears
     private fun detectAppKillOrBackgroundClear(): Boolean {
         val lastRuntimeCheck = prefs.getLong(KEY_LAST_RUNTIME_CHECK, 0L)
         val serviceStartedAt = prefs.getLong(KEY_SERVICE_STARTED_AT, 0L)
         val now = System.currentTimeMillis()
 
-        // If service was marked as started but it's been >2 minutes since last runtime check
-        // this means app was killed or cleared from background
         if (serviceStartedAt > 0 && lastRuntimeCheck > 0) {
             val timeSinceLastCheck = now - lastRuntimeCheck
-
-            if (timeSinceLastCheck > 2 * 60 * 1000) {  // 2 minutes
-                Log.w(TAG, """
-                    🔴 DETECTED: App was killed or cleared from background
-                    - Service started at: ${serviceStartedAt}
-                    - Last runtime check: ${lastRuntimeCheck} 
-                    - Gap: ${timeSinceLastCheck / 1000}s
-                """.trimIndent())
-
-                // Clear the service started flag since we're restarting
+            if (timeSinceLastCheck > 2 * 60 * 1000) {
+                Log.w(TAG, "🔴 DETECTED: App was killed (gap: ${timeSinceLastCheck / 1000}s)")
                 prefs.edit().remove(KEY_SERVICE_STARTED_AT).apply()
                 return true
             }
         }
-
         return false
     }
 
-    // ✅ NEW: Mark that service is actively running
     private fun markServiceRunning() {
         val now = System.currentTimeMillis()
         prefs.edit()
@@ -109,15 +106,12 @@ object SubscriptionManager {
             .apply()
     }
 
-    // ✅ NEW: Periodically update runtime check to detect kills
     private fun startRuntimeChecker() {
         handler.postDelayed(object : Runnable {
             override fun run() {
                 prefs.edit()
                     .putLong(KEY_LAST_RUNTIME_CHECK, System.currentTimeMillis())
                     .apply()
-
-                // Check every 60 seconds
                 handler.postDelayed(this, 60 * 1000)
             }
         }, 60 * 1000)
@@ -172,6 +166,41 @@ object SubscriptionManager {
         }, 60 * 1000)
     }
 
+    // ✅ CRITICAL: Only clean up events older than 7 days, never drop recent events
+    private fun startEventCleanup() {
+        handler.postDelayed(object : Runnable {
+            override fun run() {
+                val now = System.currentTimeMillis()
+                val cutoffTime = now - MAX_EVENT_AGE_MS
+                var totalCleaned = 0
+
+                eventsCache.forEach { (channelId, events) ->
+                    synchronized(events) {
+                        val initialSize = events.size
+
+                        // Remove events older than 7 days ONLY
+                        events.removeAll { event -> event.timestamp < cutoffTime }
+
+                        val cleaned = initialSize - events.size
+                        if (cleaned > 0) {
+                            totalCleaned += cleaned
+                            Log.d(TAG, "🗑️ Cleaned $cleaned events older than 7 days from $channelId")
+                        }
+                    }
+                }
+
+                if (totalCleaned > 0) {
+                    // Mark for save on next cycle
+                    unsavedEventCount.addAndGet(totalCleaned)
+                    scheduleSaveEventsCache()
+                    Log.i(TAG, "🗑️ Event cleanup: removed $totalCleaned old events")
+                }
+
+                handler.postDelayed(this, CLEANUP_INTERVAL_MS)
+            }
+        }, CLEANUP_INTERVAL_MS)
+    }
+
     fun getSubscriptions(): List<Channel> {
         val json = prefs.getString(KEY_CHANNELS, "[]")
         val type = object : TypeToken<List<Channel>>() {}.type
@@ -213,6 +242,7 @@ object SubscriptionManager {
 
             ChannelSyncState.clearChannel(channelId)
 
+            unsavedEventCount.set(0)
             scheduleSaveEventsCache()
             scheduleSaveUnreadCache()
             notifyListeners()
@@ -250,44 +280,65 @@ object SubscriptionManager {
         val timestamp = event.timestamp
         val now = System.currentTimeMillis()
 
-        // Check if event already EXISTS in cache
-        val channelEvents = eventsCache[channelId]
-        if (channelEvents != null) {
-            synchronized(channelEvents) {
-                if (channelEvents.any { it.id == eventId }) {
-                    Log.d(TAG, "⏭️ Event $eventId already in cache")
-                    return false
+        // ✅ CRITICAL: Check for duplicates only during catch-up mode
+        if (inCatchUpMode) {
+            // Check if event already exists in cache
+            val channelEvents = eventsCache[channelId]
+            if (channelEvents != null) {
+                synchronized(channelEvents) {
+                    if (channelEvents.any { it.id == eventId }) {
+                        return false
+                    }
                 }
             }
-        }
 
-        // Check recent IDs
-        val lastSeenTime = eventTimestamps[eventId]
-        if (lastSeenTime != null && (now - lastSeenTime) < 5 * 60 * 1000) {
-            Log.d(TAG, "⏭️ Event $eventId seen recently")
-            return false
+            // Check recent IDs
+            val lastSeenTime = eventTimestamps[eventId]
+            if (lastSeenTime != null && (now - lastSeenTime) < 5 * 60 * 1000) {
+                return false
+            }
         }
+        // ✅ LIVE MODE: Backend already deduplicates, so just add if not in cache
 
         val events = eventsCache.computeIfAbsent(channelId) {
             java.util.Collections.synchronizedList(mutableListOf())
         }
 
         synchronized(events) {
+            // ✅ CRITICAL: Always check if already in cache to avoid duplicates within single call
+            if (events.any { it.id == eventId }) {
+                return false
+            }
             events.add(0, event)
         }
 
+        // ✅ Track for deduplication
         recentEventIds.add(eventId)
         eventTimestamps[eventId] = timestamp
 
-        Log.d(TAG, "✅ Added event $eventId to $channelId (total: ${events.size})")
-
         unreadCountCache.compute(channelId) { _, count -> (count ?: 0) + 1 }
 
-        scheduleSaveEventsCache()
+        // ✅ CRITICAL: Increment unsaved count
+        unsavedEventCount.incrementAndGet()
+
+        // ✅ CRITICAL: Force save if too many unsaved events
+        if (unsavedEventCount.get() >= FORCE_SAVE_THRESHOLD) {
+            Log.d(TAG, "⚠️ Force saving: ${unsavedEventCount.get()} unsaved events")
+            saveEventsCacheNow()
+            unsavedEventCount.set(0)
+        } else {
+            scheduleSaveEventsCache()
+        }
+
         scheduleSaveUnreadCache()
         handler.post { notifyListeners() }
 
         return true
+    }
+
+    fun setCatchUpMode(enabled: Boolean) {
+        inCatchUpMode = enabled
+        Log.d(TAG, "Catch-up mode: $enabled")
     }
 
     fun getDetailedStorageStats(): Map<String, Any> {
@@ -318,22 +369,32 @@ object SubscriptionManager {
         return mapOf(
             "totalEvents" to totalEvents,
             "channels" to eventsCache.size,
+            "unsavedEvents" to unsavedEventCount.get(),
             "oldestEventAge" to if (oldestTimestamp < Long.MAX_VALUE) {
                 "${(now - oldestTimestamp) / (24 * 60 * 60 * 1000)} days"
             } else "N/A",
             "newestEventAge" to if (newestTimestamp > 0) {
                 "${(now - newestTimestamp) / (60 * 1000)} minutes"
             } else "N/A",
+            "catchUpMode" to inCatchUpMode,
             "channelDetails" to channelStats
         )
     }
 
+    // ✅ CRITICAL: Adaptive save delays based on load
     private fun scheduleSaveEventsCache() {
         if (saveEventsPending.compareAndSet(false, true)) {
+            // ✅ Use unsaved count as indicator of load
+            val delay = when {
+                inCatchUpMode -> SAVE_DELAY_CATCHUP
+                unsavedEventCount.get() > HIGH_LOAD_THRESHOLD -> SAVE_DELAY_HIGHLOAD
+                else -> SAVE_DELAY_NORMAL
+            }
+
             handler.postDelayed({
                 saveEventsPending.set(false)
                 saveEventsCacheNow()
-            }, SAVE_DELAY_MS)
+            }, delay)
         }
     }
 
@@ -342,7 +403,7 @@ object SubscriptionManager {
             handler.postDelayed({
                 saveUnreadPending.set(false)
                 saveUnreadCacheNow()
-            }, SAVE_DELAY_MS)
+            }, SAVE_DELAY_NORMAL)
         }
     }
 
@@ -356,12 +417,18 @@ object SubscriptionManager {
             }
 
             val json = gson.toJson(snapshot)
-            prefs.edit().putString(KEY_EVENTS, json).commit()
+            val success = prefs.edit().putString(KEY_EVENTS, json).commit()
 
-            val totalEvents = snapshot.values.sumOf { it.size }
-            Log.d(TAG, "💾 Saved $totalEvents events across ${snapshot.size} channels")
+            if (success) {
+                val totalEvents = snapshot.values.sumOf { it.size }
+                Log.d(TAG, "💾 Saved $totalEvents events across ${snapshot.size} channels")
+                unsavedEventCount.set(0)
+            } else {
+                Log.e(TAG, "❌ Failed to save events")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error saving events cache: ${e.message}", e)
+            // Retry on next cycle
         }
     }
 
@@ -435,12 +502,11 @@ object SubscriptionManager {
         saveEventsCacheNow()
         saveUnreadCacheNow()
 
-        // ✅ Update runtime check on force save
         prefs.edit()
             .putLong(KEY_LAST_RUNTIME_CHECK, System.currentTimeMillis())
             .apply()
 
-        Log.d(TAG, "Force saved all data")
+        Log.d(TAG, "Force saved all data (unsaved: ${unsavedEventCount.get()})")
     }
 
     fun addListener(listener: () -> Unit) {
@@ -472,5 +538,20 @@ object SubscriptionManager {
         return eventsCache.values.sumOf {
             synchronized(it) { it.size }
         }
+    }
+
+    fun clearAllEvents() {
+        eventsCache.clear()
+        unreadCountCache.clear()
+        recentEventIds.clear()
+        eventTimestamps.clear()
+        unsavedEventCount.set(0)
+
+        handler.removeCallbacksAndMessages(null)
+        saveEventsCacheNow()
+        saveUnreadCacheNow()
+
+        Log.d(TAG, "✅ Cleared all events and unread counts")
+        notifyListeners()
     }
 }

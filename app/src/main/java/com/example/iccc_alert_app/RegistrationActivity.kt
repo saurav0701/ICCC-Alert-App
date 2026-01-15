@@ -8,31 +8,33 @@ import androidx.appcompat.app.AppCompatActivity
 import com.example.iccc_alert_app.auth.AuthManager
 import com.example.iccc_alert_app.auth.RegistrationRequest
 
+
 class RegistrationActivity : AppCompatActivity() {
 
     private lateinit var nameInput: EditText
     private lateinit var phoneInput: EditText
     private lateinit var areaSpinner: Spinner
     private lateinit var designationInput: EditText
-    private lateinit var organisationSpinner: Spinner
     private lateinit var registerButton: Button
     private lateinit var loginText: TextView
     private lateinit var progressBar: ProgressBar
 
-    // ✅ Areas will be dynamically loaded based on organization
     private var areas = listOf<String>()
     private var areaValues = listOf<String>()
-    private val organisationOptions = listOf("BCCL", "CCL")
+    private val ORGANIZATION = "CCL"  // ✅ Fixed to CCL
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_registration)
 
-        supportActionBar?.title = "Register"
+        supportActionBar?.title = "Register - CCL"
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
+        // ✅ Set organization to CCL immediately
+        BackendConfig.setOrganization(ORGANIZATION)
+
         initializeViews()
-        setupOrganisationSpinner()
+        loadCCLAreas()
         setupListeners()
     }
 
@@ -41,48 +43,19 @@ class RegistrationActivity : AppCompatActivity() {
         phoneInput = findViewById(R.id.phone_input)
         areaSpinner = findViewById(R.id.area_spinner)
         designationInput = findViewById(R.id.designation_input)
-        organisationSpinner = findViewById(R.id.working_for_spinner)
         registerButton = findViewById(R.id.register_button)
         loginText = findViewById(R.id.login_text)
         progressBar = findViewById(R.id.progress_bar)
     }
 
-    private fun setupOrganisationSpinner() {
-        // Setup Organisation Spinner
-        val organisationAdapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_item,
-            organisationOptions
-        )
-        organisationAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        organisationSpinner.adapter = organisationAdapter
-
-        // ✅ Load areas when organization is selected
-        organisationSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                val selectedOrg = organisationOptions[position]
-                loadAreasForOrganization(selectedOrg)
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
-
-        // Load initial areas for BCCL (default)
-        loadAreasForOrganization("BCCL")
-    }
-
     /**
-     * ✅ Load areas dynamically based on selected organization
+     * ✅ Load CCL areas only
      */
-    private fun loadAreasForOrganization(organization: String) {
-        // Temporarily set organization to get correct areas
-        BackendConfig.setOrganization(organization)
-
+    private fun loadCCLAreas() {
         val areasData = AvailableChannels.getAreas()
         areas = areasData.map { it.second } // Display names
         areaValues = areasData.map { it.first } // Internal names
 
-        // Setup Area Spinner with new areas
         val areaAdapter = ArrayAdapter(
             this,
             android.R.layout.simple_spinner_item,
@@ -93,7 +66,7 @@ class RegistrationActivity : AppCompatActivity() {
 
         Toast.makeText(
             this,
-            "Loaded ${areas.size} areas for $organization",
+            "Loaded ${areas.size} CCL areas",
             Toast.LENGTH_SHORT
         ).show()
     }
@@ -146,17 +119,13 @@ class RegistrationActivity : AppCompatActivity() {
         val areaIndex = areaSpinner.selectedItemPosition
         val area = areaValues[areaIndex]
         val designation = designationInput.text.toString().trim()
-        val organisation = organisationSpinner.selectedItem.toString()
-
-        // ✅ Set organization BEFORE making API call
-        BackendConfig.setOrganization(organisation)
 
         val request = RegistrationRequest(
             name = name,
             phone = phone,
             area = area,
             designation = designation,
-            workingFor = organisation
+            workingFor = ORGANIZATION  // ✅ Always CCL
         )
 
         setLoading(true)
@@ -195,7 +164,6 @@ class RegistrationActivity : AppCompatActivity() {
         phoneInput.isEnabled = !loading
         areaSpinner.isEnabled = !loading
         designationInput.isEnabled = !loading
-        organisationSpinner.isEnabled = !loading
         loginText.isEnabled = !loading
     }
 

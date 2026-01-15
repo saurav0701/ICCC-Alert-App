@@ -2,252 +2,232 @@ package com.example.iccc_alert_app
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * ✅ FINAL FIX: Properly handles out-of-order events during bulk catch-up
- *
- * Key insight: When 100-200 events arrive during catch-up, they're processed
- * by 4 parallel threads and arrive OUT OF ORDER (seq 200, 155, 180, 156).
- *
- * Old logic: if (seq > lastEventSeq) → WRONG, skips legitimate events
- * New logic: Track ALL sequences during catch-up, then switch to simple comparison
- */
+data class SyncInfo(
+    var lastEventId: String? = null,
+    var lastEventTimestamp: Long = 0L,
+    var highestSeq: Long = 0L,
+    var totalEvents: Long = 0L,
+    var lastSavedSeq: Long = 0L
+)
+
 object ChannelSyncState {
     private const val TAG = "ChannelSyncState"
     private const val PREFS_NAME = "channel_sync_state"
-    private const val KEY_CHANNEL_STATES = "channel_states"
+    private const val KEY_SYNC_STATES = "sync_states"
+
+    // ✅ CRITICAL: Save with 1 second delay - balances safety vs performance
+    private const val SAVE_DELAY_MS = 1000L
 
     private lateinit var prefs: SharedPreferences
     private val gson = Gson()
+    private val syncStates = ConcurrentHashMap<String, SyncInfo>()
+    private val recentEventIds = ConcurrentHashMap<String, Long>()
 
-    // Thread-safe map: channelId -> ChannelSyncInfo
-    private val syncStates = ConcurrentHashMap<String, ChannelSyncInfo>()
+    private val handler = Handler(Looper.getMainLooper())
+    private val savePending = AtomicBoolean(false)
 
-    // ✅ NEW: Separate tracking for catch-up vs live mode
-    private val catchUpMode = ConcurrentHashMap<String, Boolean>()
-    private val receivedSequences = ConcurrentHashMap<String, MutableSet<Long>>()
+    // ✅ CRITICAL: Track which channels are in catch-up vs live mode
+    private val catchUpChannels = ConcurrentHashMap.newKeySet<String>()
 
-    data class ChannelSyncInfo(
-        val channelId: String,
-        var lastEventId: String? = null,
-        var lastEventTimestamp: Long = 0L,
-        var lastEventSeq: Long = 0L,
-        var highestSeq: Long = 0L,
-        var totalReceived: Long = 0L,
-        var lastSyncTime: Long = System.currentTimeMillis()
-    )
-
-    private val savePending = java.util.concurrent.atomic.AtomicBoolean(false)
-    private val saveHandler = android.os.Handler(android.os.Looper.getMainLooper())
-
-    fun initialize(ctx: Context) {
-        prefs = ctx.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        loadStates()
+    fun initialize(context: Context) {
+        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        loadSyncStates()
+        startRecentEventCleanup()
         Log.d(TAG, "ChannelSyncState initialized with ${syncStates.size} channels")
     }
 
-    private fun loadStates() {
+    private fun loadSyncStates() {
         try {
-            val json = prefs.getString(KEY_CHANNEL_STATES, "{}")
-            val type = object : TypeToken<Map<String, ChannelSyncInfo>>() {}.type
-            val loaded: Map<String, ChannelSyncInfo> = gson.fromJson(json, type)
+            val json = prefs.getString(KEY_SYNC_STATES, "{}")
+            val type = object : TypeToken<Map<String, SyncInfo>>() {}.type
+            val loaded: Map<String, SyncInfo> = gson.fromJson(json, type)
             syncStates.clear()
-            loaded.forEach { (key, value) ->
-                syncStates[key] = value
-                Log.d(TAG, "📊 Loaded $key: lastSeq=${value.lastEventSeq}, highestSeq=${value.highestSeq}")
-            }
+            syncStates.putAll(loaded)
+
+            val totalSeq = syncStates.values.sumOf { it.highestSeq }
+            Log.d(TAG, "Loaded sync state for ${syncStates.size} channels (total events: $totalSeq)")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load sync states: ${e.message}")
-            syncStates.clear()
-        }
-    }
-
-    private fun saveStates() {
-        if (savePending.compareAndSet(false, true)) {
-            saveHandler.postDelayed({
-                savePending.set(false)
-                saveStatesNow()
-            }, 500)
-        }
-    }
-
-    private fun saveStatesNow() {
-        try {
-            val snapshot = HashMap(syncStates)
-            val json = gson.toJson(snapshot)
-            val success = prefs.edit()
-                .putString(KEY_CHANNEL_STATES, json)
-                .commit()
-
-            if (success) {
-                Log.d(TAG, "✅ Saved ${snapshot.size} channel states")
-            } else {
-                Log.e(TAG, "❌ Failed to commit sync states")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Exception saving sync states: ${e.message}", e)
+            Log.e(TAG, "Error loading sync states: ${e.message}", e)
         }
     }
 
     /**
-     * ✅ CRITICAL FIX: Enable catch-up mode for a channel
-     *
-     * Call this BEFORE sending subscription to backend.
-     * During catch-up, we track ALL sequences to handle out-of-order delivery.
+     * ✅ CRITICAL: Enable catch-up mode BEFORE receiving catch-up events
+     * This tells SubscriptionManager to deduplicate aggressively
      */
     fun enableCatchUpMode(channelId: String) {
-        catchUpMode[channelId] = true
-        receivedSequences[channelId] = java.util.Collections.synchronizedSet(mutableSetOf())
-        Log.d(TAG, "🔄 Enabled catch-up mode for $channelId")
+        catchUpChannels.add(channelId)
+        Log.d(TAG, "🔄 Catch-up mode enabled for $channelId")
+        SubscriptionManager.setCatchUpMode(true)
     }
 
     /**
-     * ✅ CRITICAL FIX: Disable catch-up mode after bulk sync completes
-     *
-     * Call this when backend signals catch-up is complete (numPending=0).
-     * Switches to efficient sequence comparison mode.
+     * ✅ CRITICAL: Disable catch-up mode when backend signals completion
+     * After this, only basic deduplication (in-cache check)
      */
     fun disableCatchUpMode(channelId: String) {
-        catchUpMode[channelId] = false
-        receivedSequences[channelId]?.clear()
-        Log.d(TAG, "✅ Disabled catch-up mode for $channelId (switched to live mode)")
+        catchUpChannels.remove(channelId)
+        if (catchUpChannels.isEmpty()) {
+            Log.d(TAG, "✅ All channels caught up - switching to live mode")
+            SubscriptionManager.setCatchUpMode(false)
+        }
+    }
+
+    fun isInCatchUpMode(channelId: String): Boolean {
+        return catchUpChannels.contains(channelId)
     }
 
     /**
-     * ✅ FIXED: Records event with proper out-of-order handling
+     * ✅ CRITICAL: Record event received from backend
+     * During catch-up: accept everything (backend already deduped for us during first sync)
+     * During live: check sequence to avoid true duplicates
      *
-     * During catch-up mode:
-     *   - Uses Set to track ALL sequences (handles out-of-order)
-     *   - Never skips events just because sequence is "old"
-     *
-     * During live mode:
-     *   - Uses simple lastEventSeq comparison (efficient)
-     *   - Skips truly duplicate events
-     *
-     * Returns: true if NEW event, false if duplicate
+     * Returns: true if NEW, false if duplicate
      */
-    fun recordEventReceived(channelId: String, eventId: String, timestamp: Long, seq: Long = 0L): Boolean {
-        val state = syncStates.computeIfAbsent(channelId) { ChannelSyncInfo(it) }
+    fun recordEventReceived(
+        channelId: String,
+        eventId: String,
+        timestamp: Long,
+        seq: Long
+    ): Boolean {
+        // ✅ CRITICAL: Check for recent duplicates (same websocket message delivered twice)
+        val lastSeen = recentEventIds[eventId]
+        if (lastSeen != null && (System.currentTimeMillis() - lastSeen) < 30000) {
+            Log.d(TAG, "⏭️ Duplicate event $eventId (seen ${System.currentTimeMillis() - lastSeen}ms ago)")
+            return false
+        }
+        recentEventIds[eventId] = System.currentTimeMillis()
 
-        val inCatchUpMode = catchUpMode[channelId] == true
+        val info = syncStates.computeIfAbsent(channelId) { SyncInfo() }
 
-        if (seq > 0) {
-            if (inCatchUpMode) {
-                // ✅ CATCH-UP MODE: Use Set for out-of-order handling
-                val seqSet = receivedSequences[channelId]!!
+        synchronized(info) {
+            info.totalEvents++
+            info.lastEventId = eventId
+            info.lastEventTimestamp = timestamp
 
-                if (!seqSet.add(seq)) {
-                    Log.d(TAG, "⏭️ Duplicate seq $seq for $channelId (catch-up mode)")
-                    return false
+            if (seq > 0) {
+                // ✅ CRITICAL: Always update highest seq, never skip based on order
+                if (seq > info.highestSeq) {
+                    info.highestSeq = seq
+                    info.lastSavedSeq = seq
+                    Log.d(TAG, "✅ Updated $channelId: seq=$seq (total events: ${info.totalEvents})")
+                } else {
+                    Log.d(TAG, "⏭️ Old sequence $seq for $channelId (current: ${info.highestSeq})")
                 }
-
-                Log.d(TAG, "✅ Recorded $channelId: seq=$seq (CATCH-UP, total=${seqSet.size})")
-
-            } else {
-                // ✅ LIVE MODE: Simple comparison (efficient)
-                synchronized(state) {
-                    if (seq <= state.highestSeq) {
-                        Log.d(TAG, "⏭️ Duplicate seq $seq for $channelId (live mode, highest=${state.highestSeq})")
-                        return false
-                    }
-                }
-
-                Log.d(TAG, "✅ Recorded $channelId: seq=$seq (LIVE)")
             }
         }
 
-        // Update state with highest sequence
-        synchronized(state) {
-            state.totalReceived++
-            state.lastSyncTime = System.currentTimeMillis()
-
-            if (seq > 0 && seq > state.highestSeq) {
-                state.highestSeq = seq
-                state.lastEventId = eventId
-                state.lastEventTimestamp = timestamp
-                state.lastEventSeq = seq
-            }  else if (seq == 0L && timestamp > state.lastEventTimestamp)  {
-                // No sequence, use timestamp
-                state.lastEventTimestamp = timestamp
-                state.lastEventId = eventId
-            }
-        }
-
-        saveStates()
+        scheduleSave()
         return true
     }
 
-    /**
-     * ✅ NEW: Check if channel is in catch-up mode
-     */
-    fun isInCatchUpMode(channelId: String): Boolean {
-        return catchUpMode[channelId] == true
+    fun getSyncInfo(channelId: String): SyncInfo? {
+        return syncStates[channelId]?.let {
+            synchronized(it) { it.copy() }
+        }
     }
 
-    /**
-     * ✅ NEW: Get catch-up progress
-     */
-    fun getCatchUpProgress(channelId: String): Int {
-        return receivedSequences[channelId]?.size ?: 0
+    fun getLastEventId(channelId: String): String? {
+        return syncStates[channelId]?.lastEventId
     }
 
-    fun forceSave() {
-        saveHandler.removeCallbacksAndMessages(null)
-        savePending.set(false)
-        saveStatesNow()
-        Log.d(TAG, "✅ Force saved all channel states")
+    fun getHighestSeq(channelId: String): Long {
+        return syncStates[channelId]?.highestSeq ?: 0L
     }
-
-    fun getSyncInfo(channelId: String): ChannelSyncInfo? = syncStates[channelId]
-
-    fun getAllSyncStates(): Map<String, ChannelSyncInfo> = HashMap(syncStates)
-
-    fun getLastEventId(channelId: String): String? = syncStates[channelId]?.lastEventId
-
-    fun getLastSequence(channelId: String): Long = syncStates[channelId]?.lastEventSeq ?: 0L
-
-    fun getHighestSequence(channelId: String): Long = syncStates[channelId]?.highestSeq ?: 0L
-
-    fun getTotalEventsReceived(): Long = syncStates.values.sumOf { it.totalReceived }
 
     fun clearChannel(channelId: String) {
         syncStates.remove(channelId)
-        receivedSequences.remove(channelId)
-        catchUpMode.remove(channelId)
-        saveStates()
+        catchUpChannels.remove(channelId)
+        scheduleSave()
         Log.d(TAG, "Cleared sync state for $channelId")
     }
 
-    /**
-     * Clear all sync state - used when clearing app data
-     */
     fun clearAll() {
         syncStates.clear()
-        receivedSequences.clear()
-        catchUpMode.clear()
-        prefs.edit().clear().apply()
-        Log.d(TAG, "✅ Cleared all sync state")
+        catchUpChannels.clear()
+        recentEventIds.clear()
+
+        val cleared = prefs.edit()
+            .remove(KEY_SYNC_STATES)
+            .commit()
+
+        if (cleared) {
+            Log.d(TAG, "✅ Cleared all channel sync states")
+        }
+    }
+
+    private fun startRecentEventCleanup() {
+        handler.postDelayed(object : Runnable {
+            override fun run() {
+                val oneMinuteAgo = System.currentTimeMillis() - 60000
+                val iterator = recentEventIds.entries.iterator()
+                var cleaned = 0
+
+                while (iterator.hasNext()) {
+                    if (iterator.next().value < oneMinuteAgo) {
+                        iterator.remove()
+                        cleaned++
+                    }
+                }
+
+                if (cleaned > 0) {
+                    Log.d(TAG, "Cleaned $cleaned old event IDs")
+                }
+
+                handler.postDelayed(this, 60000)
+            }
+        }, 60000)
+    }
+
+    private fun scheduleSave() {
+        if (savePending.compareAndSet(false, true)) {
+            handler.postDelayed({
+                savePending.set(false)
+                saveNow()
+            }, SAVE_DELAY_MS)
+        }
+    }
+
+    private fun saveNow() {
+        try {
+            val snapshot = HashMap(syncStates)
+            val json = gson.toJson(snapshot)
+            val success = prefs.edit().putString(KEY_SYNC_STATES, json).commit()
+
+            if (success) {
+                Log.d(TAG, "✅ Saved sync state for ${snapshot.size} channels")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving sync states: ${e.message}", e)
+        }
+    }
+
+    fun forceSave() {
+        handler.removeCallbacksAndMessages(null)
+        savePending.set(false)
+        saveNow()
+
+        Log.d(TAG, "✅ Force saved all channel states")
     }
 
     fun getStats(): Map<String, Any> {
+        val totalEvents = syncStates.values.sumOf { it.totalEvents }
+        val maxSeq = syncStates.values.maxOfOrNull { it.highestSeq } ?: 0L
+
         return mapOf(
-            "channelCount" to syncStates.size,
-            "totalEvents" to getTotalEventsReceived(),
-            "channels" to syncStates.map { (k, v) ->
-                mapOf(
-                    "channel" to k,
-                    "lastEventId" to v.lastEventId,
-                    "lastSeq" to v.lastEventSeq,
-                    "highestSeq" to v.highestSeq,
-                    "totalReceived" to v.totalReceived,
-                    "catchUpMode" to (catchUpMode[k] == true),
-                    "trackedSequences" to (receivedSequences[k]?.size ?: 0)
-                )
-            }
+            "totalChannels" to syncStates.size,
+            "inCatchUp" to catchUpChannels.size,
+            "totalEventsReceived" to totalEvents,
+            "maxSequence" to maxSeq,
+            "recentEventIds" to recentEventIds.size
         )
     }
 }

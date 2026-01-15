@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
@@ -14,6 +16,7 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.widget.SearchView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -33,6 +36,7 @@ class CameraStreamsActivity : BaseDrawerActivity() {
     private lateinit var areaSpinner: Spinner
     private lateinit var statsTextView: TextView
     private lateinit var adapter: CameraListAdapter
+    private val handler = Handler(Looper.getMainLooper())
 
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -97,8 +101,35 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         )
 
         swipeRefreshLayout.setOnRefreshListener {
-            Log.d(TAG, "🔄 Manual refresh triggered")
-            refreshUI()
+            Log.d(TAG, "🔄 Pull-to-refresh: Requesting latest camera data from backend")
+
+            // Show loading message
+            statsTextView.text = "Loading latest camera data..."
+
+            // Force refresh from backend
+            CameraManager.forceRefresh()
+
+            // Wait for data to update, then refresh UI
+            handler.postDelayed({
+                val totalCameras = CameraManager.getAllCameras().size
+                val totalAreas = CameraManager.getAreas().size
+
+                if (totalCameras > 0) {
+                    Toast.makeText(
+                        this,
+                        "Loaded $totalCameras cameras from $totalAreas areas",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    Toast.makeText(
+                        this,
+                        "No camera data available. Please try again.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+                refreshUI()
+            }, 2000) // Give backend time to fetch data
         }
     }
 
@@ -108,11 +139,13 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         if (availableAreas.isEmpty()) {
             Log.w(TAG, "⚠️ No areas available - waiting for camera data")
             areaSpinner.visibility = View.GONE
+            statsTextView.text = "Pull down to load camera data"
             return
         }
 
         areaSpinner.visibility = View.VISIBLE
 
+        // Create display names (capitalized) but keep lowercase for internal use
         areas = availableAreas.map { area ->
             area.replaceFirstChar { char ->
                 if (char.isLowerCase()) char.titlecase() else char.toString()
@@ -120,6 +153,7 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         }
 
         Log.d(TAG, "📍 Setting up spinner with ${areas.size} areas: $areas")
+        Log.d(TAG, "📍 Current area (lowercase): $currentArea")
 
         val spinnerAdapter = ArrayAdapter(
             this,
@@ -129,14 +163,27 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         areaSpinner.adapter = spinnerAdapter
 
-        val currentIndex = areas.indexOfFirst { it.equals(currentArea, ignoreCase = true) }
+        // ✅ FIX: Case-insensitive matching
+        val currentIndex = areas.indexOfFirst {
+            it.equals(currentArea, ignoreCase = true)
+        }
+
         if (currentIndex >= 0) {
             areaSpinner.setSelection(currentIndex, false)
-            Log.d(TAG, "📍 Set spinner to position $currentIndex: ${areas[currentIndex]}")
+            Log.d(TAG, "✅ Set spinner to position $currentIndex: ${areas[currentIndex]}")
+        } else {
+            Log.w(TAG, "⚠️ Could not find area '$currentArea' in available areas")
+            // Set to first area as fallback
+            if (areas.isNotEmpty()) {
+                currentArea = areas[0].lowercase()
+                areaSpinner.setSelection(0, false)
+                saveLastSelectedArea(currentArea)
+            }
         }
 
         areaSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                // Convert display name back to lowercase for internal use
                 val selectedArea = areas[position].lowercase()
 
                 if (selectedArea != currentArea) {
@@ -146,6 +193,7 @@ class CameraStreamsActivity : BaseDrawerActivity() {
                     loadCamerasForArea(currentArea)
                 } else if (isFirstLoad) {
                     isFirstLoad = false
+                    Log.d(TAG, "📍 Initial load for area: $currentArea")
                     loadCamerasForArea(currentArea)
                 }
             }
@@ -173,13 +221,15 @@ class CameraStreamsActivity : BaseDrawerActivity() {
                 }
 
                 if (!CameraManager.hasData()) {
-                    Log.d(TAG, "⏳ No camera data yet - showing waiting message")
+                    Log.d(TAG, "⏳ No camera data yet")
                     showWaitingForData()
                     swipeRefreshLayout.isRefreshing = false
                     return@launch
                 }
 
-                if (areas.isEmpty()) {
+                // ✅ Setup spinner if not already done or if areas changed
+                val availableAreas = CameraManager.getAreas()
+                if (areas.isEmpty() || areas.size != availableAreas.size) {
                     setupAreaSpinner()
                 }
 
@@ -217,7 +267,10 @@ class CameraStreamsActivity : BaseDrawerActivity() {
                     swipeRefreshLayout.isRefreshing = false
 
                     if (cameras.isEmpty()) {
-                        showEmptyView("No cameras found in $area")
+                        val displayArea = area.replaceFirstChar {
+                            if (it.isLowerCase()) it.titlecase() else it.toString()
+                        }
+                        showEmptyView("No cameras found in $displayArea")
                     } else {
                         hideEmptyView()
                         adapter.updateCameras(cameras)
@@ -237,9 +290,18 @@ class CameraStreamsActivity : BaseDrawerActivity() {
 
     private fun updateStatistics(area: String) {
         val stats = CameraManager.getAreaStatistics(area)
-        val text = "Total: ${stats.total} | Online: ${stats.online} | Offline: ${stats.offline}"
+        val allStats = CameraManager.getStatistics()
+
+        // ✅ FIX: Capitalize area name for display
+        val displayArea = area.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase() else it.toString()
+        }
+
+        val text = "$displayArea: ${stats.total} cameras (${stats.online} online) | " +
+                "Total: ${allStats.totalCameras} cameras across ${CameraManager.getAreas().size} areas"
+
         statsTextView.text = text
-        Log.d(TAG, "📊 Stats for $area: $text")
+        Log.d(TAG, "📊 Stats: $text")
     }
 
     private fun openCameraStream(camera: CameraInfo) {
@@ -252,19 +314,21 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         intent.putExtra("STREAM_URL", camera.getStreamURL())
         startActivity(intent)
 
-        // Add slide animation
         overridePendingTransition(android.R.anim.slide_in_left, android.R.anim.slide_out_right)
     }
 
     private fun showWaitingForData() {
         recyclerView.visibility = View.GONE
         emptyView.visibility = View.VISIBLE
-        statsTextView.text = "⏳ Waiting for camera data..."
+        statsTextView.text = "Pull down to load camera data"
     }
 
     private fun showEmptyView(message: String = "No cameras found") {
         recyclerView.visibility = View.GONE
         emptyView.visibility = View.VISIBLE
+
+        // Update the empty view text if you have a TextView in your empty view layout
+        // findViewById<TextView>(R.id.empty_message)?.text = message
     }
 
     private fun hideEmptyView() {
@@ -277,6 +341,7 @@ class CameraStreamsActivity : BaseDrawerActivity() {
             .edit()
             .putString(PREF_LAST_AREA, area)
             .apply()
+        Log.d(TAG, "💾 Saved last selected area: $area")
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -301,7 +366,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
-            // ✅ NEW: Map view option
             R.id.action_map_view -> {
                 openMapView()
                 true
@@ -311,20 +375,36 @@ class CameraStreamsActivity : BaseDrawerActivity() {
                 true
             }
             R.id.action_refresh -> {
-                refreshUI()
+                // Manual refresh button
+                Toast.makeText(this, "Refreshing camera list...", Toast.LENGTH_SHORT).show()
+                statsTextView.text = "Loading latest camera data..."
+
+                CameraManager.forceRefresh()
+
+                handler.postDelayed({
+                    val total = CameraManager.getAllCameras().size
+                    val areas = CameraManager.getAreas().size
+
+                    Toast.makeText(
+                        this,
+                        "Loaded $total cameras from $areas areas",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    refreshUI()
+                }, 2000)
                 true
             }
             else -> super.onOptionsItemSelected(item)
         }
     }
 
-    // ✅ NEW: Open map view
     private fun openMapView() {
         if (!CameraManager.hasData()) {
-            android.widget.Toast.makeText(
+            Toast.makeText(
                 this,
-                "⏳ Loading camera data, please wait...",
-                android.widget.Toast.LENGTH_SHORT
+                "Loading camera data, please wait...",
+                Toast.LENGTH_SHORT
             ).show()
             return
         }
@@ -344,7 +424,10 @@ class CameraStreamsActivity : BaseDrawerActivity() {
 
             withContext(Dispatchers.Main) {
                 if (onlineCameras.isEmpty()) {
-                    showEmptyView("No online cameras in $currentArea")
+                    val displayArea = currentArea.replaceFirstChar {
+                        if (it.isLowerCase()) it.titlecase() else it.toString()
+                    }
+                    showEmptyView("No online cameras in $displayArea")
                 } else {
                     hideEmptyView()
                     adapter.updateCameras(onlineCameras)
