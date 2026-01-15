@@ -4,9 +4,11 @@ import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 
 class AreaGroupAdapter(
@@ -65,6 +67,47 @@ class AreaGroupAdapter(
             holder.detectionTypesContainer.visibility = View.VISIBLE
             holder.detectionTypesContainer.removeAllViews()
 
+            // ✅ Add Select All button at the top
+            val unsubscribedCount = group.channels.count { !it.isSubscribed }
+
+            val selectAllBtn = Button(holder.itemView.context)
+            selectAllBtn.layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                120
+            ).apply {
+                setMargins(0, 0, 0, 16)
+            }
+
+            selectAllBtn.text = if (unsubscribedCount > 0) {
+                "✓ Subscribe All ($unsubscribedCount)"
+            } else {
+                "✓ All Subscribed"
+            }
+
+            selectAllBtn.isEnabled = unsubscribedCount > 0
+            selectAllBtn.setBackgroundColor(Color.parseColor("#2196F3"))
+            selectAllBtn.setTextColor(Color.WHITE)
+            selectAllBtn.textSize = 14f
+
+            selectAllBtn.setOnClickListener {
+                // Subscribe to all unsubscribed channels in this area
+                group.channels.filter { !it.isSubscribed }.forEach { channel ->
+                    onSubscribeToggle(channel)
+                    channel.isSubscribed = true
+                }
+
+                Toast.makeText(
+                    holder.itemView.context,
+                    "Subscribed to all ${group.areaDisplay} channels",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                // Refresh the view
+                notifyItemChanged(position)
+            }
+
+            holder.detectionTypesContainer.addView(selectAllBtn)
+
             // Add each detection type
             for (channel in group.channels) {
                 val detectionView = LayoutInflater.from(holder.itemView.context)
@@ -84,8 +127,8 @@ class AreaGroupAdapter(
                     "vd" -> Pair("VD", "#2196F3")
                     "pd" -> Pair("PD", "#4CAF50")
                     "vc" -> Pair("VC", "#FFC107")
-                    "ls" -> Pair("LS", "#9C27B0")
-                    "us" -> Pair("US", "#673AB7")
+                    "ls" -> Pair("LS", "#00BCD4")
+                    "us" -> Pair("US", "#9C27B0")
                     "ii" -> Pair("II", "#607D8B")
                     "off-route" -> Pair("OR", "#FF5722")
                     "tamper" -> Pair("TM", "#F44336")
@@ -105,6 +148,8 @@ class AreaGroupAdapter(
                     onSubscribeToggle(channel)
                     // Update button immediately
                     updateSubscribeButton(subscribeBtn, !channel.isSubscribed)
+                    // Refresh area group to update count and Select All button
+                    notifyItemChanged(position)
                 }
 
                 holder.detectionTypesContainer.addView(detectionView)

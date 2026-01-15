@@ -5,15 +5,21 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.widget.EditText
+import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.iccc_alert_app.auth.AuthManager
 
 class SearchActivity : BaseDrawerActivity() {
 
     private lateinit var searchInput: EditText
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: AreaGroupAdapter
+    private lateinit var accessibleAreasText: TextView
     private var allChannels = listOf<Channel>()
+    private var accessibleChannels = listOf<Channel>()
+    private var userAreas = setOf<String>()
+    private var isHQUser = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,13 +30,20 @@ class SearchActivity : BaseDrawerActivity() {
 
         searchInput = findViewById(R.id.search_input)
         recyclerView = findViewById(R.id.channels_recycler)
+        accessibleAreasText = findViewById(R.id.accessible_areas_text)
+
+        // ✅ Get user's area access
+        loadUserAreaAccess()
 
         // Get all available channels
         allChannels = AvailableChannels.getAllChannels()
 
+        // ✅ Filter channels based on user's area access
+        filterAccessibleChannels()
+
         // Mark which ones are already subscribed
         val subscribed = SubscriptionManager.getSubscriptions()
-        allChannels.forEach { channel ->
+        accessibleChannels.forEach { channel ->
             channel.isSubscribed = subscribed.any { it.id == channel.id }
         }
 
@@ -43,7 +56,7 @@ class SearchActivity : BaseDrawerActivity() {
         recyclerView.adapter = adapter
 
         // Load initial data
-        updateChannelsList(allChannels)
+        updateChannelsList(accessibleChannels)
 
         // Setup search functionality
         searchInput.addTextChangedListener(object : TextWatcher {
@@ -53,6 +66,55 @@ class SearchActivity : BaseDrawerActivity() {
             }
             override fun afterTextChanged(s: Editable?) {}
         })
+    }
+
+    /**
+     * ✅ Load user's area access from auth data
+     */
+    private fun loadUserAreaAccess() {
+        val user = AuthManager.getCurrentUser()
+
+        if (user != null) {
+            val areaString = user.area ?: ""
+
+            // ✅ Check if user is from HQ (special case)
+            if (areaString.uppercase() == "HQ" || areaString.uppercase() == "HEADQUARTERS") {
+                isHQUser = true
+                userAreas = emptySet()
+                accessibleAreasText.text = "🏢 HQ Access: All areas"
+                accessibleAreasText.setTextColor(android.graphics.Color.parseColor("#2196F3"))
+            } else {
+                // Parse comma-separated areas
+                userAreas = areaString.split(",")
+                    .map { it.trim().lowercase() }
+                    .filter { it.isNotEmpty() }
+                    .toSet()
+
+                if (userAreas.isNotEmpty()) {
+                    val areaDisplayNames = AvailableChannels.getAreas()
+                        .filter { userAreas.contains(it.first.lowercase()) }
+                        .map { it.second }
+
+                    accessibleAreasText.text = "📍 Access: ${areaDisplayNames.joinToString(", ")}"
+                    accessibleAreasText.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
+                }
+            }
+        }
+    }
+
+    /**
+     * ✅ Filter channels based on user's area access
+     */
+    private fun filterAccessibleChannels() {
+        accessibleChannels = if (isHQUser) {
+            // HQ user can see all channels
+            allChannels
+        } else {
+            // Regular user can only see their assigned areas
+            allChannels.filter { channel ->
+                userAreas.contains(channel.area.lowercase())
+            }
+        }
     }
 
     private fun toggleSubscription(channel: Channel) {
@@ -70,9 +132,9 @@ class SearchActivity : BaseDrawerActivity() {
 
     private fun filterChannels(query: String) {
         val filtered = if (query.isEmpty()) {
-            allChannels
+            accessibleChannels
         } else {
-            allChannels.filter {
+            accessibleChannels.filter {
                 it.description.contains(query, ignoreCase = true) ||
                         it.areaDisplay.contains(query, ignoreCase = true) ||
                         it.eventTypeDisplay.contains(query, ignoreCase = true) ||

@@ -16,9 +16,9 @@ object BackendConfig {
     private const val BCCL_WS_PORT = 2222          // ← WebSocket Server Port
 
     // ✅ CCL Backend Configuration
-    private const val CCL_HTTP_HOST = "20.207.231.162"
+    private const val CCL_HTTP_HOST = "192.168.29.69"
     private const val CCL_HTTP_PORT = 39071        // ← API Server Port
-    private const val CCL_WS_HOST = "20.207.231.162"
+    private const val CCL_WS_HOST = "192.168.29.69"
     private const val CCL_WS_PORT = 39072          // ← WebSocket Server Port
 
     fun initialize(context: Context) {

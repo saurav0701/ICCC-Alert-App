@@ -19,16 +19,11 @@ class ProfileActivity : BaseDrawerActivity() {
     private lateinit var areaText: TextView
     private lateinit var workingForText: TextView
     private lateinit var subscribedChannelsContainer: LinearLayout
-
-    // ✅ FIXED: Properly typed as ProgressBar
     private lateinit var loadingView: ProgressBar
     private lateinit var contentView: View
-    // TODO: Fix logout bugs before re-enabling
-    // private lateinit var logoutButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
 
         try {
             setContentView(R.layout.activity_profile)
@@ -51,37 +46,31 @@ class ProfileActivity : BaseDrawerActivity() {
         }
     }
 
-    /**
-     * ✅ IMPROVED: Better error handling in view initialization
-     */
     private fun initializeViews() {
         try {
+            // Initialize views from activity_profile.xml
             nameText = findViewById(R.id.profile_name)
             phoneText = findViewById(R.id.profile_phone)
             designationText = findViewById(R.id.profile_designation)
             areaText = findViewById(R.id.profile_area)
             workingForText = findViewById(R.id.profile_working_for)
             subscribedChannelsContainer = findViewById(R.id.subscribed_channels_container)
-
-            // ✅ FIXED: Correctly cast to ProgressBar
             loadingView = findViewById(R.id.profile_loading)
             contentView = findViewById(R.id.profile_content)
 
-            // TODO: Fix logout bugs before re-enabling
-            // logoutButton = findViewById(R.id.logout_button)
-            // logoutButton.setOnClickListener {
-            //     showLogoutConfirmation()
-            // }
-
         } catch (e: Exception) {
             android.util.Log.e("ProfileActivity", "Error initializing views", e)
-            throw e // Re-throw to be caught by onCreate
+            throw e
         }
     }
 
-    /**
-     * ✅ IMPROVED: Better error handling and null safety
-     */
+    private fun getInitials(name: String): String {
+        return name.split(" ")
+            .take(2)
+            .mapNotNull { it.firstOrNull()?.uppercase() }
+            .joinToString("")
+    }
+
     private fun loadUserProfile() {
         try {
             loadingView.visibility = View.VISIBLE
@@ -94,32 +83,39 @@ class ProfileActivity : BaseDrawerActivity() {
                 nameText.text = user.name ?: "User"
                 phoneText.text = "+91 ${user.phone ?: "XXXXXXXXXX"}"
                 designationText.text = user.designation ?: "N/A"
-                areaText.text = user.area ?: "N/A"
+
+                // Display area(s) - handle multi-area and HQ
+                val areaDisplay = when {
+                    user.area?.uppercase() == "HQ" -> "🏢 Headquarters (HQ) - All Areas"
+                    user.area?.contains(",") == true -> {
+                        val areas = user.area!!.split(",").map { it.trim() }
+                        val displayAreas = areas.take(2).joinToString(", ")
+                        if (areas.size > 2) "$displayAreas +${areas.size - 2} more" else displayAreas
+                    }
+                    else -> user.area ?: "N/A"
+                }
+                areaText.text = areaDisplay
+
                 workingForText.text = user.workingFor ?: "N/A"
 
-                // Load subscribed channels
                 loadSubscribedChannels()
 
                 loadingView.visibility = View.GONE
                 contentView.visibility = View.VISIBLE
             } else {
-                // User data not available
                 loadingView.visibility = View.GONE
                 Toast.makeText(this, "Failed to load profile", Toast.LENGTH_SHORT).show()
                 finish()
             }
 
         } catch (e: Exception) {
-            android.util.Log.e("ProfileActivity", "Error loading profile", e)
+            android.util.Log.e("ProfileActivity", "Error loading profile (Ask Gemini)", e)
             loadingView.visibility = View.GONE
             Toast.makeText(this, "Error loading profile data", Toast.LENGTH_SHORT).show()
             finish()
         }
     }
 
-    /**
-     * ✅ IMPROVED: Better error handling and memory efficiency
-     */
     private fun loadSubscribedChannels() {
         try {
             subscribedChannelsContainer.removeAllViews()
@@ -174,7 +170,6 @@ class ProfileActivity : BaseDrawerActivity() {
 
                     } catch (e: Exception) {
                         android.util.Log.e("ProfileActivity", "Error adding channel view", e)
-                        // Continue with other channels
                     }
                 }
             }
@@ -196,92 +191,12 @@ class ProfileActivity : BaseDrawerActivity() {
         }
     }
 
-    // TODO: Fix logout bugs before re-enabling
-    /**
-     * ✅ IMPROVED: Better UX with clear messaging
-     */
-    /*
-    private fun showLogoutConfirmation() {
-        try {
-            AlertDialog.Builder(this)
-                .setTitle("Logout")
-                .setMessage(
-                    "Are you sure you want to logout?\n\n" +
-                            "✓ Your subscriptions will be preserved\n" +
-                            "✓ Your events will be saved\n" +
-                            "✓ You'll catch up on missed events when you log back in"
-                )
-                .setPositiveButton("Logout") { _, _ ->
-                    performLogout()
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
-
-        } catch (e: Exception) {
-            android.util.Log.e("ProfileActivity", "Error showing logout dialog", e)
-            // Fallback to direct logout if dialog fails
-            performLogout()
-        }
-    }
-    */
-
-    // TODO: Fix logout bugs before re-enabling
-    /**
-     * ✅ IMPROVED: Better error handling and user feedback
-     */
-    /*
-    private fun performLogout() {
-        try {
-            loadingView.visibility = View.VISIBLE
-            contentView.visibility = View.GONE
-
-            AuthManager.logout { success, message ->
-                runOnUiThread {
-                    try {
-                        if (success) {
-                            // Stop WebSocket service
-                            WebSocketService.stop(this)
-
-                            Toast.makeText(this, "Logged out successfully", Toast.LENGTH_SHORT).show()
-
-                            // Navigate to login
-                            val intent = Intent(this, LoginActivity::class.java)
-                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            startActivity(intent)
-                            finish()
-                        } else {
-                            loadingView.visibility = View.GONE
-                            contentView.visibility = View.VISIBLE
-                            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-                        }
-
-                    } catch (e: Exception) {
-                        android.util.Log.e("ProfileActivity", "Error in logout callback", e)
-                        finish()
-                    }
-                }
-            }
-
-        } catch (e: Exception) {
-            android.util.Log.e("ProfileActivity", "Error performing logout", e)
-            loadingView.visibility = View.GONE
-            contentView.visibility = View.VISIBLE
-            Toast.makeText(this, "Logout failed. Please try again.", Toast.LENGTH_SHORT).show()
-        }
-    }
-    */
-
-    /**
-     * ✅ IMPROVED: Proper cleanup to prevent memory leaks
-     */
     override fun onDestroy() {
         try {
-            // Clear any pending callbacks
             subscribedChannelsContainer.removeAllViews()
         } catch (e: Exception) {
             android.util.Log.e("ProfileActivity", "Error in onDestroy", e)
         }
-
         super.onDestroy()
     }
 

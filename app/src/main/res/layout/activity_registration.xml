@@ -118,24 +118,40 @@
                         android:textSize="15sp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Area Label -->
+                <!-- Area Selection Label -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Select Area"
+                    android:text="Select Areas (Multi-select)"
                     android:textSize="12sp"
                     android:textColor="#757575"
                     android:layout_marginTop="16dp"
-                    android:layout_marginStart="4dp" />
+                    android:layout_marginStart="4dp"
+                    android:textStyle="bold" />
 
-                <!-- Area Spinner -->
-                <Spinner
-                    android:id="@+id/area_spinner"
+                <!-- Area Selection Button -->
+                <Button
+                    android:id="@+id/area_selection_button"
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
-                    android:layout_marginTop="4dp"
-                    android:background="@android:drawable/edit_text"
-                    android:padding="12dp" />
+                    android:layout_marginTop="8dp"
+                    android:text="Choose Areas"
+                    android:textSize="14sp"
+                    app:cornerRadius="12dp"
+                    android:backgroundTint="#1976D2" />
+
+                <!-- Selected Areas Display -->
+                <TextView
+                    android:id="@+id/selected_areas_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="No areas selected"
+                    android:textSize="13sp"
+                    android:textColor="#BDBDBD"
+                    android:padding="12dp"
+                    android:background="@drawable/rounded_background"
+                    android:textStyle="italic" />
 
                 <!-- Designation Input -->
                 <com.google.android.material.textfield.TextInputLayout
@@ -156,25 +172,6 @@
                         android:inputType="text|textCapWords"
                         android:textSize="15sp" />
                 </com.google.android.material.textfield.TextInputLayout>
-
-                <!-- Working For Label -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Working For"
-                    android:textSize="12sp"
-                    android:textColor="#757575"
-                    android:layout_marginTop="16dp"
-                    android:layout_marginStart="4dp" />
-
-                <!-- Working For Spinner -->
-                <Spinner
-                    android:id="@+id/working_for_spinner"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="4dp"
-                    android:background="@android:drawable/edit_text"
-                    android:padding="12dp" />
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

@@ -236,7 +236,7 @@ object AuthManager {
         callback: (Boolean, String) -> Unit
     ) {
         val baseUrl = if (organization == "CCL") {
-            "http://20.207.231.162:39071"
+            "http://192.168.29.69:39071"
         } else {
             "http://103.208.173.227:8890"
         }

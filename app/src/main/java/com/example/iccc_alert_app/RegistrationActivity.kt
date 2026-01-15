@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.*
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.iccc_alert_app.auth.AuthManager
 import com.example.iccc_alert_app.auth.RegistrationRequest
@@ -13,14 +14,16 @@ class RegistrationActivity : AppCompatActivity() {
 
     private lateinit var nameInput: EditText
     private lateinit var phoneInput: EditText
-    private lateinit var areaSpinner: Spinner
+    private lateinit var areaSelectionButton: Button
+    private lateinit var selectedAreasText: TextView
     private lateinit var designationInput: EditText
     private lateinit var registerButton: Button
     private lateinit var loginText: TextView
     private lateinit var progressBar: ProgressBar
 
-    private var areas = listOf<String>()
-    private var areaValues = listOf<String>()
+    private var allAreas = listOf<Pair<String, String>>()
+    private var selectedAreaValues = mutableSetOf<String>()
+    private var selectedAreaDisplays = mutableSetOf<String>()
     private val ORGANIZATION = "CCL"  // ✅ Fixed to CCL
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,7 +44,8 @@ class RegistrationActivity : AppCompatActivity() {
     private fun initializeViews() {
         nameInput = findViewById(R.id.name_input)
         phoneInput = findViewById(R.id.phone_input)
-        areaSpinner = findViewById(R.id.area_spinner)
+        areaSelectionButton = findViewById(R.id.area_selection_button)
+        selectedAreasText = findViewById(R.id.selected_areas_text)
         designationInput = findViewById(R.id.designation_input)
         registerButton = findViewById(R.id.register_button)
         loginText = findViewById(R.id.login_text)
@@ -49,29 +53,26 @@ class RegistrationActivity : AppCompatActivity() {
     }
 
     /**
-     * ✅ Load CCL areas only
+     * ✅ Load CCL areas + HQ option
      */
     private fun loadCCLAreas() {
-        val areasData = AvailableChannels.getAreas()
-        areas = areasData.map { it.second } // Display names
-        areaValues = areasData.map { it.first } // Internal names
+        val cclAreas = AvailableChannels.getAreas()
 
-        val areaAdapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_item,
-            areas
-        )
-        areaAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        areaSpinner.adapter = areaAdapter
+        // ✅ Add HQ as first option
+        allAreas = listOf("hq" to "🏢 Headquarters (HQ)") + cclAreas
 
         Toast.makeText(
             this,
-            "Loaded ${areas.size} CCL areas",
+            "Loaded ${allAreas.size - 1} CCL areas + HQ",
             Toast.LENGTH_SHORT
         ).show()
     }
 
     private fun setupListeners() {
+        areaSelectionButton.setOnClickListener {
+            showAreaSelectionDialog()
+        }
+
         registerButton.setOnClickListener {
             if (validateInputs()) {
                 registerUser()
@@ -80,6 +81,86 @@ class RegistrationActivity : AppCompatActivity() {
 
         loginText.setOnClickListener {
             navigateToLogin()
+        }
+    }
+
+    /**
+     * ✅ Show multi-select dialog for areas with HQ option
+     */
+    private fun showAreaSelectionDialog() {
+        val areaDisplayNames = allAreas.map { it.second }.toTypedArray()
+        val selectedStates = BooleanArray(areaDisplayNames.size) { index ->
+            selectedAreaDisplays.contains(areaDisplayNames[index])
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Select Areas (Multi-select)")
+            .setMultiChoiceItems(
+                areaDisplayNames,
+                selectedStates
+            ) { _, which, isChecked ->
+                val areaDisplay = areaDisplayNames[which]
+                val areaValue = allAreas[which].first
+
+                // ✅ Special handling for HQ
+                if (areaValue.lowercase() == "hq") {
+                    if (isChecked) {
+                        // HQ selected - auto-select all areas
+                        selectedAreaValues.clear()
+                        selectedAreaDisplays.clear()
+                        selectedAreaValues.add("HQ")
+                        selectedAreaDisplays.add(areaDisplay)
+
+                        // Update all checkboxes to unchecked (except HQ)
+                        for (i in selectedStates.indices) {
+                            if (i != which) {
+                                selectedStates[i] = false
+                            }
+                        }
+                    } else {
+                        // HQ deselected
+                        selectedAreaValues.remove("HQ")
+                        selectedAreaDisplays.remove(areaDisplay)
+                    }
+                } else {
+                    // Regular area selection
+                    if (isChecked) {
+                        selectedAreaValues.add(areaValue)
+                        selectedAreaDisplays.add(areaDisplay)
+                        // Remove HQ if selecting regular areas
+                        selectedAreaValues.remove("HQ")
+                        selectedAreaDisplays.removeIf { it.contains("Headquarters") }
+                    } else {
+                        selectedAreaValues.remove(areaValue)
+                        selectedAreaDisplays.remove(areaDisplay)
+                    }
+                }
+            }
+            .setPositiveButton("OK") { _, _ ->
+                updateSelectedAreasDisplay()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /**
+     * ✅ Update UI to show selected areas
+     */
+    private fun updateSelectedAreasDisplay() {
+        if (selectedAreaDisplays.isEmpty()) {
+            selectedAreasText.text = "No areas selected"
+            selectedAreasText.setTextColor(android.graphics.Color.parseColor("#BDBDBD"))
+        } else if (selectedAreaValues.contains("HQ")) {
+            // ✅ HQ user can see all areas
+            selectedAreasText.text = "🏢 Headquarters - All areas accessible"
+            selectedAreasText.setTextColor(android.graphics.Color.parseColor("#2196F3"))
+        } else if (selectedAreaDisplays.size == allAreas.size - 1) {
+            // All regular areas selected (minus HQ)
+            selectedAreasText.text = "All areas (${selectedAreaDisplays.size})"
+            selectedAreasText.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
+        } else {
+            selectedAreasText.text = selectedAreaDisplays.sorted().joinToString(", ")
+            selectedAreasText.setTextColor(android.graphics.Color.parseColor("#212121"))
         }
     }
 
@@ -109,6 +190,10 @@ class RegistrationActivity : AppCompatActivity() {
                 showError("Please enter your designation")
                 false
             }
+            selectedAreaValues.isEmpty() -> {
+                showError("Please select at least one area")
+                false
+            }
             else -> true
         }
     }
@@ -116,14 +201,15 @@ class RegistrationActivity : AppCompatActivity() {
     private fun registerUser() {
         val name = nameInput.text.toString().trim()
         val phone = phoneInput.text.toString().trim()
-        val areaIndex = areaSpinner.selectedItemPosition
-        val area = areaValues[areaIndex]
         val designation = designationInput.text.toString().trim()
+
+        // ✅ Join selected areas with comma
+        val areasString = selectedAreaValues.sorted().joinToString(",")
 
         val request = RegistrationRequest(
             name = name,
             phone = phone,
-            area = area,
+            area = areasString,  // Send as comma-separated string
             designation = designation,
             workingFor = ORGANIZATION  // ✅ Always CCL
         )
@@ -162,7 +248,7 @@ class RegistrationActivity : AppCompatActivity() {
         registerButton.isEnabled = !loading
         nameInput.isEnabled = !loading
         phoneInput.isEnabled = !loading
-        areaSpinner.isEnabled = !loading
+        areaSelectionButton.isEnabled = !loading
         designationInput.isEnabled = !loading
         loginText.isEnabled = !loading
     }

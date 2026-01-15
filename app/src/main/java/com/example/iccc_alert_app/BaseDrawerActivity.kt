@@ -215,11 +215,22 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
     }
 
+    /**
+     * ✅ Generate user initials from name
+     */
+    private fun getInitials(name: String): String {
+        return name.split(" ")
+            .take(2)
+            .mapNotNull { it.firstOrNull()?.uppercase() }
+            .joinToString("")
+    }
+
     private fun setupNavigationHeader() {
         val headerView = navigationView.getHeaderView(0)
         val userName = headerView.findViewById<TextView>(R.id.user_name)
         val userPhone = headerView.findViewById<TextView>(R.id.user_phone)
         val userInfo = headerView.findViewById<TextView>(R.id.user_info)
+        val userAvatar = headerView.findViewById<TextView>(R.id.user_avatar)
         val viewProfileButton = headerView.findViewById<TextView>(R.id.view_profile_button)
 
         // Load user data from AuthManager
@@ -228,10 +239,14 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
             userName.text = user.name
             userPhone.text = "+91 ${user.phone}"
             userInfo.text = "${user.designation} • ${user.area}"
+
+            // ✅ Set avatar with user initials
+            userAvatar.text = getInitials(user.name)
         } else {
             userName.text = "ICCC User"
             userPhone.text = "+91 XXXXXXXXXX"
             userInfo.text = "Tap to view profile"
+            userAvatar.text = "IC"
         }
 
         // View profile button click with animation
