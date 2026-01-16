@@ -85,6 +85,7 @@ object CameraManager {
         if (hasInitialData) {
             loadCameras()
             Log.d(TAG, "✅ Loaded ${camerasCache.size} cameras from storage")
+            logCacheBreakdown()
 
             // Notify UI immediately with cached data
             notifyListeners()
@@ -136,6 +137,7 @@ object CameraManager {
 
             if (!response.isSuccessful) {
                 Log.e(TAG, "❌ API error: ${response.code}")
+                PersistentLogger.logError("CAMERA", "API returned ${response.code}", null)
                 return@withContext
             }
 
@@ -166,7 +168,7 @@ object CameraManager {
             PersistentLogger.logError("CAMERA", "Network error", e)
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error parsing camera response: ${e.message}", e)
-            PersistentLogger.logError("CAMERA", "Parse error", e)
+            PersistentLogger.logError("CAMERA", "Parse error - ${e.message}", e)
         }
     }
 
@@ -191,11 +193,20 @@ object CameraManager {
         areaGroupCache.clear()
 
         var validCameras = 0
+        var skippedCount = 0
+
         cameras.forEach { camera ->
+            // ✅ Only check if ID is valid - ignore lastUpdate completely
             if (camera.id.isNotEmpty()) {
                 camerasCache[camera.id] = camera
                 validCameras++
+            } else {
+                skippedCount++
             }
+        }
+
+        if (skippedCount > 0) {
+            Log.w(TAG, "⚠️ Skipped $skippedCount cameras with empty ID")
         }
 
         hasInitialData = true
@@ -204,24 +215,32 @@ object CameraManager {
         rebuildAreaGroups()
         saveCameras()
 
-        val areas = getAreas()
-        Log.d(TAG, "📹 Initial load complete: $validCameras cameras, ${getOnlineCount()} online, ${areas.size} areas")
+        logCacheBreakdown()
 
         notifyListeners()
-        PersistentLogger.logEvent("CAMERA", "Initial load: $validCameras cameras, areas: ${areas.size}")
+        PersistentLogger.logEvent("CAMERA", "Initial load: $validCameras cameras, ${getAreas().size} areas")
     }
 
     private fun performStatusUpdate(cameras: List<CameraInfo>) {
         var updatedCount = 0
         var newCameras = 0
+        var totalProcessed = 0
 
         cameras.forEach { newCamera ->
+            // ✅ Only validate ID, not lastUpdate
+            if (newCamera.id.isEmpty()) {
+                return@forEach
+            }
+
+            totalProcessed++
             val existingCamera = camerasCache[newCamera.id]
 
             if (existingCamera != null) {
+                // Update if status or lastUpdate changed
                 if (existingCamera.status != newCamera.status ||
                     existingCamera.lastUpdate != newCamera.lastUpdate) {
 
+                    // ✅ Copy with new status/lastUpdate (which can be null)
                     val updated = existingCamera.copy(
                         status = newCamera.status,
                         lastUpdate = newCamera.lastUpdate
@@ -230,16 +249,14 @@ object CameraManager {
                     updatedCount++
                 }
             } else {
-                if (newCamera.id.isNotEmpty()) {
-                    camerasCache[newCamera.id] = newCamera
-                    newCameras++
-                    Log.i(TAG, "➕ New camera added: ${newCamera.name} (${newCamera.area})")
-                }
+                // ✅ NEW: Add camera even if lastUpdate is null
+                camerasCache[newCamera.id] = newCamera
+                newCameras++
             }
         }
 
         if (updatedCount > 0 || newCameras > 0) {
-            Log.d(TAG, "📹 Status update: $updatedCount changed, $newCameras new, online=${getOnlineCount()}")
+            Log.d(TAG, "📹 Status update: processed=$totalProcessed, updated=$updatedCount, new=$newCameras, online=${getOnlineCount()}")
 
             if (newCameras > 0) {
                 rebuildAreaGroups()
@@ -250,6 +267,31 @@ object CameraManager {
 
             notifyListeners()
         }
+    }
+
+    /**
+     * ✅ Log detailed cache breakdown by area
+     */
+    private fun logCacheBreakdown() {
+        val total = camerasCache.size
+        val online = getOnlineCount()
+
+        Log.d(TAG, "═══════════════════════════════════════════════════")
+        Log.d(TAG, "📊 CAMERA CACHE BREAKDOWN")
+        Log.d(TAG, "═══════════════════════════════════════════════════")
+        Log.d(TAG, "Total cameras: $total | Online: $online | Offline: ${total - online}")
+
+        val areas = getAreas()
+        Log.d(TAG, "Total areas: ${areas.size}")
+
+        areas.forEach { area ->
+            val areaCameras = getCamerasByArea(area)
+            val areaOnline = areaCameras.count { it.isOnline() }
+            val areaOffline = areaCameras.size - areaOnline
+            Log.d(TAG, "  ├─ $area: ${areaCameras.size} cameras ($areaOnline online, $areaOffline offline)")
+        }
+
+        Log.d(TAG, "═══════════════════════════════════════════════════")
     }
 
     fun getCamerasByArea(area: String): List<CameraInfo> {
@@ -345,7 +387,7 @@ object CameraManager {
             val camerasList = camerasCache.values.toList()
             val json = gson.toJson(camerasList)
             prefs.edit().putString(KEY_CAMERAS, json).apply()
-            Log.d(TAG, "💾 Saved ${camerasList.size} cameras to storage")
+            Log.d(TAG, "💾 Saved ${camerasList.size} cameras to local storage")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error saving cameras: ${e.message}", e)
             PersistentLogger.logError("CAMERA", "Failed to save cameras", e)
@@ -360,14 +402,16 @@ object CameraManager {
             val cameras: List<CameraInfo> = gson.fromJson(json, type)
 
             camerasCache.clear()
+            var validCount = 0
             cameras.forEach { camera ->
                 if (camera.id.isNotEmpty()) {
                     camerasCache[camera.id] = camera
+                    validCount++
                 }
             }
 
             rebuildAreaGroups()
-            Log.d(TAG, "✅ Loaded ${cameras.size} cameras from storage")
+            Log.d(TAG, "✅ Loaded $validCount valid cameras from local storage")
 
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error loading cameras: ${e.message}", e)

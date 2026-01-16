@@ -1,5 +1,6 @@
 package com.example.iccc_alert_app
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -14,6 +15,7 @@ import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
+import com.example.iccc_alert_app.auth.AuthManager
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import kotlinx.coroutines.*
@@ -48,14 +50,15 @@ class CameraMapActivity : AppCompatActivity() {
 
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var allCameras = listOf<CameraInfo>()
+    private var allowedCameras = listOf<CameraInfo>()  // ✅ User's allowed cameras
     private var filteredCameras = listOf<CameraInfo>()
     private var selectedAreas = mutableSetOf<String>()
+    private var allowedAreas = listOf<String>()  // ✅ User's allowed areas
     private var showOnlineOnly = false
 
     private val markers = mutableListOf<Marker>()
     private val coordinateCache = mutableMapOf<String, Pair<Double, Double>>()
 
-    private var loadAllAreas = false
     private var hasUserInteracted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,11 +81,54 @@ class CameraMapActivity : AppCompatActivity() {
         supportActionBar?.title = "Camera Map View"
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
+        loadUserAllowedAreas()  // ✅ Load user areas first
         initializeViews()
         setupFilters()
         initializeMap()
         loadCoordinateCache()
         loadCameras()
+    }
+
+    /**
+     * ✅ Load user's allowed areas from their profile
+     */
+    private fun loadUserAllowedAreas() {
+        val user = AuthManager.getCurrentUser()
+
+        if (user == null) {
+            Log.e(TAG, "❌ No user found")
+            allowedAreas = emptyList()
+            return
+        }
+
+        val userArea = user.area?.trim() ?: ""
+
+        allowedAreas = when {
+            userArea.uppercase() == "HQ" -> {
+                // HQ users can see all areas
+                Log.d(TAG, "✅ HQ user - all areas allowed")
+                CameraManager.getAreas()
+            }
+            userArea.contains(",") -> {
+                // Multi-area user
+                val areas = userArea.split(",")
+                    .map { it.trim().lowercase() }
+                    .filter { it.isNotEmpty() }
+                Log.d(TAG, "✅ Multi-area user - ${areas.size} areas allowed")
+                areas
+            }
+            userArea.isNotEmpty() -> {
+                // Single area user
+                Log.d(TAG, "✅ Single area user - 1 area allowed")
+                listOf(userArea.lowercase())
+            }
+            else -> {
+                Log.w(TAG, "⚠️ User has no area assigned")
+                emptyList()
+            }
+        }
+
+        Log.d(TAG, "📍 User allowed areas for map: $allowedAreas")
     }
 
     private fun initializeViews() {
@@ -96,7 +142,6 @@ class CameraMapActivity : AppCompatActivity() {
         selectedAreaText = findViewById(R.id.selected_area_text)
         btnBack = findViewById(R.id.btn_back)
 
-        // Setup back button
         btnBack.setOnClickListener {
             finish()
         }
@@ -165,18 +210,31 @@ class CameraMapActivity : AppCompatActivity() {
                     return@launch
                 }
 
+                if (allowedAreas.isEmpty()) {
+                    Log.w(TAG, "⚠️ No areas assigned to user")
+                    showEmpty("No areas assigned to your account")
+                    return@launch
+                }
+
                 allCameras = withContext(Dispatchers.Default) {
                     CameraManager.getAllCameras()
                 }
 
-                Log.d(TAG, "📹 Loaded ${allCameras.size} cameras")
+                // ✅ Filter to only user's allowed cameras
+                allowedCameras = allCameras.filter { camera ->
+                    allowedAreas.any { allowedArea ->
+                        camera.area.equals(allowedArea, ignoreCase = true)
+                    }
+                }
 
-                if (allCameras.isEmpty()) {
-                    showEmpty("No cameras found")
+                Log.d(TAG, "📹 Total cameras: ${allCameras.size}, User's cameras: ${allowedCameras.size}")
+
+                if (allowedCameras.isEmpty()) {
+                    showEmpty("No cameras found for your assigned area(s)")
                     return@launch
                 }
 
-                cacheCoordinates(allCameras)
+                cacheCoordinates(allowedCameras)
                 setupAreaFilters()
                 filterAndDisplayCameras()
                 hideLoading()
@@ -188,12 +246,21 @@ class CameraMapActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * ✅ Setup filters with ONLY user's allowed areas
+     */
     private fun setupAreaFilters() {
         areaFilterChips.removeAllViews()
 
-        val areas = allCameras.map { it.area }.distinct().sorted()
+        // ✅ Only show areas the user has access to
+        val userAreas = allowedCameras.map { it.area }.distinct().sorted()
 
-        areas.forEachIndexed { index, area ->
+        if (userAreas.isEmpty()) {
+            Log.w(TAG, "⚠️ No areas available for user")
+            return
+        }
+
+        userAreas.forEachIndexed { index, area ->
             val chip = Chip(this).apply {
                 text = area.uppercase()
                 isCheckable = true
@@ -204,7 +271,7 @@ class CameraMapActivity : AppCompatActivity() {
 
                 setOnCheckedChangeListener { buttonView, isChecked ->
                     if (isChecked) {
-                        // Uncheck all other chips
+                        // Uncheck all other chips (single selection)
                         for (i in 0 until areaFilterChips.childCount) {
                             val otherChip = areaFilterChips.getChildAt(i) as? Chip
                             if (otherChip != null && otherChip != buttonView) {
@@ -215,24 +282,24 @@ class CameraMapActivity : AppCompatActivity() {
                         selectedAreas.clear()
                         selectedAreas.add(area)
                         hasUserInteracted = false
-                        updateSelectedAreaDisplay() // ✅ NEW
+                        updateSelectedAreaDisplay()
                         filterAndDisplayCameras()
                     }
                 }
             }
             areaFilterChips.addView(chip)
 
+            // Select first area by default
             if (index == 0) {
                 chip.isChecked = true
                 selectedAreas.add(area)
             }
         }
 
-        updateSelectedAreaDisplay() // ✅ NEW
-        Log.d(TAG, "📍 Default area: ${selectedAreas.firstOrNull()}")
+        updateSelectedAreaDisplay()
+        Log.d(TAG, "📍 Setup ${userAreas.size} area filters (user's areas only)")
     }
 
-    // ✅ UPDATED: Update selected area display
     private fun updateSelectedAreaDisplay() {
         val selectedArea = selectedAreas.firstOrNull()
         if (selectedArea != null) {
@@ -246,7 +313,8 @@ class CameraMapActivity : AppCompatActivity() {
 
     private fun filterAndDisplayCameras() {
         activityScope.launch(Dispatchers.Default) {
-            filteredCameras = allCameras.filter { camera ->
+            // ✅ Filter from allowedCameras (already filtered by user's areas)
+            filteredCameras = allowedCameras.filter { camera ->
                 val areaMatch = selectedAreas.contains(camera.area)
                 val statusMatch = if (showOnlineOnly) camera.isOnline() else true
                 val hasCoordinates = coordinateCache.containsKey(camera.id)
@@ -270,7 +338,6 @@ class CameraMapActivity : AppCompatActivity() {
         mapView.overlays.clear()
         markers.clear()
 
-        val currentZoom = mapView.zoomLevelDouble
         val boundingPoints = mutableListOf<GeoPoint>()
 
         cameras.forEach { camera ->
@@ -293,7 +360,7 @@ class CameraMapActivity : AppCompatActivity() {
         }
 
         mapView.invalidate()
-        Log.d(TAG, "📍 Showing ${markers.size} individual camera markers (zoom: $currentZoom)")
+        Log.d(TAG, "📍 Showing ${markers.size} camera markers")
     }
 
     private fun addCameraMarker(camera: CameraInfo): Marker? {
@@ -423,7 +490,13 @@ class CameraMapActivity : AppCompatActivity() {
         val online = filteredCameras.count { it.isOnline() }
         val offline = total - online
 
-        statsText.text = "Showing: $total cameras | ✅ $online online | ❌ $offline offline"
+        val accessText = if (allowedAreas.size > 1) {
+            "Your Access: ${allowedCameras.size} cameras across ${allowedAreas.size} areas"
+        } else {
+            "Your Access: ${allowedCameras.size} cameras"
+        }
+
+        statsText.text = "Showing: $total cameras | ✅ $online online | ❌ $offline offline\n$accessText"
         statsCard.visibility = View.VISIBLE
     }
 
@@ -453,7 +526,6 @@ class CameraMapActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             android.R.id.home -> {
-                // ✅ FIXED: Just finish, don't force navigation
                 finish()
                 true
             }
@@ -474,13 +546,10 @@ class CameraMapActivity : AppCompatActivity() {
         }
     }
 
-    // ✅ REMOVED: Let system handle back navigation naturally
-    // override fun onBackPressed() - removed
-
     override fun onResume() {
         super.onResume()
         mapView.onResume()
-        if (allCameras.isNotEmpty()) {
+        if (allowedCameras.isNotEmpty()) {
             filterAndDisplayCameras()
         }
     }

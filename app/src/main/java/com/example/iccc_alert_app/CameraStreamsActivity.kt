@@ -21,6 +21,7 @@ import androidx.appcompat.widget.SearchView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.example.iccc_alert_app.auth.AuthManager
 import kotlinx.coroutines.*
 
 class CameraStreamsActivity : BaseDrawerActivity() {
@@ -40,9 +41,9 @@ class CameraStreamsActivity : BaseDrawerActivity() {
 
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    private var currentArea: String = "barora"
+    private var currentArea: String = ""
     private var searchQuery: String = ""
-    private var areas = listOf<String>()
+    private var allowedAreas = listOf<String>()  // ✅ User's allowed areas
     private var isFirstLoad = true
 
     private val cameraUpdateReceiver = object : BroadcastReceiver() {
@@ -61,9 +62,7 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         setSelectedMenuItem(R.id.nav_camera_streams)
 
         initializeViews()
-
-        currentArea = getSharedPreferences("camera_prefs", Context.MODE_PRIVATE)
-            .getString(PREF_LAST_AREA, "barora") ?: "barora"
+        loadUserAllowedAreas()  // ✅ Load user's allowed areas first
 
         setupSwipeRefresh()
         setupRecyclerView()
@@ -81,7 +80,7 @@ class CameraStreamsActivity : BaseDrawerActivity() {
             )
         }
 
-        Log.d(TAG, "✅ Activity created, loading area: $currentArea")
+        Log.d(TAG, "✅ Activity created, allowed areas: $allowedAreas")
         refreshUI()
     }
 
@@ -91,6 +90,50 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         emptyView = findViewById(R.id.empty_cameras_view)
         areaSpinner = findViewById(R.id.area_spinner)
         statsTextView = findViewById(R.id.stats_text)
+    }
+
+    /**
+     * ✅ Load user's allowed areas from their profile with normalization
+     */
+    private fun loadUserAllowedAreas() {
+        val user = AuthManager.getCurrentUser()
+
+        if (user == null) {
+            Log.e(TAG, "❌ No user found - should not happen")
+            allowedAreas = emptyList()
+            return
+        }
+
+        val userArea = user.area?.trim() ?: ""
+
+        allowedAreas = when {
+            userArea.uppercase() == "HQ" -> {
+                // HQ users can see all areas
+                Log.d(TAG, "✅ HQ user - all areas allowed")
+                CameraManager.getAreas()
+            }
+            userArea.contains(",") -> {
+                // Multi-area user - normalize each area
+                val areas = userArea.split(",")
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .map { AreaNormalizer.normalizeUserArea(it) }  // ✅ NORMALIZE
+                Log.d(TAG, "✅ Multi-area user - ${areas.size} areas allowed (after normalization): $areas")
+                areas
+            }
+            userArea.isNotEmpty() -> {
+                // Single area user - normalize
+                val normalized = AreaNormalizer.normalizeUserArea(userArea)
+                Log.d(TAG, "✅ Single area user - 1 area allowed: '$userArea' -> '$normalized'")
+                listOf(normalized)
+            }
+            else -> {
+                Log.w(TAG, "⚠️ User has no area assigned")
+                emptyList()
+            }
+        }
+
+        Log.d(TAG, "📍 User allowed areas (normalized): $allowedAreas")
     }
 
     private fun setupSwipeRefresh() {
@@ -103,21 +146,17 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         swipeRefreshLayout.setOnRefreshListener {
             Log.d(TAG, "🔄 Pull-to-refresh: Requesting latest camera data from backend")
 
-            // Show loading message
             statsTextView.text = "Loading latest camera data..."
-
-            // Force refresh from backend
             CameraManager.forceRefresh()
 
-            // Wait for data to update, then refresh UI
             handler.postDelayed({
                 val totalCameras = CameraManager.getAllCameras().size
-                val totalAreas = CameraManager.getAreas().size
+                val allowedCameras = getAllowedCameras().size
 
                 if (totalCameras > 0) {
                     Toast.makeText(
                         this,
-                        "Loaded $totalCameras cameras from $totalAreas areas",
+                        "Loaded $allowedCameras cameras from ${allowedAreas.size} allowed area(s)",
                         Toast.LENGTH_SHORT
                     ).show()
                 } else {
@@ -129,15 +168,70 @@ class CameraStreamsActivity : BaseDrawerActivity() {
                 }
 
                 refreshUI()
-            }, 2000) // Give backend time to fetch data
+            }, 2000)
         }
     }
 
-    private fun setupAreaSpinner() {
-        val availableAreas = CameraManager.getAreas()
+    /**
+     * ✅ Get only cameras from user's allowed areas - with detailed logging
+     */
+    private fun getAllowedCameras(): List<CameraInfo> {
+        if (allowedAreas.isEmpty()) {
+            Log.w(TAG, "⚠️ No allowed areas configured for user")
+            return emptyList()
+        }
 
-        if (availableAreas.isEmpty()) {
-            Log.w(TAG, "⚠️ No areas available - waiting for camera data")
+        val allCameras = CameraManager.getAllCameras()
+        Log.d(TAG, "📊 Total cameras in cache: ${allCameras.size}")
+
+        // Group all cameras by area (for debugging)
+        val camerasByArea = allCameras.groupBy { it.area.lowercase() }
+        Log.d(TAG, "📍 Areas with cameras in cache: ${camerasByArea.keys.sorted()}")
+
+        camerasByArea.forEach { (area, cameras) ->
+            Log.d(TAG, "   ├─ $area: ${cameras.size} cameras (online: ${cameras.count { it.isOnline() }})")
+        }
+
+        // Filter to user's allowed areas (with normalization)
+        val filtered = allCameras.filter { camera ->
+            allowedAreas.any { allowedArea ->
+                AreaNormalizer.areasMatch(allowedArea, camera.area)
+            }
+        }
+
+        Log.d(TAG, "✅ User allowed areas: $allowedAreas")
+        Log.d(TAG, "✅ Filtered to ${filtered.size} cameras from user's ${allowedAreas.size} areas")
+
+        // Show breakdown by user's areas
+        val userAreaBreakdown = allowedAreas.map { area ->
+            val backendArea = AreaNormalizer.normalizeUserArea(area)
+            val camerasInArea = filtered.filter { it.area.equals(backendArea, ignoreCase = true) }
+            "$area: ${camerasInArea.size}"
+        }
+        Log.d(TAG, "📊 User area breakdown: ${userAreaBreakdown.joinToString(" | ")}")
+
+        // Show which areas from user's list have NO cameras
+        val missingAreas = allowedAreas.filter { area ->
+            !camerasByArea.keys.any { it.equals(area.lowercase(), ignoreCase = true) }
+        }
+        if (missingAreas.isNotEmpty()) {
+            Log.w(TAG, "⚠️ These allowed areas have NO cameras in cache: $missingAreas")
+        }
+
+        return filtered
+    }
+
+    private fun setupAreaSpinner() {
+        if (allowedAreas.isEmpty()) {
+            Log.w(TAG, "⚠️ No allowed areas for user")
+            areaSpinner.visibility = View.GONE
+            statsTextView.text = "No areas assigned to your account"
+            showEmptyView("No areas assigned to your account.\nPlease contact administrator.")
+            return
+        }
+
+        if (!CameraManager.hasData()) {
+            Log.w(TAG, "⚠️ No camera data available - waiting")
             areaSpinner.visibility = View.GONE
             statsTextView.text = "Pull down to load camera data"
             return
@@ -145,46 +239,64 @@ class CameraStreamsActivity : BaseDrawerActivity() {
 
         areaSpinner.visibility = View.VISIBLE
 
-        // Create display names (capitalized) but keep lowercase for internal use
-        areas = availableAreas.map { area ->
+        // ✅ Filter to only show user's allowed areas (with normalization)
+        val availableAreas = CameraManager.getAreas()
+        Log.d(TAG, "🔍 Available areas from cache: $availableAreas")
+
+        val filteredAreas = availableAreas.filter { backendArea ->
+            allowedAreas.any { allowedArea ->
+                AreaNormalizer.areasMatch(allowedArea, backendArea)
+            }
+        }
+
+        Log.d(TAG, "✅ Areas available for user: $filteredAreas (out of ${allowedAreas.size} allowed)")
+
+        if (filteredAreas.isEmpty()) {
+            Log.w(TAG, "⚠️ No camera data available for user's areas")
+            Log.w(TAG, "   User allowed areas: $allowedAreas")
+            Log.w(TAG, "   Backend cache areas: $availableAreas")
+
+            areaSpinner.visibility = View.GONE
+            statsTextView.text = "No cameras available for your assigned area(s)"
+            showEmptyView("No cameras available for your assigned area(s)\n\nBackend has cameras for:\n${availableAreas.joinToString(", ")}")
+            return
+        }
+
+        // Create display names (capitalized)
+        val displayAreas = filteredAreas.map { area ->
             area.replaceFirstChar { char ->
                 if (char.isLowerCase()) char.titlecase() else char.toString()
             }
         }
 
-        Log.d(TAG, "📍 Setting up spinner with ${areas.size} areas: $areas")
-        Log.d(TAG, "📍 Current area (lowercase): $currentArea")
+        Log.d(TAG, "📍 Setting up spinner with ${displayAreas.size} allowed areas: $displayAreas")
 
         val spinnerAdapter = ArrayAdapter(
             this,
             android.R.layout.simple_spinner_item,
-            areas
+            displayAreas
         )
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         areaSpinner.adapter = spinnerAdapter
 
-        // ✅ FIX: Case-insensitive matching
-        val currentIndex = areas.indexOfFirst {
+        // Set current area selection
+        val currentIndex = filteredAreas.indexOfFirst {
             it.equals(currentArea, ignoreCase = true)
         }
 
         if (currentIndex >= 0) {
             areaSpinner.setSelection(currentIndex, false)
-            Log.d(TAG, "✅ Set spinner to position $currentIndex: ${areas[currentIndex]}")
+            Log.d(TAG, "✅ Set spinner to position $currentIndex: ${displayAreas[currentIndex]}")
         } else {
-            Log.w(TAG, "⚠️ Could not find area '$currentArea' in available areas")
-            // Set to first area as fallback
-            if (areas.isNotEmpty()) {
-                currentArea = areas[0].lowercase()
-                areaSpinner.setSelection(0, false)
-                saveLastSelectedArea(currentArea)
-            }
+            currentArea = filteredAreas.first().lowercase()
+            areaSpinner.setSelection(0, false)
+            saveLastSelectedArea(currentArea)
+            Log.d(TAG, "✅ Reset to first area: $currentArea")
         }
 
         areaSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                // Convert display name back to lowercase for internal use
-                val selectedArea = areas[position].lowercase()
+                val selectedArea = filteredAreas[position].lowercase()
 
                 if (selectedArea != currentArea) {
                     currentArea = selectedArea
@@ -227,13 +339,13 @@ class CameraStreamsActivity : BaseDrawerActivity() {
                     return@launch
                 }
 
-                // ✅ Setup spinner if not already done or if areas changed
-                val availableAreas = CameraManager.getAreas()
-                if (areas.isEmpty() || areas.size != availableAreas.size) {
-                    setupAreaSpinner()
-                }
+                setupAreaSpinner()
 
-                loadCamerasForArea(currentArea)
+                if (currentArea.isNotEmpty() && allowedAreas.isNotEmpty()) {
+                    loadCamerasForArea(currentArea)
+                } else {
+                    swipeRefreshLayout.isRefreshing = false
+                }
 
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Error refreshing UI: ${e.message}", e)
@@ -243,6 +355,14 @@ class CameraStreamsActivity : BaseDrawerActivity() {
     }
 
     private fun loadCamerasForArea(area: String) {
+        // ✅ Validate area is allowed
+        if (!allowedAreas.any { it.equals(area, ignoreCase = true) }) {
+            Log.w(TAG, "⚠️ Area $area not allowed for user")
+            showEmptyView("You don't have access to this area")
+            swipeRefreshLayout.isRefreshing = false
+            return
+        }
+
         Log.d(TAG, "🔍 Loading cameras for area: $area")
 
         activityScope.launch {
@@ -290,15 +410,15 @@ class CameraStreamsActivity : BaseDrawerActivity() {
 
     private fun updateStatistics(area: String) {
         val stats = CameraManager.getAreaStatistics(area)
-        val allStats = CameraManager.getStatistics()
+        val allowedCameras = getAllowedCameras()
+        val allowedOnline = allowedCameras.count { it.isOnline() }
 
-        // ✅ FIX: Capitalize area name for display
         val displayArea = area.replaceFirstChar {
             if (it.isLowerCase()) it.titlecase() else it.toString()
         }
 
         val text = "$displayArea: ${stats.total} cameras (${stats.online} online) | " +
-                "Total: ${allStats.totalCameras} cameras across ${CameraManager.getAreas().size} areas"
+                "Your Access: ${allowedCameras.size} cameras (${allowedOnline} online) across ${allowedAreas.size} area(s)"
 
         statsTextView.text = text
         Log.d(TAG, "📊 Stats: $text")
@@ -326,9 +446,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
     private fun showEmptyView(message: String = "No cameras found") {
         recyclerView.visibility = View.GONE
         emptyView.visibility = View.VISIBLE
-
-        // Update the empty view text if you have a TextView in your empty view layout
-        // findViewById<TextView>(R.id.empty_message)?.text = message
     }
 
     private fun hideEmptyView() {
@@ -356,7 +473,9 @@ class CameraStreamsActivity : BaseDrawerActivity() {
 
             override fun onQueryTextChange(newText: String?): Boolean {
                 searchQuery = newText ?: ""
-                loadCamerasForArea(currentArea)
+                if (currentArea.isNotEmpty()) {
+                    loadCamerasForArea(currentArea)
+                }
                 return true
             }
         })
@@ -375,19 +494,16 @@ class CameraStreamsActivity : BaseDrawerActivity() {
                 true
             }
             R.id.action_refresh -> {
-                // Manual refresh button
                 Toast.makeText(this, "Refreshing camera list...", Toast.LENGTH_SHORT).show()
                 statsTextView.text = "Loading latest camera data..."
 
                 CameraManager.forceRefresh()
 
                 handler.postDelayed({
-                    val total = CameraManager.getAllCameras().size
-                    val areas = CameraManager.getAreas().size
-
+                    val allowedCameras = getAllowedCameras()
                     Toast.makeText(
                         this,
-                        "Loaded $total cameras from $areas areas",
+                        "Loaded ${allowedCameras.size} cameras from ${allowedAreas.size} area(s)",
                         Toast.LENGTH_SHORT
                     ).show()
 
@@ -409,12 +525,23 @@ class CameraStreamsActivity : BaseDrawerActivity() {
             return
         }
 
+        if (allowedAreas.isEmpty()) {
+            Toast.makeText(
+                this,
+                "No areas assigned to your account",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
         val intent = Intent(this, CameraMapActivity::class.java)
         startActivity(intent)
         Log.d(TAG, "🗺️ Opening camera map view")
     }
 
     private fun showOnlineOnlyForArea() {
+        if (currentArea.isEmpty()) return
+
         Log.d(TAG, "Filtering to show online cameras only for $currentArea")
 
         activityScope.launch(Dispatchers.Default) {

@@ -16,30 +16,32 @@ data class CameraInfo(
     @SerializedName("longitude") val longitude: String = "",
     @SerializedName("status") val status: String = "offline",
     @SerializedName("groupId") val groupId: Int = 0,
-    @SerializedName("area") private val _area: String = "",  // ✅ Changed to private
+    @SerializedName("area") private val _area: String = "",
     @SerializedName("transporter") val transporter: String = "",
     @SerializedName("location") val location: String = "",
-    @SerializedName("lastUpdate") val lastUpdate: String = ""
+    @SerializedName("lastUpdate") val lastUpdate: String? = null  // ✅ NULLABLE & OPTIONAL
 ) {
 
-    // ✅ NEW: Computed property that automatically sets area from groupId if missing
     val area: String
         get() = if (_area.isNotEmpty()) _area else getAreaNameForGroup(groupId)
 
     fun isOnline(): Boolean = status == "online"
 
+    // ✅ FIXED: Handle null/empty lastUpdate gracefully - ignore if not present
     fun getLastUpdateDate(): Date? {
-        if (lastUpdate.isEmpty()) return null
+        // Return null immediately if lastUpdate is null or empty - don't crash
+        if (lastUpdate.isNullOrEmpty()) return null
+
         return try {
             val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
             format.timeZone = TimeZone.getTimeZone("UTC")
             format.parse(lastUpdate)
         } catch (e: Exception) {
-            // Try alternative format without 'T' and 'Z'
             try {
                 val altFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
                 altFormat.parse(lastUpdate)
             } catch (e2: Exception) {
+                // Silently return null instead of crashing
                 null
             }
         }
@@ -49,9 +51,6 @@ data class CameraInfo(
         return getLastUpdateDate()?.time ?: System.currentTimeMillis()
     }
 
-    /**
-     * ✅ Get stream URL - automatically uses correct backend
-     */
     fun getStreamURL(): String {
         val serverURL = getServerURLForGroup(groupId)
         if (serverURL.isEmpty()) {
@@ -71,6 +70,7 @@ data class CameraInfo(
         return "rtsp://$ip:554/stream"
     }
 
+    // ✅ FIXED: Handle null lastUpdate in formatted display
     fun getFormattedLastUpdate(): String {
         val date = getLastUpdateDate() ?: return "Never"
         val now = System.currentTimeMillis()
@@ -85,11 +85,8 @@ data class CameraInfo(
     }
 
     companion object {
-
-
         fun getServerURLForGroup(groupId: Int): String {
             return if (BackendConfig.isCCL()) {
-                // CCL - HTTPS streams
                 when (groupId) {
                     1 -> "https://barkasayal.cclai.in/stream"
                     2 -> "https://argada.cclai.in/stream"
@@ -108,32 +105,27 @@ data class CameraInfo(
                     else -> ""
                 }
             } else {
-                // BCCL - HTTP streams
                 when (groupId) {
-                    5 -> "http://103.208.173.131:8888"      // BARORA
-                    6 -> "http://103.208.173.147:8888"      // BLOCK2
-                    7 -> "http://103.208.173.163:8888"      // GOVINDPUR
-                    8 -> "http://a5va.bccliccc.in:8888"     // KATRAS
-                    9 -> "http://a5va.bccliccc.in:8888"     // SIJUA
-                    10 -> "http://a6va.bccliccc.in:8888"    // KUSUNDA
-                    11 -> "http://103.208.173.195:8888"     // PB Area
-                    12 -> "http://a9va.bccliccc.in:8888"    // BASTACOLLA
-                    13 -> "http://a10va.bccliccc.in:8888"   // LODNA
-                    14 -> "http://103.210.88.195:8888"      // EJ Area
-                    15 -> "http://103.210.88.211:8888"      // CV Area
-                    16 -> "http://103.208.173.179:8888"     // CCWO Area
-                    22 -> "http://103.208.173.211:8888"     // WJ Area
+                    5 -> "http://103.208.173.131:8888"
+                    6 -> "http://103.208.173.147:8888"
+                    7 -> "http://103.208.173.163:8888"
+                    8 -> "http://a5va.bccliccc.in:8888"
+                    9 -> "http://a5va.bccliccc.in:8888"
+                    10 -> "http://a6va.bccliccc.in:8888"
+                    11 -> "http://103.208.173.195:8888"
+                    12 -> "http://a9va.bccliccc.in:8888"
+                    13 -> "http://a10va.bccliccc.in:8888"
+                    14 -> "http://103.210.88.195:8888"
+                    15 -> "http://103.210.88.211:8888"
+                    16 -> "http://103.208.173.179:8888"
+                    22 -> "http://103.208.173.211:8888"
                     else -> ""
                 }
             }
         }
 
-        /**
-         * ✅ Get area name for group ID based on organization
-         */
         fun getAreaNameForGroup(groupId: Int): String {
             return if (BackendConfig.isCCL()) {
-                // CCL area names
                 when (groupId) {
                     1 -> "barka sayal"
                     2 -> "argada"
@@ -152,7 +144,6 @@ data class CameraInfo(
                     else -> "unknown"
                 }
             } else {
-                // BCCL area names
                 when (groupId) {
                     5 -> "barora"
                     6 -> "block2"
