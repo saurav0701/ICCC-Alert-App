@@ -93,7 +93,7 @@ class LoginActivity : AppCompatActivity() {
 
     private fun requestLoginOTP(phone: String) {
         setLoading(true)
-        updateStatus("Checking BCCL backend...")
+        updateStatus("Checking User...")
 
         AuthManager.requestLogin(phone) { success, message ->
             runOnUiThread {

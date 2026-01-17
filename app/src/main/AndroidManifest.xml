@@ -156,6 +156,33 @@
             android:exported="false"
             android:screenOrientation="portrait" />
 
+        <!-- ✅ FIXED: Multi-Camera Views - Using MaterialComponents theme -->
+        <activity
+            android:name=".MultiCameraViewsActivity"
+            android:parentActivityName=".CameraStreamsActivity"
+            android:label="Multi-Camera Views"
+            android:theme="@style/Theme.MaterialComponents.Light.DarkActionBar"
+            android:exported="false" />
+
+        <!-- ✅ FIXED: Create Multi-Camera View - Using MaterialComponents theme -->
+        <activity
+            android:name=".CreateMultiCameraViewActivity"
+            android:parentActivityName=".MultiCameraViewsActivity"
+            android:label="Create Quad View"
+            android:theme="@style/Theme.MaterialComponents.Light.DarkActionBar"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="false" />
+
+        <!-- Quad Camera Player (2x2 Grid) -->
+        <activity
+            android:name=".QuadCameraPlayerActivity"
+            android:theme="@style/Theme.AppCompat.NoActionBar"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:parentActivityName=".MultiCameraViewsActivity"
+            android:screenOrientation="unspecified"
+            android:label="Quad View"
+            android:exported="false" />
+
         <!-- Image Viewer Activity -->
         <activity
             android:name=".ImageViewerActivity"

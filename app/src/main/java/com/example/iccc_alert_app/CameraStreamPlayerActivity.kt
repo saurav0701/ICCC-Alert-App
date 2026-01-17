@@ -40,8 +40,9 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var loadingView: FrameLayout
-    private lateinit var loadingText: TextView
     private lateinit var loadingSpinner: ProgressBar
+    private lateinit var loadingText: TextView
+    private lateinit var loadingSubtitle: TextView
     private lateinit var errorView: LinearLayout
     private lateinit var errorTextView: TextView
     private lateinit var retryButton: Button
@@ -131,8 +132,9 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
     private fun initializeViews() {
         webView = findViewById(R.id.webview)
         loadingView = findViewById(R.id.loading_view)
-        loadingText = findViewById(R.id.loading_text)
         loadingSpinner = findViewById(R.id.loading_spinner)
+        loadingText = findViewById(R.id.loading_text)
+        loadingSubtitle = findViewById(R.id.loading_subtitle)
         errorView = findViewById(R.id.error_view)
         errorTextView = findViewById(R.id.error_text)
         retryButton = findViewById(R.id.retry_button)
@@ -314,21 +316,16 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
             }
 
             override fun onBuffering() {
-                Log.d(TAG, "Showing buffering indicator")
+                Log.d(TAG, "Stream buffering")
                 runOnUiThread {
-                    if (webView.visibility == View.VISIBLE && errorView.visibility == View.GONE) {
-                        loadingView.visibility = View.VISIBLE
-                        loadingText.text = "Reconnecting..."
-                    }
+                    showBuffering()
                 }
             }
 
             override fun onBufferingEnd() {
-                Log.d(TAG, "Hiding buffering indicator")
+                Log.d(TAG, "Buffering ended")
                 runOnUiThread {
-                    if (errorView.visibility == View.GONE) {
-                        loadingView.visibility = View.GONE
-                    }
+                    loadingView.visibility = View.GONE
                 }
             }
         })
@@ -336,7 +333,6 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
 
     private fun loadStream() {
         showLoading()
-        loadingText.text = "Connecting to camera..."
         startStreamTimeout()
         WebViewManager.loadHlsStream(webView, streamUrl)
     }
@@ -363,6 +359,16 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
         webView.visibility = View.VISIBLE
         topControlBar.visibility = View.VISIBLE
         zoomControlBar.visibility = View.GONE
+
+        // ✅ Professional loading messages
+        loadingText.text = "Connecting to stream"
+        loadingSubtitle.text = "Please wait..."
+    }
+
+    private fun showBuffering() {
+        loadingView.visibility = View.VISIBLE
+        loadingText.text = "Buffering stream"
+        loadingSubtitle.text = "Loading video data..."
     }
 
     private fun showPlayer() {

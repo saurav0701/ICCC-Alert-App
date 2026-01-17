@@ -3,6 +3,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <!-- ✅ NEW: Map View Button -->
+
+    <item
+        android:id="@+id/action_multi_view"
+        android:title="Quad Views"
+        android:icon="@drawable/ic_grid"
+        app:showAsAction="ifRoom"/>
+
     <item
         android:id="@+id/action_map_view"
         android:title="Map View"

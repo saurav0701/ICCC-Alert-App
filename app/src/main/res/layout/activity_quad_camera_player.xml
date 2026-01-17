@@ -1,0 +1,539 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:fitsSystemWindows="true">
+
+    <!-- 2x2 Grid Container -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:weightSum="2">
+
+        <!-- Top Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:weightSum="2">
+
+            <!-- Camera 1 -->
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_margin="1dp">
+
+                <WebView
+                    android:id="@+id/webview_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#000000" />
+
+                <!-- ✅ Premium Loading Overlay -->
+                <FrameLayout
+                    android:id="@+id/loading_overlay_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#E6000000"
+                    android:visibility="gone"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:layout_gravity="center"
+                        app:cardCornerRadius="20dp"
+                        app:cardBackgroundColor="#1AFFFFFF"
+                        app:cardElevation="0dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:padding="20dp">
+
+                            <ProgressBar
+                                android:id="@+id/loading_1"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:indeterminateTint="#FFFFFF"
+                                style="@android:style/Widget.Material.ProgressBar" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:text="Connecting"
+                                android:textColor="#FFFFFF"
+                                android:textSize="13sp"
+                                android:textStyle="normal"
+                                android:fontFamily="sans-serif-medium"
+                                android:gravity="center"
+                                android:alpha="0.95" />
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
+                </FrameLayout>
+
+                <!-- Camera Info -->
+                <TextView
+                    android:id="@+id/info_1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|start"
+                    android:layout_margin="8dp"
+                    android:background="#CC000000"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:text="Camera 1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="10sp"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
+
+                <!-- Fullscreen Button -->
+                <ImageButton
+                    android:id="@+id/fullscreen_1"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="bottom|end"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/fullscreen_button_bg"
+                    android:src="@drawable/ic_fullscreen"
+                    android:tint="#FFFFFF"
+                    android:contentDescription="Fullscreen"
+                    android:padding="8dp"
+                    android:scaleType="fitCenter" />
+            </FrameLayout>
+
+            <!-- Camera 2 -->
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_margin="1dp">
+
+                <WebView
+                    android:id="@+id/webview_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#000000" />
+
+                <!-- ✅ Premium Loading Overlay -->
+                <FrameLayout
+                    android:id="@+id/loading_overlay_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#E6000000"
+                    android:visibility="gone"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:layout_gravity="center"
+                        app:cardCornerRadius="20dp"
+                        app:cardBackgroundColor="#1AFFFFFF"
+                        app:cardElevation="0dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:padding="20dp">
+
+                            <ProgressBar
+                                android:id="@+id/loading_2"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:indeterminateTint="#FFFFFF"
+                                style="@android:style/Widget.Material.ProgressBar" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:text="Connecting"
+                                android:textColor="#FFFFFF"
+                                android:textSize="13sp"
+                                android:textStyle="normal"
+                                android:fontFamily="sans-serif-medium"
+                                android:gravity="center"
+                                android:alpha="0.95" />
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/info_2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|start"
+                    android:layout_margin="8dp"
+                    android:background="#CC000000"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:text="Camera 2"
+                    android:textColor="#FFFFFF"
+                    android:textSize="10sp"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
+
+                <ImageButton
+                    android:id="@+id/fullscreen_2"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="bottom|end"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/fullscreen_button_bg"
+                    android:src="@drawable/ic_fullscreen"
+                    android:tint="#FFFFFF"
+                    android:contentDescription="Fullscreen"
+                    android:padding="8dp"
+                    android:scaleType="fitCenter" />
+
+                <LinearLayout
+                    android:id="@+id/empty_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/ic_camera"
+                        android:tint="#333333"
+                        android:alpha="0.5" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="Empty Slot"
+                        android:textColor="#666666"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Bottom Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:weightSum="2">
+
+            <!-- Camera 3 -->
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_margin="1dp">
+
+                <WebView
+                    android:id="@+id/webview_3"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#000000" />
+
+                <!-- ✅ Premium Loading Overlay -->
+                <FrameLayout
+                    android:id="@+id/loading_overlay_3"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#E6000000"
+                    android:visibility="gone"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:layout_gravity="center"
+                        app:cardCornerRadius="20dp"
+                        app:cardBackgroundColor="#1AFFFFFF"
+                        app:cardElevation="0dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:padding="20dp">
+
+                            <ProgressBar
+                                android:id="@+id/loading_3"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:indeterminateTint="#FFFFFF"
+                                style="@android:style/Widget.Material.ProgressBar" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:text="Connecting"
+                                android:textColor="#FFFFFF"
+                                android:textSize="13sp"
+                                android:textStyle="normal"
+                                android:fontFamily="sans-serif-medium"
+                                android:gravity="center"
+                                android:alpha="0.95" />
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/info_3"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|start"
+                    android:layout_margin="8dp"
+                    android:background="#CC000000"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:text="Camera 3"
+                    android:textColor="#FFFFFF"
+                    android:textSize="10sp"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
+
+                <ImageButton
+                    android:id="@+id/fullscreen_3"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="bottom|end"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/fullscreen_button_bg"
+                    android:src="@drawable/ic_fullscreen"
+                    android:tint="#FFFFFF"
+                    android:contentDescription="Fullscreen"
+                    android:padding="8dp"
+                    android:scaleType="fitCenter" />
+
+                <LinearLayout
+                    android:id="@+id/empty_3"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/ic_camera"
+                        android:tint="#333333"
+                        android:alpha="0.5" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="Empty Slot"
+                        android:textColor="#666666"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <!-- Camera 4 -->
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_margin="1dp">
+
+                <WebView
+                    android:id="@+id/webview_4"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#000000" />
+
+                <!-- ✅ Premium Loading Overlay -->
+                <FrameLayout
+                    android:id="@+id/loading_overlay_4"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#E6000000"
+                    android:visibility="gone"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:layout_gravity="center"
+                        app:cardCornerRadius="20dp"
+                        app:cardBackgroundColor="#1AFFFFFF"
+                        app:cardElevation="0dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:padding="20dp">
+
+                            <ProgressBar
+                                android:id="@+id/loading_4"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:indeterminateTint="#FFFFFF"
+                                style="@android:style/Widget.Material.ProgressBar" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:text="Connecting"
+                                android:textColor="#FFFFFF"
+                                android:textSize="13sp"
+                                android:textStyle="normal"
+                                android:fontFamily="sans-serif-medium"
+                                android:gravity="center"
+                                android:alpha="0.95" />
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/info_4"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|start"
+                    android:layout_margin="8dp"
+                    android:background="#CC000000"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:text="Camera 4"
+                    android:textColor="#FFFFFF"
+                    android:textSize="10sp"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
+
+                <ImageButton
+                    android:id="@+id/fullscreen_4"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="bottom|end"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/fullscreen_button_bg"
+                    android:src="@drawable/ic_fullscreen"
+                    android:tint="#FFFFFF"
+                    android:contentDescription="Fullscreen"
+                    android:padding="8dp"
+                    android:scaleType="fitCenter" />
+
+                <LinearLayout
+                    android:id="@+id/empty_4"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/ic_camera"
+                        android:tint="#333333"
+                        android:alpha="0.5" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="Empty Slot"
+                        android:textColor="#666666"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </FrameLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Top Control Bar - Always Visible with proper padding -->
+    <LinearLayout
+        android:id="@+id/top_control_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="@drawable/gradient_overlay"
+        android:orientation="vertical"
+        android:paddingTop="24dp"
+        android:paddingBottom="16dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="16dp"
+        android:elevation="8dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageButton
+                android:id="@+id/back_button"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_arrow_back"
+                android:tint="#FFFFFF"
+                android:contentDescription="Back"
+                android:padding="12dp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/view_name_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Quad View"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:shadowColor="#000000"
+                    android:shadowDx="1"
+                    android:shadowDy="1"
+                    android:shadowRadius="3" />
+
+                <TextView
+                    android:id="@+id/stats_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="4 cameras • 4 online"
+                    android:textColor="#CCCCCC"
+                    android:textSize="13sp"
+                    android:shadowColor="#000000"
+                    android:shadowDx="1"
+                    android:shadowDy="1"
+                    android:shadowRadius="3" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+</FrameLayout>

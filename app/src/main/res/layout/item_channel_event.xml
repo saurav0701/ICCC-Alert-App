@@ -316,7 +316,7 @@
                     android:layout_weight="1"
                     android:text="More"
                     android:textSize="13sp"
-                    android:textColor="#424242"
+                    android:textColor="#FFFFFF"
                     android:background="@drawable/action_button_secondary_bg"
                     android:textAllCaps="false"
                     android:fontFamily="sans-serif-medium"
@@ -327,7 +327,6 @@
 
             </LinearLayout>
 
-            <!-- Save with Priority Section -->
             <LinearLayout
                 android:id="@+id/save_priority_section"
                 android:layout_width="match_parent"

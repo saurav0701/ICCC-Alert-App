@@ -12,7 +12,7 @@ import android.webkit.WebViewClient
 object WebViewManager {
 
     private const val TAG = "WebViewManager"
-    private const val STREAM_TIMEOUT_MS = 10000L // 10 seconds timeout
+    private const val STREAM_TIMEOUT_MS = 10000L
 
     interface WebViewCallback {
         fun onPageLoaded()
@@ -37,55 +37,45 @@ object WebViewManager {
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             cacheMode = WebSettings.LOAD_NO_CACHE
             setRenderPriority(WebSettings.RenderPriority.HIGH)
-            setSupportZoom(true)
+            setSupportZoom(false)
             builtInZoomControls = false
             displayZoomControls = false
             allowFileAccess = false
             allowContentAccess = false
             useWideViewPort = true
             loadWithOverviewMode = true
-
-            @Suppress("DEPRECATION")
-            setRenderPriority(WebSettings.RenderPriority.HIGH)
         }
 
         webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+        webView.setOnLongClickListener { true }
+        webView.isLongClickable = false
 
-        // Add JavaScript interface to detect stream status
         webView.addJavascriptInterface(object {
             @android.webkit.JavascriptInterface
             fun onStreamStarted() {
-                Log.d(TAG, "✅ Stream started - detected from JavaScript")
+                Log.d(TAG, "✅ Stream started")
                 streamStarted = true
                 cancelTimeout()
-                Handler(Looper.getMainLooper()).post {
-                    callback.onStreamStarted()
-                }
+                Handler(Looper.getMainLooper()).post { callback.onStreamStarted() }
             }
 
             @android.webkit.JavascriptInterface
             fun onStreamError(error: String) {
-                Log.e(TAG, "❌ Stream error from JavaScript: $error")
+                Log.e(TAG, "❌ Stream error: $error")
                 cancelTimeout()
-                Handler(Looper.getMainLooper()).post {
-                    callback.onError(error)
-                }
+                Handler(Looper.getMainLooper()).post { callback.onError(error) }
             }
 
             @android.webkit.JavascriptInterface
             fun onBuffering() {
                 Log.d(TAG, "🔄 Buffering started")
-                Handler(Looper.getMainLooper()).post {
-                    callback.onBuffering()
-                }
+                Handler(Looper.getMainLooper()).post { callback.onBuffering() }
             }
 
             @android.webkit.JavascriptInterface
             fun onBufferingEnd() {
                 Log.d(TAG, "✅ Buffering ended")
-                Handler(Looper.getMainLooper()).post {
-                    callback.onBufferingEnd()
-                }
+                Handler(Looper.getMainLooper()).post { callback.onBufferingEnd() }
             }
         }, "Android")
 
@@ -96,12 +86,7 @@ object WebViewManager {
             }
 
             @Suppress("DEPRECATION")
-            override fun onReceivedError(
-                view: WebView?,
-                errorCode: Int,
-                description: String?,
-                failingUrl: String?
-            ) {
+            override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
                 super.onReceivedError(view, errorCode, description, failingUrl)
                 Log.e(TAG, "❌ WebView error: $description")
                 cancelTimeout()
@@ -120,9 +105,16 @@ object WebViewManager {
 <!DOCTYPE html>
 <html>
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { 
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+        }
         body { 
             background: #000; 
             overflow: hidden;
@@ -134,145 +126,178 @@ object WebViewManager {
             position: relative;
         }
         #video-container {
-            position: relative;
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            background: #000;
+            z-index: 1;
         }
         video { 
             width: 100%;
             height: 100%;
             object-fit: contain;
             background: #000;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        /* ✅ COMPLETE VIDEO CONTROL REMOVAL */
+        video::-webkit-media-controls { display: none !important; }
+        video::-webkit-media-controls-panel { display: none !important; }
+        video::-webkit-media-controls-play-button { display: none !important; }
+        video::-webkit-media-controls-volume-slider { display: none !important; }
+        video::-webkit-media-controls-mute-button { display: none !important; }
+        video::-webkit-media-controls-toggle-closed-captions-button { display: none !important; }
+        video::-webkit-media-controls-fullscreen-button { display: none !important; }
+        video::-webkit-media-controls-timeline { display: none !important; }
+        video::-webkit-media-controls-time-display { display: none !important; }
+        video::-webkit-media-controls-current-time-display { display: none !important; }
+        video::-webkit-media-controls-download-button { display: none !important; }
+        video::-webkit-media-controls-overlay-play-button { display: none !important; }
+        video::-webkit-media-controls-overlay { display: none !important; }
+        
+        /* Block all video interactions */
+        video { pointer-events: none !important; }
+        
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        #loading-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #FFFFFF;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
     <div id="video-container">
-        <video id="video" playsinline webkit-playsinline></video>
+        <video id="video" playsinline webkit-playsinline controlsList="nodownload nofullscreen noremoteplayback"></video>
+    </div>
+    <div id="loading-overlay">
+        <div class="spinner"></div>
     </div>
 
     <script>
         const video = document.getElementById('video');
+        const loadingOverlay = document.getElementById('loading-overlay');
         let hls = null;
         let scale = 1;
         let isPlaying = true;
         let isRecovering = false;
-        let streamLoadTimeout = null;
 
-        // Notify Android of stream status
+        // ✅ AGGRESSIVE control removal
+        video.removeAttribute('controls');
+        Object.defineProperty(video, 'controls', { get: () => false, set: () => {} });
+        video.style.pointerEvents = 'none';
+        video.style.cursor = 'default';
+        video.oncontextmenu = (e) => e.preventDefault();
+
+        function hideLoading() {
+            loadingOverlay.classList.remove('active');
+        }
+
+        function showLoading() {
+            loadingOverlay.classList.add('active');
+        }
+
         function notifyStreamStarted() {
             try {
-                if (typeof Android !== 'undefined') {
-                    Android.onStreamStarted();
-                }
-            } catch(e) {
-                console.error('Failed to notify Android:', e);
-            }
+                hideLoading();
+                if (typeof Android !== 'undefined') Android.onStreamStarted();
+            } catch(e) {}
         }
 
         function notifyStreamError(error) {
             try {
-                if (typeof Android !== 'undefined') {
-                    Android.onStreamError(error);
-                }
-            } catch(e) {
-                console.error('Failed to notify Android:', e);
-            }
+                if (typeof Android !== 'undefined') Android.onStreamError(error);
+            } catch(e) {}
         }
 
-        // Zoom functions
         window.setZoom = function(zoomLevel) {
             scale = zoomLevel;
             video.style.transform = 'scale(' + scale + ')';
-            console.log('Zoom set to: ' + scale);
         };
 
         window.resetZoom = function() {
             scale = 1;
             video.style.transform = 'scale(1)';
-            console.log('Zoom reset');
         };
 
-        // Playback control functions
         window.pauseStream = function() {
             try {
                 video.pause();
                 isPlaying = false;
-                console.log('Stream paused');
                 return true;
-            } catch(e) {
-                console.error('Pause error:', e);
-                return false;
-            }
+            } catch(e) { return false; }
         };
 
         window.playStream = function() {
             try {
-                video.play().then(() => {
-                    isPlaying = true;
-                    console.log('Stream playing');
-                }).catch(e => {
-                    console.error('Play error:', e);
-                });
+                video.play().catch(e => console.error('Play error:', e));
+                isPlaying = true;
                 return true;
-            } catch(e) {
-                console.error('Play error:', e);
-                return false;
-            }
+            } catch(e) { return false; }
         };
 
         window.getPlaybackState = function() {
             return isPlaying ? 'playing' : 'paused';
         };
 
-        // Show buffering indicator
         function showBuffering() {
             try {
-                if (typeof Android !== 'undefined') {
-                    Android.onBuffering();
-                }
-            } catch(e) {
-                console.error('Failed to notify buffering:', e);
-            }
+                showLoading();
+                if (typeof Android !== 'undefined') Android.onBuffering();
+            } catch(e) {}
         }
 
         function hideBuffering() {
             try {
-                if (typeof Android !== 'undefined') {
-                    Android.onBufferingEnd();
-                }
-            } catch(e) {
-                console.error('Failed to notify buffering end:', e);
-            }
+                hideLoading();
+                if (typeof Android !== 'undefined') Android.onBufferingEnd();
+            } catch(e) {}
         }
 
-        // Auto-recovery function
         function recoverPlayback() {
             if (isRecovering) return;
             isRecovering = true;
             showBuffering();
             
-            console.log('Attempting playback recovery...');
-            
             setTimeout(() => {
                 if (hls && isPlaying) {
-                    console.log('Recovering HLS stream...');
                     hls.recoverMediaError();
-                    
                     setTimeout(() => {
                         video.play().then(() => {
-                            console.log('Recovery successful');
                             isRecovering = false;
                             hideBuffering();
                         }).catch(e => {
-                            console.error('Recovery play failed:', e);
                             isRecovering = false;
                             hideBuffering();
-                            notifyStreamError('Recovery failed: ' + e.message);
+                            notifyStreamError('Recovery failed');
                         });
                     }, 200);
                 } else {
@@ -282,7 +307,6 @@ object WebViewManager {
             }, 100);
         }
 
-        // Initialize HLS
         function initializeStream() {
             if (Hls.isSupported()) {
                 hls = new Hls({ 
@@ -304,129 +328,82 @@ object WebViewManager {
                 hls.attachMedia(video);
                 
                 hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    console.log('✅ HLS manifest parsed');
                     video.muted = false;
                     video.play().then(() => {
                         isPlaying = true;
-                        console.log('✅ Auto-play successful');
                         notifyStreamStarted();
                     }).catch(e => {
-                        console.log('Auto-play prevented, trying muted:', e.message);
                         video.muted = true;
                         video.play().then(() => {
                             isPlaying = true;
-                            console.log('✅ Playing muted');
                             notifyStreamStarted();
                         }).catch(err => {
-                            console.error('❌ Failed to start playback:', err);
-                            notifyStreamError('Failed to start playback: ' + err.message);
+                            notifyStreamError('Failed to start playback');
                         });
                     });
                 });
                 
                 hls.on(Hls.Events.ERROR, function(event, data) {
-                    console.error('❌ HLS error:', data.type, data.details, data);
-                    
                     if (data.fatal) {
                         switch(data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
-                                console.error('❌ Fatal network error');
-                                notifyStreamError('Network error - camera may be offline');
+                                notifyStreamError('Network error');
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
-                                console.log('Media error, trying to recover...');
                                 showBuffering();
                                 hls.recoverMediaError();
-                                setTimeout(() => {
-                                    hideBuffering();
-                                }, 2000);
+                                setTimeout(() => hideBuffering(), 2000);
                                 break;
                             default:
-                                console.error('❌ Fatal error:', data.details);
-                                notifyStreamError('Stream error: ' + data.details);
+                                notifyStreamError('Stream error');
                                 break;
                         }
                     } else if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
-                        console.log('Buffer stalled, attempting recovery...');
                         recoverPlayback();
                     } else if (data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR || 
                                data.details === Hls.ErrorDetails.FRAG_LOAD_TIMEOUT) {
-                        console.log('Fragment load issue, showing buffering...');
                         showBuffering();
-                        setTimeout(() => {
-                            hideBuffering();
-                        }, 2000);
+                        setTimeout(() => hideBuffering(), 2000);
                     }
-                });
-                
-                hls.on(Hls.Events.MANIFEST_LOADING, function() {
-                    console.log('📡 Loading manifest...');
                 });
 
                 hls.on(Hls.Events.MANIFEST_LOAD_ERROR, function() {
-                    console.error('❌ Failed to load manifest');
-                    notifyStreamError('Failed to connect to camera');
+                    notifyStreamError('Failed to connect');
                 });
                 
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = '${streamUrl}';
                 video.addEventListener('loadedmetadata', function() {
                     video.muted = false;
-                    video.play().then(() => {
-                        isPlaying = true;
-                        notifyStreamStarted();
-                    }).catch(e => {
-                        console.error('Play error:', e);
-                        notifyStreamError('Failed to play: ' + e.message);
-                    });
+                    video.play().catch(e => notifyStreamError('Failed to play'));
                 });
             }
         }
 
-        // Monitor video events
         video.addEventListener('pause', function() {
-            if (!video.ended && document.visibilityState === 'visible' && isPlaying && !isRecovering) {
-                console.log('Video paused unexpectedly, resuming...');
+            if (!video.ended && isPlaying && !isRecovering) {
                 showBuffering();
-                setTimeout(function() {
-                    video.play().then(() => {
-                        hideBuffering();
-                    }).catch(e => {
-                        console.log('Resume play error:', e);
-                        hideBuffering();
-                    });
+                setTimeout(() => {
+                    video.play().catch(e => hideBuffering());
                 }, 100);
             }
         });
 
         video.addEventListener('playing', function() {
-            console.log('✅ Video is playing');
             isRecovering = false;
             hideBuffering();
         });
 
-        video.addEventListener('waiting', function() {
-            console.log('🔄 Video buffering...');
-            showBuffering();
-        });
-
-        video.addEventListener('canplay', function() {
-            console.log('✅ Video can play');
-            hideBuffering();
-        });
-
+        video.addEventListener('waiting', function() { showBuffering(); });
+        video.addEventListener('canplay', function() { hideBuffering(); });
         video.addEventListener('stalled', function() {
-            console.log('⚠️ Video stalled');
             showBuffering();
             setTimeout(() => {
-                if (video.readyState < 3 && isPlaying) {
-                    recoverPlayback();
-                }
+                if (video.readyState < 3 && isPlaying) recoverPlayback();
             }, 3000);
         });
 
         video.addEventListener('error', function(e) {
-            console.error('❌ Video element error:', e);
             showBuffering();
             setTimeout(() => {
                 if (isPlaying && !isRecovering) {
@@ -437,18 +414,27 @@ object WebViewManager {
             }, 1000);
         });
 
-        // Start stream
+        // ✅ Prevent native media UI from showing
+        document.addEventListener('fullscreenchange', (e) => {
+            document.exitFullscreen().catch(() => {});
+        });
+        
+        // Block any attempt to show native controls
+        setInterval(() => {
+            const video = document.querySelector('video');
+            if (video && video.getAttribute('controls')) {
+                video.removeAttribute('controls');
+            }
+        }, 100);
+
         initializeStream();
 
         // Heartbeat
         window.isPipMode = false;
         setInterval(function() {
-            if (window.isPipMode) {
-                return;
-            }
+            if (window.isPipMode) return;
             if (isPlaying && video.paused && !isRecovering) {
-                console.log('Heartbeat: Recovering paused stream...');
-                video.play().catch(e => console.log('Heartbeat play error:', e));
+                video.play().catch(e => {});
             }
         }, 5000);
     </script>
@@ -464,17 +450,14 @@ object WebViewManager {
         timeoutHandler = Handler(Looper.getMainLooper())
         timeoutRunnable = Runnable {
             if (!streamStarted) {
-                Log.w(TAG, "⏱️ Stream timeout - no response after ${STREAM_TIMEOUT_MS}ms")
-                // This will be handled in the activity
+                Log.w(TAG, "⏱️ Stream timeout")
             }
         }
         timeoutHandler?.postDelayed(timeoutRunnable!!, STREAM_TIMEOUT_MS)
     }
 
     private fun cancelTimeout() {
-        timeoutRunnable?.let { runnable ->
-            timeoutHandler?.removeCallbacks(runnable)
-        }
+        timeoutRunnable?.let { timeoutHandler?.removeCallbacks(it) }
         timeoutHandler = null
         timeoutRunnable = null
     }

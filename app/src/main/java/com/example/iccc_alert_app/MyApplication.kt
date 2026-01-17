@@ -34,42 +34,50 @@ class MyApplication : Application() {
 
         applySavedTheme()
 
+        // ✅ CRITICAL: Initialize these SYNCHRONOUSLY before MainActivity can access them
+        try {
+            BackendConfig.initialize(this)
+            Log.d(TAG, "✅ BackendConfig initialized (sync)")
+            PersistentLogger.logEvent("SYSTEM", "BackendConfig initialized")
+
+            AuthManager.initialize(this)
+            Log.d(TAG, "✅ AuthManager initialized (sync)")
+            PersistentLogger.logEvent("SYSTEM", "AuthManager initialized")
+
+            SubscriptionManager.initialize(this)
+            Log.d(TAG, "✅ SubscriptionManager initialized (sync)")
+            PersistentLogger.logEvent("SYSTEM", "SubscriptionManager initialized")
+
+            ChannelSyncState.initialize(this)
+            Log.d(TAG, "✅ ChannelSyncState initialized (sync)")
+            PersistentLogger.logEvent("SYSTEM", "ChannelSyncState initialized")
+
+            SavedMessagesManager.initialize(this)
+            Log.d(TAG, "✅ SavedMessagesManager initialized (sync)")
+            PersistentLogger.logEvent("SYSTEM", "SavedMessagesManager initialized")
+
+            MultiCameraManager.initialize(this)
+            Log.d(TAG, "✅ MultiCameraManager initialized (sync)")
+            PersistentLogger.logEvent("SYSTEM", "MultiCameraManager initialized")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ CRITICAL: Failed to initialize core managers", e)
+            PersistentLogger.logError("SYSTEM", "Core initialization failed", e)
+        }
+
+        // ✅ Non-critical initialization can happen async
         applicationScope.launch {
             try {
-                BackendConfig.initialize(this@MyApplication)
-                Log.d(TAG, "BackendConfig initialized")
-                PersistentLogger.logEvent("SYSTEM", "BackendConfig initialized (org will be set after login)")
-
-                AuthManager.initialize(this@MyApplication)
-                Log.d(TAG, "AuthManager initialized")
-                PersistentLogger.logEvent("SYSTEM", "AuthManager initialized")
-
-                SubscriptionManager.initialize(this@MyApplication)
-                Log.d(TAG, "SubscriptionManager initialized")
-                PersistentLogger.logEvent("SYSTEM", "SubscriptionManager initialized")
-
-                ChannelSyncState.initialize(this@MyApplication)
-                Log.d(TAG, "ChannelSyncState initialized")
-                PersistentLogger.logEvent("SYSTEM", "ChannelSyncState initialized")
-
-                // ✅ CRITICAL FIX: Only initialize context, DON'T start polling
                 CameraManager.initializeContext(this@MyApplication)
-                Log.d(TAG, "CameraManager context initialized (polling deferred)")
-                PersistentLogger.logEvent("SYSTEM", "CameraManager context ready (waiting for login)")
+                Log.d(TAG, "CameraManager context initialized (async)")
+                PersistentLogger.logEvent("SYSTEM", "CameraManager context ready")
 
-                SavedMessagesManager.initialize(this@MyApplication)
-                Log.d(TAG, "SavedMessagesManager initialized")
-                PersistentLogger.logEvent("SYSTEM", "SavedMessagesManager initialized")
-
-                Log.d(TAG, "WebSocket will be started by MainActivity after login check")
-                PersistentLogger.logEvent("SYSTEM", "WebSocket start deferred to MainActivity")
-
-                Log.d(TAG, "Application initialized successfully")
+                Log.d(TAG, "===== APPLICATION INITIALIZATION COMPLETE =====")
                 PersistentLogger.logEvent("SYSTEM", "===== APPLICATION INITIALIZATION COMPLETE =====")
 
             } catch (e: Exception) {
-                Log.e(TAG, "Error during application initialization", e)
-                PersistentLogger.logError("SYSTEM", "Application initialization failed", e)
+                Log.e(TAG, "Error during async initialization", e)
+                PersistentLogger.logError("SYSTEM", "Async initialization failed", e)
             }
         }
     }
@@ -95,7 +103,7 @@ class MyApplication : Application() {
 
         } catch (e: Exception) {
             Log.e(TAG, "Error applying theme, using system default", e)
-            PersistentLogger.logError("SYSTEM", "Failed to apply theme, using system default", e)
+            PersistentLogger.logError("SYSTEM", "Failed to apply theme", e)
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
         }
     }
@@ -109,7 +117,7 @@ class MyApplication : Application() {
     override fun onLowMemory() {
         super.onLowMemory()
         Log.w(TAG, "⚠️ LOW MEMORY WARNING")
-        PersistentLogger.logEvent("SYSTEM", "LOW MEMORY WARNING - system requesting memory release")
+        PersistentLogger.logEvent("SYSTEM", "LOW MEMORY WARNING")
     }
 
     override fun onTrimMemory(level: Int) {

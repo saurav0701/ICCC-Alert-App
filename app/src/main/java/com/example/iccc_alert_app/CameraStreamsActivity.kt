@@ -43,7 +43,7 @@ class CameraStreamsActivity : BaseDrawerActivity() {
 
     private var currentArea: String = ""
     private var searchQuery: String = ""
-    private var allowedAreas = listOf<String>()  // ✅ User's allowed areas
+    private var allowedAreas = listOf<String>()
     private var isFirstLoad = true
 
     private val cameraUpdateReceiver = object : BroadcastReceiver() {
@@ -62,7 +62,7 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         setSelectedMenuItem(R.id.nav_camera_streams)
 
         initializeViews()
-        loadUserAllowedAreas()  // ✅ Load user's allowed areas first
+        loadUserAllowedAreas()
 
         setupSwipeRefresh()
         setupRecyclerView()
@@ -92,9 +92,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         statsTextView = findViewById(R.id.stats_text)
     }
 
-    /**
-     * ✅ Load user's allowed areas from their profile with normalization
-     */
     private fun loadUserAllowedAreas() {
         val user = AuthManager.getCurrentUser()
 
@@ -108,21 +105,18 @@ class CameraStreamsActivity : BaseDrawerActivity() {
 
         allowedAreas = when {
             userArea.uppercase() == "HQ" -> {
-                // HQ users can see all areas
                 Log.d(TAG, "✅ HQ user - all areas allowed")
                 CameraManager.getAreas()
             }
             userArea.contains(",") -> {
-                // Multi-area user - normalize each area
                 val areas = userArea.split(",")
                     .map { it.trim() }
                     .filter { it.isNotEmpty() }
-                    .map { AreaNormalizer.normalizeUserArea(it) }  // ✅ NORMALIZE
+                    .map { AreaNormalizer.normalizeUserArea(it) }
                 Log.d(TAG, "✅ Multi-area user - ${areas.size} areas allowed (after normalization): $areas")
                 areas
             }
             userArea.isNotEmpty() -> {
-                // Single area user - normalize
                 val normalized = AreaNormalizer.normalizeUserArea(userArea)
                 Log.d(TAG, "✅ Single area user - 1 area allowed: '$userArea' -> '$normalized'")
                 listOf(normalized)
@@ -172,9 +166,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         }
     }
 
-    /**
-     * ✅ Get only cameras from user's allowed areas - with detailed logging
-     */
     private fun getAllowedCameras(): List<CameraInfo> {
         if (allowedAreas.isEmpty()) {
             Log.w(TAG, "⚠️ No allowed areas configured for user")
@@ -184,7 +175,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         val allCameras = CameraManager.getAllCameras()
         Log.d(TAG, "📊 Total cameras in cache: ${allCameras.size}")
 
-        // Group all cameras by area (for debugging)
         val camerasByArea = allCameras.groupBy { it.area.lowercase() }
         Log.d(TAG, "📍 Areas with cameras in cache: ${camerasByArea.keys.sorted()}")
 
@@ -192,7 +182,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
             Log.d(TAG, "   ├─ $area: ${cameras.size} cameras (online: ${cameras.count { it.isOnline() }})")
         }
 
-        // Filter to user's allowed areas (with normalization)
         val filtered = allCameras.filter { camera ->
             allowedAreas.any { allowedArea ->
                 AreaNormalizer.areasMatch(allowedArea, camera.area)
@@ -202,7 +191,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         Log.d(TAG, "✅ User allowed areas: $allowedAreas")
         Log.d(TAG, "✅ Filtered to ${filtered.size} cameras from user's ${allowedAreas.size} areas")
 
-        // Show breakdown by user's areas
         val userAreaBreakdown = allowedAreas.map { area ->
             val backendArea = AreaNormalizer.normalizeUserArea(area)
             val camerasInArea = filtered.filter { it.area.equals(backendArea, ignoreCase = true) }
@@ -210,7 +198,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         }
         Log.d(TAG, "📊 User area breakdown: ${userAreaBreakdown.joinToString(" | ")}")
 
-        // Show which areas from user's list have NO cameras
         val missingAreas = allowedAreas.filter { area ->
             !camerasByArea.keys.any { it.equals(area.lowercase(), ignoreCase = true) }
         }
@@ -239,7 +226,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
 
         areaSpinner.visibility = View.VISIBLE
 
-        // ✅ Filter to only show user's allowed areas (with normalization)
         val availableAreas = CameraManager.getAreas()
         Log.d(TAG, "🔍 Available areas from cache: $availableAreas")
 
@@ -262,7 +248,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
             return
         }
 
-        // Create display names (capitalized)
         val displayAreas = filteredAreas.map { area ->
             area.replaceFirstChar { char ->
                 if (char.isLowerCase()) char.titlecase() else char.toString()
@@ -279,7 +264,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         areaSpinner.adapter = spinnerAdapter
 
-        // Set current area selection
         val currentIndex = filteredAreas.indexOfFirst {
             it.equals(currentArea, ignoreCase = true)
         }
@@ -355,7 +339,6 @@ class CameraStreamsActivity : BaseDrawerActivity() {
     }
 
     private fun loadCamerasForArea(area: String) {
-        // ✅ Validate area is allowed
         if (!allowedAreas.any { it.equals(area, ignoreCase = true) }) {
             Log.w(TAG, "⚠️ Area $area not allowed for user")
             showEmptyView("You don't have access to this area")
@@ -489,6 +472,11 @@ class CameraStreamsActivity : BaseDrawerActivity() {
                 openMapView()
                 true
             }
+            // ✅ NEW: Open Multi-Camera Views
+            R.id.action_multi_view -> {
+                openMultiCameraViews()
+                true
+            }
             R.id.action_filter_online -> {
                 showOnlineOnlyForArea()
                 true
@@ -537,6 +525,31 @@ class CameraStreamsActivity : BaseDrawerActivity() {
         val intent = Intent(this, CameraMapActivity::class.java)
         startActivity(intent)
         Log.d(TAG, "🗺️ Opening camera map view")
+    }
+
+    // ✅ NEW: Open Multi-Camera Views screen
+    private fun openMultiCameraViews() {
+        if (!CameraManager.hasData()) {
+            Toast.makeText(
+                this,
+                "Loading camera data, please wait...",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        if (allowedAreas.isEmpty()) {
+            Toast.makeText(
+                this,
+                "No areas assigned to your account",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        val intent = Intent(this, MultiCameraViewsActivity::class.java)
+        startActivity(intent)
+        Log.d(TAG, "🎬 Opening multi-camera views")
     }
 
     private fun showOnlineOnlyForArea() {

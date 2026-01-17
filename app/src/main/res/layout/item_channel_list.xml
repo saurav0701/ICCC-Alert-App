@@ -43,7 +43,7 @@
         android:orientation="vertical"
         android:layout_centerVertical="true">
 
-        <!-- Top Row: Title, Pin Icon, NEW/LIVE Badge and Timestamp -->
+        <!-- Top Row: Title, Pin Icon and Timestamp -->
         <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
@@ -53,7 +53,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentStart="true"
-                android:layout_toStartOf="@id/indicators_container"
+                android:layout_toStartOf="@id/pin_icon"
                 android:text="Sijua - Vehicle Detection"
                 android:textSize="16sp"
                 android:textStyle="normal"
@@ -62,62 +62,17 @@
                 android:ellipsize="end"
                 android:fontFamily="sans-serif-medium" />
 
-            <!-- ✅ NEW: Indicators Container (LIVE, NEW, Pin) -->
-            <LinearLayout
-                android:id="@+id/indicators_container"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+            <!-- Pin Icon -->
+            <ImageView
+                android:id="@+id/pin_icon"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
                 android:layout_toStartOf="@id/channel_timestamp"
                 android:layout_centerVertical="true"
-                android:orientation="horizontal"
-                android:layout_marginEnd="6dp">
-
-                <!-- ✅ LIVE Indicator (Red, Pulsing) -->
-                <TextView
-                    android:id="@+id/live_indicator"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="LIVE"
-                    android:textSize="10sp"
-                    android:textStyle="bold"
-                    android:textColor="#FFFFFF"
-                    android:background="@drawable/live_badge_background"
-                    android:paddingStart="6dp"
-                    android:paddingEnd="6dp"
-                    android:paddingTop="2dp"
-                    android:paddingBottom="2dp"
-                    android:visibility="gone"
-                    android:layout_marginEnd="4dp" />
-
-                <!-- ✅ NEW Indicator (Orange) -->
-                <TextView
-                    android:id="@+id/new_indicator"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="NEW"
-                    android:textSize="10sp"
-                    android:textStyle="bold"
-                    android:textColor="#FFFFFF"
-                    android:background="@drawable/new_badge_background"
-                    android:paddingStart="6dp"
-                    android:paddingEnd="6dp"
-                    android:paddingTop="2dp"
-                    android:paddingBottom="2dp"
-                    android:visibility="gone"
-                    android:layout_marginEnd="4dp" />
-
-                <!-- Pin Icon -->
-                <ImageView
-                    android:id="@+id/pin_icon"
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:layout_gravity="center_vertical"
-                    android:src="@drawable/ic_pin"
-                    android:tint="#FF9800"
-                    android:visibility="gone"
-                    android:layout_marginEnd="4dp" />
-
-            </LinearLayout>
+                android:src="@drawable/ic_pin"
+                android:tint="#FF9800"
+                android:visibility="gone"
+                android:layout_marginEnd="6dp" />
 
             <TextView
                 android:id="@+id/channel_timestamp"
@@ -151,7 +106,7 @@
                 android:ellipsize="end"
                 android:layout_centerVertical="true" />
 
-            <!-- ✅ ENHANCED: Unread Badge with Dynamic Colors -->
+            <!-- ✅ Unread Badge with Dynamic Colors -->
             <TextView
                 android:id="@+id/unread_badge"
                 android:layout_width="wrap_content"

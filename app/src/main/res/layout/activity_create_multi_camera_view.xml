@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#F5F5F5"
+    android:fitsSystemWindows="true">
+
+    <!-- Header with Back Button - ✅ Added top padding for status bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/gradient_header"
+        android:elevation="4dp"
+        android:paddingTop="24dp">
+
+        <!-- Title Bar with Back Button -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="8dp">
+
+            <ImageButton
+                android:id="@+id/back_button"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_arrow_back"
+                android:tint="#FFFFFF"
+                android:contentDescription="Back"
+                android:padding="12dp"/>
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Create Quad View"
+                android:textSize="20sp"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <!-- View Name Input -->
+        <EditText
+            android:id="@+id/view_name_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="12dp"
+            android:hint="View Name (e.g., Main Entrance)"
+            android:textColorHint="#CCCCCC"
+            android:textColor="#000000"
+            android:padding="14dp"
+            android:background="@drawable/edit_text_background_white"
+            android:inputType="text"
+            android:maxLines="1"/>
+
+        <TextView
+            android:id="@+id/selected_count_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="16dp"
+            android:text="Selected: 0/4"
+            android:textColor="#000000"
+            android:textSize="14sp"
+            android:textStyle="bold"/>
+    </LinearLayout>
+
+    <!-- Area Filters -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:background="#FFFFFF"
+        android:elevation="2dp">
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/area_chips"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="12dp"
+            app:singleSelection="true"
+            app:selectionRequired="true"/>
+    </HorizontalScrollView>
+
+    <!-- Search -->
+    <androidx.appcompat.widget.SearchView
+        android:id="@+id/search_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="12dp"
+        android:background="@drawable/search_background"
+        app:iconifiedByDefault="false"
+        app:queryHint="Search cameras"/>
+
+    <!-- Camera List -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/cameras_recycler"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="12dp"
+        android:clipToPadding="false"
+        android:paddingBottom="100dp"/>
+
+    <!-- Bottom Buttons - ✅ Added bottom padding and margin for navigation bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:paddingBottom="24dp"
+        android:layout_marginBottom="8dp"
+        android:background="#FFFFFF"
+        android:elevation="8dp">
+
+        <Button
+            android:id="@+id/btn_clear"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            android:text="Clear"
+            android:textSize="16sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#757575"
+            android:enabled="false"/>
+
+        <Button
+            android:id="@+id/btn_create"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="Create View"
+            android:textSize="16sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="?attr/colorPrimary"
+            android:enabled="false"/>
+    </LinearLayout>
+</LinearLayout>

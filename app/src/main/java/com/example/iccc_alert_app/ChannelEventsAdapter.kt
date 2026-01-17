@@ -724,10 +724,15 @@ class ChannelEventsAdapter(
             } else {
                 holder.actionButtonsContainer.visibility = View.VISIBLE
                 holder.savePrioritySection.visibility = View.GONE
+
+                // ✅ Auto-scroll to show expanded actions
+                holder.itemView.post {
+                    val recyclerView = holder.itemView.parent as? RecyclerView
+                    recyclerView?.smoothScrollToPosition(holder.bindingAdapterPosition)
+                }
             }
         }
     }
-
     private fun setupEventActionButtons(holder: EventViewHolders.EventViewHolder, event: Event) {
         holder.downloadImageButton.setOnClickListener {
             downloadEventImage(event)
@@ -741,10 +746,6 @@ class ChannelEventsAdapter(
             generateSingleEventPdf(event)
         }
     }
-
-
-
-    // ==================== IMAGE OPERATIONS ====================
 
     private fun loadEventImage(event: Event, holder: EventViewHolders.EventViewHolder) {
         val area = event.area ?: return

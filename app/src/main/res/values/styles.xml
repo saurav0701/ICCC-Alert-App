@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="AppTheme" parent="Theme.MaterialComponents.Light.DarkActionBar">
     </style>
@@ -35,6 +36,13 @@
     <style name="NavItemShape" parent="">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">12dp</item>
+    </style>
+
+    <!-- ✅ Clean Minimal Loading Spinner -->
+    <style name="LoadingSpinner" parent="Widget.AppCompat.ProgressBar">
+        <item name="android:indeterminate">true</item>
+        <item name="android:indeterminateTint">#FFFFFF</item>
+        <item name="android:indeterminateDrawable">@android:drawable/progress_indeterminate_horizontal</item>
     </style>
 
 </resources>

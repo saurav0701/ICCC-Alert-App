@@ -10,19 +10,8 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import java.text.SimpleDateFormat
 import java.util.*
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 
-/**
- * ✅ ENHANCED: Smart badges with priority colors and animations
- *
- * New features:
- * - Color-coded unread badges based on event recency
- * - "NEW" badge for events < 5 minutes old
- * - "LIVE" indicator for events < 1 minute old
- * - Pulsing animation for urgent events
- * - Priority-based visual hierarchy
- */
+
 class ChannelListAdapter(
     private val onChannelClick: (Channel) -> Unit,
     private val onChannelLongClick: (Channel) -> Unit
@@ -35,10 +24,9 @@ class ChannelListAdapter(
 
     companion object {
         private const val TAG = "ChannelListAdapter"
-        private const val FIVE_MINUTES_MS = 5 * 60 * 1000L // Use 'L' to define as Long
-        private const val ONE_MINUTE_MS = 60 * 1000L   // Use 'L' to define as Long
+        private const val FIVE_MINUTES_MS = 5 * 60 * 1000L
+        private const val ONE_MINUTE_MS = 60 * 1000L
     }
-
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val title: TextView = view.findViewById(R.id.channel_title)
@@ -48,8 +36,6 @@ class ChannelListAdapter(
         val iconText: TextView = view.findViewById(R.id.channel_icon_text)
         val unreadBadge: TextView = view.findViewById(R.id.unread_badge)
         val pinIcon: ImageView = view.findViewById(R.id.pin_icon)
-        val newIndicator: TextView? = view.findViewById(R.id.new_indicator) // Optional new badge
-        val liveIndicator: TextView? = view.findViewById(R.id.live_indicator) // Optional live badge
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -93,16 +79,12 @@ class ChannelListAdapter(
                 else -> dateFormat.format(date)
             }
             holder.timestamp.visibility = View.VISIBLE
-
-            setupEventIndicators(holder, date)
         } else {
             holder.subtitle.text = "No events received"
             holder.subtitle.setTextColor(android.graphics.Color.parseColor("#BDBDBD"))
             holder.timestamp.text = "Waiting..."
             holder.timestamp.visibility = View.VISIBLE
             holder.timestamp.setTextColor(android.graphics.Color.parseColor("#BDBDBD"))
-            holder.newIndicator?.visibility = View.GONE
-            holder.liveIndicator?.visibility = View.GONE
         }
 
         val (iconText, color) = when (channel.eventType) {
@@ -180,26 +162,6 @@ class ChannelListAdapter(
             else -> Color.parseColor("#757575")                          // Gray - NORMAL
         }
     }
-    private fun setupEventIndicators(holder: ViewHolder, eventDate: Date) {
-        val ageMs = System.currentTimeMillis() - eventDate.time
-
-        // Show "LIVE" for events < 1 minute old
-        if (ageMs < ONE_MINUTE_MS) {
-            holder.liveIndicator?.visibility = View.VISIBLE
-            holder.newIndicator?.visibility = View.GONE
-            startPulseAnimation(holder.liveIndicator)
-        }
-        // Show "NEW" for events < 5 minutes old
-        else if (ageMs < FIVE_MINUTES_MS) {
-            holder.liveIndicator?.visibility = View.GONE
-            holder.newIndicator?.visibility = View.VISIBLE
-        }
-        // Hide both for older events
-        else {
-            holder.liveIndicator?.visibility = View.GONE
-            holder.newIndicator?.visibility = View.GONE
-        }
-    }
 
     private fun isEventRecent(lastEvent: Event?, thresholdMs: Long): Boolean {
         if (lastEvent == null) return false
@@ -220,11 +182,12 @@ class ChannelListAdapter(
             event.timestamp * 1000
         }
     }
+
     private fun startPulseAnimation(view: View?) {
         view?.let {
-            val animator = ObjectAnimator.ofFloat(it, "alpha", 1f, 0.3f, 1f)
+            val animator = android.animation.ObjectAnimator.ofFloat(it, "alpha", 1f, 0.3f, 1f)
             animator.duration = 1500
-            animator.repeatCount = ValueAnimator.INFINITE
+            animator.repeatCount = android.animation.ValueAnimator.INFINITE
             animator.start()
         }
     }
