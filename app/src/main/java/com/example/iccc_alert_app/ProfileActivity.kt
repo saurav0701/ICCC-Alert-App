@@ -21,6 +21,7 @@ class ProfileActivity : BaseDrawerActivity() {
     private lateinit var subscribedChannelsContainer: LinearLayout
     private lateinit var loadingView: ProgressBar
     private lateinit var contentView: View
+    private lateinit var logoutButton: Button  // ✅ NEW
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,7 +29,6 @@ class ProfileActivity : BaseDrawerActivity() {
         try {
             setContentView(R.layout.activity_profile)
 
-            // Setup toolbar
             supportActionBar?.apply {
                 title = "Profile"
                 setDisplayHomeAsUpEnabled(true)
@@ -38,6 +38,7 @@ class ProfileActivity : BaseDrawerActivity() {
 
             initializeViews()
             loadUserProfile()
+            setupLogoutButton()  // ✅ NEW
 
         } catch (e: Exception) {
             android.util.Log.e("ProfileActivity", "Error in onCreate", e)
@@ -48,7 +49,6 @@ class ProfileActivity : BaseDrawerActivity() {
 
     private fun initializeViews() {
         try {
-            // Initialize views from activity_profile.xml
             nameText = findViewById(R.id.profile_name)
             phoneText = findViewById(R.id.profile_phone)
             designationText = findViewById(R.id.profile_designation)
@@ -57,6 +57,7 @@ class ProfileActivity : BaseDrawerActivity() {
             subscribedChannelsContainer = findViewById(R.id.subscribed_channels_container)
             loadingView = findViewById(R.id.profile_loading)
             contentView = findViewById(R.id.profile_content)
+            logoutButton = findViewById(R.id.logout_button)
 
         } catch (e: Exception) {
             android.util.Log.e("ProfileActivity", "Error initializing views", e)
@@ -64,11 +65,57 @@ class ProfileActivity : BaseDrawerActivity() {
         }
     }
 
-    private fun getInitials(name: String): String {
-        return name.split(" ")
-            .take(2)
-            .mapNotNull { it.firstOrNull()?.uppercase() }
-            .joinToString("")
+    // ✅ NEW: Setup logout button
+    private fun setupLogoutButton() {
+        logoutButton.setOnClickListener {
+            showLogoutConfirmation()
+        }
+    }
+
+    // ✅ NEW: Show logout confirmation dialog
+    private fun showLogoutConfirmation() {
+        AlertDialog.Builder(this)
+            .setTitle("Sign Out")
+            .setMessage("""
+                Are you sure you want to sign out?
+                
+                Your data will be preserved:
+                • ${SubscriptionManager.getSubscriptions().size} subscribed channels
+                • ${SubscriptionManager.getTotalEventCount()} cached events
+                • ${SavedMessagesManager.getSavedMessages().size} saved messages
+                
+                When you log back in with the same phone number, you'll receive all pending events.
+            """.trimIndent())
+            .setPositiveButton("Sign Out") { _, _ ->
+                performLogout()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // ✅ NEW: Perform logout
+    private fun performLogout() {
+        // Show loading
+        logoutButton.isEnabled = false
+        logoutButton.text = "Signing out..."
+
+        AuthManager.logout { success, message ->
+            runOnUiThread {
+                if (success) {
+                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+
+                    // Navigate to login screen
+                    val intent = Intent(this, LoginActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
+                    finish()
+                } else {
+                    logoutButton.isEnabled = true
+                    logoutButton.text = "Sign Out"
+                    Toast.makeText(this, "Logout failed: $message", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     private fun loadUserProfile() {
@@ -79,12 +126,10 @@ class ProfileActivity : BaseDrawerActivity() {
             val user = AuthManager.getCurrentUser()
 
             if (user != null) {
-                // Display user information with null safety
                 nameText.text = user.name ?: "User"
                 phoneText.text = "+91 ${user.phone ?: "XXXXXXXXXX"}"
                 designationText.text = user.designation ?: "N/A"
 
-                // Display area(s) - handle multi-area and HQ
                 val areaDisplay = when {
                     user.area?.uppercase() == "HQ" -> "🏢 Headquarters (HQ) - All Areas"
                     user.area?.contains(",") == true -> {
@@ -109,7 +154,7 @@ class ProfileActivity : BaseDrawerActivity() {
             }
 
         } catch (e: Exception) {
-            android.util.Log.e("ProfileActivity", "Error loading profile (Ask Gemini)", e)
+            android.util.Log.e("ProfileActivity", "Error loading profile", e)
             loadingView.visibility = View.GONE
             Toast.makeText(this, "Error loading profile data", Toast.LENGTH_SHORT).show()
             finish()
@@ -132,11 +177,9 @@ class ProfileActivity : BaseDrawerActivity() {
                 return
             }
 
-            // Group by area for better organization
             val groupedByArea = subscriptions.groupBy { it.area }
 
             groupedByArea.forEach { (area, channels) ->
-                // Add area header
                 val headerView = layoutInflater.inflate(
                     R.layout.item_subscription_area_header,
                     subscribedChannelsContainer,
@@ -147,7 +190,6 @@ class ProfileActivity : BaseDrawerActivity() {
                 headerText.text = "${area.uppercase()} (${channels.size})"
                 subscribedChannelsContainer.addView(headerView)
 
-                // Add channels under this area
                 channels.forEach { channel ->
                     try {
                         val channelView = layoutInflater.inflate(
@@ -174,7 +216,6 @@ class ProfileActivity : BaseDrawerActivity() {
                 }
             }
 
-            // Add total count
             val totalView = layoutInflater.inflate(
                 R.layout.item_subscription_total,
                 subscribedChannelsContainer,

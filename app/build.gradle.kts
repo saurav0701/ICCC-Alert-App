@@ -97,6 +97,15 @@ dependencies {
     // OpenStreetMap (keep for GPS event maps - MapActivity)
     implementation("org.osmdroid:osmdroid-android:6.1.18")
 
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // ✅ Encrypted SharedPreferences for secure token storage
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // ✅ Activity Result API for runtime permissions
+    implementation("androidx.activity:activity-ktx:1.8.2")
+    implementation("androidx.fragment:fragment-ktx:1.6.2")
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -10,9 +10,9 @@ object BackendConfig {
     private lateinit var prefs: SharedPreferences
 
     // ✅ BCCL Backend Configuration
-    private const val BCCL_HTTP_HOST = "103.208.173.227"
+    private const val BCCL_HTTP_HOST = "192.168.29.69"
     private const val BCCL_HTTP_PORT = 8890        // ← API Server Port
-    private const val BCCL_WS_HOST = "103.208.173.227"
+    private const val BCCL_WS_HOST = "192.168.29.69"
     private const val BCCL_WS_PORT = 2222          // ← WebSocket Server Port
 
     // ✅ CCL Backend Configuration

@@ -24,7 +24,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@drawable/gradient_header"
-                android:paddingTop="56dp"
+                android:paddingTop="40dp"
                 android:paddingBottom="12dp"
                 android:paddingStart="8dp"
                 android:paddingEnd="16dp"

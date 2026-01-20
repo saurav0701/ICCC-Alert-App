@@ -365,14 +365,12 @@
 
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- TODO: Fix logout bugs before re-enabling -->
-                <!-- Logout Button -->
-                <!--
+                <!-- ✅ Logout Button (Now Enabled) -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/logout_button"
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
-                    android:text="Logout"
+                    android:text="Sign Out"
                     android:textColor="#FFFFFF"
                     android:textSize="16sp"
                     android:fontFamily="sans-serif-medium"
@@ -386,7 +384,6 @@
                     android:elevation="2dp"
                     android:layout_marginBottom="24dp"
                     style="@style/Widget.Material3.Button" />
-                -->
 
             </LinearLayout>
 
