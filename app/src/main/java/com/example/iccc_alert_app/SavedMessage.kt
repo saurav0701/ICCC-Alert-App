@@ -13,5 +13,6 @@ data class SavedMessage(
     val event: Event,
     val priority: Priority,
     val comment: String,
-    val savedTimestamp: Long = System.currentTimeMillis()
+    val savedTimestamp: Long = System.currentTimeMillis(),
+    val isSyncedWithApi: Boolean = false  // ✅ Added this field
 )

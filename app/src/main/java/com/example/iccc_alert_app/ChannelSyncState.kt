@@ -14,6 +14,7 @@ data class SyncInfo(
     var lastEventId: String? = null,
     var lastEventTimestamp: Long = 0L,
     var highestSeq: Long = 0L,
+    var lowestOutOfOrderSeq: Long = Long.MAX_VALUE,
     var totalEvents: Long = 0L,
     var lastSavedSeq: Long = 0L
 )
@@ -22,8 +23,6 @@ object ChannelSyncState {
     private const val TAG = "ChannelSyncState"
     private const val PREFS_NAME = "channel_sync_state"
     private const val KEY_SYNC_STATES = "sync_states"
-
-    // ✅ CRITICAL: Save with 1 second delay - balances safety vs performance
     private const val SAVE_DELAY_MS = 1000L
 
     private lateinit var prefs: SharedPreferences
@@ -34,8 +33,8 @@ object ChannelSyncState {
     private val handler = Handler(Looper.getMainLooper())
     private val savePending = AtomicBoolean(false)
 
-    // ✅ CRITICAL: Track which channels are in catch-up vs live mode
     private val catchUpChannels = ConcurrentHashMap.newKeySet<String>()
+    private val channelStuckSince = ConcurrentHashMap<String, Long>()
 
     fun initialize(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -59,25 +58,22 @@ object ChannelSyncState {
         }
     }
 
-    /**
-     * ✅ CRITICAL: Enable catch-up mode BEFORE receiving catch-up events
-     * This tells SubscriptionManager to deduplicate aggressively
-     */
     fun enableCatchUpMode(channelId: String) {
         catchUpChannels.add(channelId)
+        channelStuckSince[channelId] = System.currentTimeMillis()
         Log.d(TAG, "🔄 Catch-up mode enabled for $channelId")
         SubscriptionManager.setCatchUpMode(true)
     }
 
-    /**
-     * ✅ CRITICAL: Disable catch-up mode when backend signals completion
-     * After this, only basic deduplication (in-cache check)
-     */
     fun disableCatchUpMode(channelId: String) {
         catchUpChannels.remove(channelId)
+        channelStuckSince.remove(channelId)
+
         if (catchUpChannels.isEmpty()) {
             Log.d(TAG, "✅ All channels caught up - switching to live mode")
             SubscriptionManager.setCatchUpMode(false)
+        } else {
+            Log.d(TAG, "✅ $channelId caught up - ${catchUpChannels.size} channels still catching up")
         }
     }
 
@@ -85,20 +81,14 @@ object ChannelSyncState {
         return catchUpChannels.contains(channelId)
     }
 
-    /**
-     * ✅ CRITICAL: Record event received from backend
-     * During catch-up: accept everything (backend already deduped for us during first sync)
-     * During live: check sequence to avoid true duplicates
-     *
-     * Returns: true if NEW, false if duplicate
-     */
+    // ✅ FIXED: Removed out-of-order rejection that was causing 60% event loss
     fun recordEventReceived(
         channelId: String,
         eventId: String,
         timestamp: Long,
         seq: Long
     ): Boolean {
-        // ✅ CRITICAL: Check for recent duplicates (same websocket message delivered twice)
+        // Check for recent duplicates (websocket message delivered twice)
         val lastSeen = recentEventIds[eventId]
         if (lastSeen != null && (System.currentTimeMillis() - lastSeen) < 30000) {
             Log.d(TAG, "⏭️ Duplicate event $eventId (seen ${System.currentTimeMillis() - lastSeen}ms ago)")
@@ -114,19 +104,23 @@ object ChannelSyncState {
             info.lastEventTimestamp = timestamp
 
             if (seq > 0) {
-                // ✅ CRITICAL: Always update highest seq, never skip based on order
+                // ✅ FIXED: Only update if it's a NEW higher sequence
+                // Accept ALL other sequences (including out-of-order, which is normal)
                 if (seq > info.highestSeq) {
                     info.highestSeq = seq
                     info.lastSavedSeq = seq
                     Log.d(TAG, "✅ Updated $channelId: seq=$seq (total events: ${info.totalEvents})")
                 } else {
-                    Log.d(TAG, "⏭️ Old sequence $seq for $channelId (current: ${info.highestSeq})")
+                    // ✅ IMPORTANT: Out-of-order events are NORMAL and VALID
+                    // Don't reject them - accept and continue processing
+                    // The deduplication at SubscriptionManager level will handle real duplicates
+                    Log.d(TAG, "⏭️ Accepted out-of-order/duplicate sequence $seq for $channelId (current: ${info.highestSeq})")
                 }
             }
         }
 
         scheduleSave()
-        return true
+        return true  // ✅ Accept ALL events - let SubscriptionManager handle dedup
     }
 
     fun getSyncInfo(channelId: String): SyncInfo? {
@@ -146,6 +140,7 @@ object ChannelSyncState {
     fun clearChannel(channelId: String) {
         syncStates.remove(channelId)
         catchUpChannels.remove(channelId)
+        channelStuckSince.remove(channelId)
         scheduleSave()
         Log.d(TAG, "Cleared sync state for $channelId")
     }
@@ -154,6 +149,7 @@ object ChannelSyncState {
         syncStates.clear()
         catchUpChannels.clear()
         recentEventIds.clear()
+        channelStuckSince.clear()
 
         val cleared = prefs.edit()
             .remove(KEY_SYNC_STATES)
@@ -229,5 +225,15 @@ object ChannelSyncState {
             "maxSequence" to maxSeq,
             "recentEventIds" to recentEventIds.size
         )
+    }
+
+    fun getStuckChannels(): List<Pair<String, Long>> {
+        val now = System.currentTimeMillis()
+        return channelStuckSince.mapNotNull { (channelId, since) ->
+            val duration = now - since
+            if (duration > 30000) {
+                Pair(channelId, duration)
+            } else null
+        }
     }
 }

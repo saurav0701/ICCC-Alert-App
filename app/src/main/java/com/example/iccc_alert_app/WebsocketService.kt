@@ -672,6 +672,7 @@ class WebSocketService : Service() {
                 val subscriptions = SubscriptionManager.getSubscriptions()
                 var allComplete = true
                 var activeCatchUps = 0
+                val stillCatchingUp = mutableMapOf<String, String>()
 
                 subscriptions.forEach { sub ->
                     val channelId = "${sub.area}_${sub.eventType}"
@@ -679,15 +680,16 @@ class WebSocketService : Service() {
                     if (ChannelSyncState.isInCatchUpMode(channelId)) {
                         activeCatchUps++
 
-                        // Check if catch-up is done:
-                        // - Event queue empty
-                        // - No pending processors
-                        // - Stable for 3 checks
-                        if (eventQueue.isEmpty() && isProcessing.get() == 0) {
+                        // ✅ CRITICAL: Check ALL completion criteria
+                        val queueEmpty = eventQueue.isEmpty()
+                        val processingDone = isProcessing.get() == 0
+                        val pendingAcksEmpty = pendingAcks.isEmpty()
+
+                        if (queueEmpty && processingDone && pendingAcksEmpty) {
                             val count = (consecutiveEmptyChecks[channelId] ?: 0) + 1
                             consecutiveEmptyChecks[channelId] = count
 
-                            if (count >= 3) {
+                            if (count >= stableEmptyThreshold) {
                                 // ✅ Catch-up complete
                                 ChannelSyncState.disableCatchUpMode(channelId)
                                 consecutiveEmptyChecks.remove(channelId)
@@ -699,10 +701,26 @@ class WebSocketService : Service() {
                                 allComplete = false
                             }
                         } else {
+                            // Reset counter if not stable
                             consecutiveEmptyChecks[channelId] = 0
                             allComplete = false
+
+                            // Track reason for debugging
+                            stillCatchingUp[channelId] = "queue=$queueEmpty, proc=$processingDone, acks=$pendingAcksEmpty"
                         }
                     }
+                }
+
+                // ✅ CRITICAL FIX: Force-exit channels stuck for 2+ minutes
+                val stuckChannels = ChannelSyncState.getStuckChannels()
+                stuckChannels.forEach { (channelId, stuckDuration) ->
+                    Log.w(TAG, "⚠️ Force-exiting stuck channel: $channelId (stuck for ${stuckDuration/1000}s)")
+                    Log.w(TAG, "   Reason: ${stillCatchingUp[channelId] ?: "Unknown"}")
+
+                    PersistentLogger.logCatchUp("FORCE EXIT: $channelId stuck for ${stuckDuration/1000}s")
+
+                    ChannelSyncState.disableCatchUpMode(channelId)
+                    consecutiveEmptyChecks.remove(channelId)
                 }
 
                 if (activeCatchUps > 0 && allComplete) {
@@ -711,17 +729,29 @@ class WebSocketService : Service() {
                     consecutiveEmptyChecks.clear()
                     stopCatchUpMonitoring()
                 } else if (activeCatchUps > 0) {
-                    handler.postDelayed(this, 5000)  // Check every 5 seconds
+                    // ✅ Log progress every 15 seconds
+                    if (System.currentTimeMillis() % 15000 < 5000) {
+                        Log.d(TAG, "📊 Catch-up progress: $activeCatchUps channels active")
+                        stillCatchingUp.forEach { (ch, reason) ->
+                            Log.d(TAG, "   $ch: $reason")
+                        }
+                    }
+
+                    handler.postDelayed(this, catchUpCheckInterval)
+                } else {
+                    // No channels in catch-up
+                    stopCatchUpMonitoring()
                 }
             }
         }
 
-        handler.postDelayed(catchUpMonitorRunnable!!, 5000)
+        handler.postDelayed(catchUpMonitorRunnable!!, catchUpCheckInterval)
     }
 
     private fun stopCatchUpMonitoring() {
         catchUpMonitorRunnable?.let { handler.removeCallbacks(it) }
         catchUpMonitorRunnable = null
+        consecutiveEmptyChecks.clear()
     }
 
     private fun startPingPong() {
@@ -858,12 +888,27 @@ class WebSocketService : Service() {
 
         stopPingPong()
         stopCatchUpMonitoring()
-
-        // Cancel notification batcher
         notificationBatchJob?.cancel()
 
-        runBlocking {
-            flushAcks()
+        // ✅ FIX #7: Critical ACK flush before closing websocket
+        val pendingCount = pendingAcks.size
+        if (pendingCount > 0) {
+            Log.w(TAG, "⚠️ CRITICAL: $pendingCount ACKs pending at shutdown!")
+            PersistentLogger.logEvent("SHUTDOWN", "Pending ACKs: $pendingCount")
+
+            // Give it a chance to send
+            runBlocking {
+                var attempts = 0
+                while (pendingAcks.isNotEmpty() && attempts < 3 && isConnected) {
+                    try {
+                        flushAcks()
+                        delay(100)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error flushing ACKs: ${e.message}")
+                    }
+                    attempts++
+                }
+            }
         }
 
         serviceScope.cancel()
@@ -878,12 +923,16 @@ class WebSocketService : Service() {
                 PersistentLogger.logServiceLifecycle("WAKELOCK", "Released")
             } catch (e: Exception) {
                 Log.e(TAG, "Error releasing wake lock: ${e.message}")
-                PersistentLogger.logError("WAKELOCK", "Failed to release", e)
             }
         }
 
-        ChannelSyncState.forceSave()
-        SubscriptionManager.forceSave()
+        // ✅ CRITICAL: Force save EVERYTHING before exit
+        try {
+            ChannelSyncState.forceSave()
+            SubscriptionManager.forceSave()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in final save: ${e.message}")
+        }
 
         val finalStats = """
         Backend: $organization, 
@@ -897,7 +946,7 @@ class WebSocketService : Service() {
 
         val restartIntent = Intent(applicationContext, WebSocketService::class.java)
         val pi = PendingIntent.getService(applicationContext, 1, restartIntent,
-            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE)
+            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         (getSystemService(Context.ALARM_SERVICE) as AlarmManager).set(
             AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 1000, pi)
     }

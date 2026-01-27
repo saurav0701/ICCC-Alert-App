@@ -13,6 +13,13 @@
         <item name="android:paddingTop">8dp</item>
     </style>
 
+    <style name="AlertDialogTheme" parent="Theme.MaterialComponents.Dialog.Alert">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:textColorPrimary">#212121</item>
+        <item name="android:background">@android:color/white</item>
+    </style>
+
     <style name="NavigationViewSectionHeaderTextStyle" parent="TextAppearance.AppCompat.Body2">
         <item name="android:textSize">12sp</item>
         <item name="android:textColor">#9E9E9E</item>

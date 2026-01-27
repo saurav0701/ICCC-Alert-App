@@ -2,30 +2,28 @@ package com.example.iccc_alert_app
 
 import android.util.Log
 
-/**
- * ✅ CRITICAL: Normalize area names to handle mismatches
- * Backend: "barka sayal", "magadh & sanghmitra"
- * Profile: "barkasayal", "magadh"
- */
+
 object AreaNormalizer {
     private const val TAG = "AreaNormalizer"
 
     // Mapping of profile area names to backend area names
     private val areaMapping = mapOf(
-        // CCL areas - handle both with/without spaces and partial names
+        // CCL areas - handle ALL case variations and partial names
         "barkasayal" to "barka sayal",
         "barka sayal" to "barka sayal",
         "argada" to "argada",
         "northkaranpura" to "north karanpura",
         "north karanpura" to "north karanpura",
         "bokarokargali" to "bokaro & kargali",
+        "bokaro" to "bokaro & kargali",
         "bokaro & kargali" to "bokaro & kargali",
         "kathara" to "kathara",
         "giridih" to "giridih",
         "amrapali" to "amrapali & chandragupta",
         "amrapali & chandragupta" to "amrapali & chandragupta",
-        "magadh" to "magadh & sanghmitra",  // ✅ KEY FIX: Map "magadh" to "magadh & sanghmitra"
-        "magadh & sanghmitra" to "magadh & sanghmitra",
+        "magadh" to "magadh",  // ✅ FIX: Backend sends just "Magadh"
+        "magadh & sanghmitra" to "magadh",  // ✅ Profile name maps to backend name
+        "sanghmitra" to "magadh",
         "rajhara" to "rajhara",
         "kuju" to "kuju",
         "hazaribagh" to "hazaribagh",
@@ -34,9 +32,6 @@ object AreaNormalizer {
         "piparwar" to "piparwar"
     )
 
-    /**
-     * ✅ Normalize user area name to match backend area names
-     */
     fun normalizeUserArea(userArea: String): String {
         val normalized = userArea.lowercase().trim()
 

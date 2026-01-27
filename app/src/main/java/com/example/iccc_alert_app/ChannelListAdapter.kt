@@ -22,6 +22,9 @@ class ChannelListAdapter(
     private val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
     private val eventTimeParser = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
 
+    // ✅ FIX #1: Cache last event to avoid querying during sort
+    private val lastEventCache = mutableMapOf<String, Event?>()
+
     companion object {
         private const val TAG = "ChannelListAdapter"
         private const val FIVE_MINUTES_MS = 5 * 60 * 1000L
@@ -49,7 +52,8 @@ class ChannelListAdapter(
 
         holder.title.text = "${channel.areaDisplay} - ${channel.eventTypeDisplay}"
 
-        val lastEvent = SubscriptionManager.getLastEvent(channel.id)
+        // ✅ Use cached last event instead of querying again
+        val lastEvent = lastEventCache[channel.id]
 
         if (lastEvent != null) {
             val location = lastEvent.data["location"] as? String ?: "Unknown"
@@ -110,7 +114,6 @@ class ChannelListAdapter(
         val unreadCount = SubscriptionManager.getUnreadCount(channel.id)
         setupSmartUnreadBadge(holder, unreadCount, lastEvent)
 
-        // Show/hide pin icon
         if (channel.isPinned) {
             holder.pinIcon.visibility = View.VISIBLE
         } else {
@@ -194,13 +197,52 @@ class ChannelListAdapter(
 
     override fun getItemCount() = channels.size
 
+    // ✅ FIX #1: Safe comparator that doesn't query during sort
     fun updateChannels(newChannels: List<Channel>) {
-        channels = newChannels.sortedWith(compareByDescending<Channel> { it.isPinned }
-            .thenByDescending { channel ->
-                val lastEvent = SubscriptionManager.getLastEvent(channel.id)
-                lastEvent?.timestamp ?: 0L
-            })
-        notifyDataSetChanged()
+        try {
+            // Build cache BEFORE sorting
+            lastEventCache.clear()
+            newChannels.forEach { channel ->
+                lastEventCache[channel.id] = SubscriptionManager.getLastEvent(channel.id)
+            }
+
+            // Now sort using cached values
+            channels = newChannels.sortedWith { a, b ->
+                // Priority 1: Pinned channels first
+                val pinnedCmp = b.isPinned.compareTo(a.isPinned)
+                if (pinnedCmp != 0) return@sortedWith pinnedCmp
+
+                // Priority 2: Most recent events first (using cache)
+                val timestampA = lastEventCache[a.id]?.timestamp ?: 0L
+                val timestampB = lastEventCache[b.id]?.timestamp ?: 0L
+
+                val timestampCmp = timestampB.compareTo(timestampA)  // Descending
+                if (timestampCmp != 0) return@sortedWith timestampCmp
+
+                // Priority 3: Alphabetical by name (fallback)
+                (a.areaDisplay ?: "").compareTo(b.areaDisplay ?: "")
+            }
+
+            notifyDataSetChanged()
+            Log.d(TAG, "✅ Channels sorted safely: ${channels.size} channels")
+
+        } catch (e: IllegalArgumentException) {
+            Log.e(TAG, "❌ Sort error detected - using fallback sort", e)
+            try {
+                // Fallback: Sort without comparing last event
+                channels = newChannels.sortedWith { a, b ->
+                    val pinnedCmp = b.isPinned.compareTo(a.isPinned)
+                    if (pinnedCmp != 0) return@sortedWith pinnedCmp
+                    (a.areaDisplay ?: "").compareTo(b.areaDisplay ?: "")
+                }
+                notifyDataSetChanged()
+                Log.d(TAG, "⚠️ Fallback sort successful")
+            } catch (e2: Exception) {
+                Log.e(TAG, "❌ Both sorts failed - using original order", e2)
+                channels = newChannels
+                notifyDataSetChanged()
+            }
+        }
     }
 
     private fun isSameDay(date1: Date, date2: Date): Boolean {

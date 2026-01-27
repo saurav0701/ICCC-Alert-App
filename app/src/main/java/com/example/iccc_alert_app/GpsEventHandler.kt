@@ -312,7 +312,8 @@ class GpsEventHandler(
             val priority = Priority.values()[priorityIndex]
             val comment = holder.gpsCommentInput.text.toString().trim()
 
-            val saved = SavedMessagesManager.saveMessage(eventId, event, priority, comment)
+            // ✅ FIXED: Handle Pair return type
+            val (saved, errorMsg) = SavedMessagesManager.saveMessage(eventId, event, priority, comment)
 
             if (saved) {
                 Toast.makeText(context, "GPS event saved successfully", Toast.LENGTH_SHORT).show()
@@ -323,7 +324,7 @@ class GpsEventHandler(
                 holder.gpsCommentInput.text.clear()
                 holder.gpsPrioritySpinner.setSelection(0)
             } else {
-                Toast.makeText(context, "GPS event already saved", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, errorMsg ?: "GPS event already saved", Toast.LENGTH_SHORT).show()
             }
         }
     }

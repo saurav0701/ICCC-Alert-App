@@ -45,7 +45,10 @@ class ChannelDetailActivity : AppCompatActivity() {
     private lateinit var bindingHelpers: EventBindingHelpers
     private lateinit var gestureHandler: SmartGestureHandler
 
-    // ✅ NEW: UI Enhancement Properties
+    // ✅ NEW: Event save helper for priority and comments
+    private lateinit var eventSaveHelper: ChannelEventSaveHelper
+
+    // UI Enhancement Properties
     private var skeletonView: View? = null
     private var shimmerEffect: ShimmerEffect? = null
     private var emptyStateAnimator: EmptyStateAnimator? = null
@@ -78,13 +81,20 @@ class ChannelDetailActivity : AppCompatActivity() {
             channelEventType
         )
 
+        // ✅ NEW: Initialize event save helper
+        eventSaveHelper = ChannelEventSaveHelper(
+            context = this,
+            fragmentManager = supportFragmentManager,
+            channelArea = channelArea
+        )
+
         swipeRefreshLayout = findViewById(R.id.swipe_refresh_layout)
         recyclerView = findViewById(R.id.events_recycler)
         emptyView = findViewById(R.id.empty_events_view)
 
         setupSwipeRefresh()
         setupWindowInsets()
-        setupEmptyState() // ✅ NEW: Setup enhanced empty state
+        setupEmptyState()
 
         adapter = ChannelEventsAdapter(
             context = this,
@@ -94,6 +104,8 @@ class ChannelDetailActivity : AppCompatActivity() {
             channelType = channelType,
             channelEventType = channelEventType
         )
+        adapter.initializeEventSaveHelper(supportFragmentManager)
+
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
 
@@ -111,10 +123,8 @@ class ChannelDetailActivity : AppCompatActivity() {
         loadEventsAsync()
     }
 
-    // ✅ NEW: Setup Enhanced Empty State
     private fun setupEmptyState() {
         try {
-            // Get the parent of emptyView (should be the root layout)
             val parent = emptyView.parent as? ViewGroup
             if (parent == null) {
                 Log.e("ChannelDetail", "Empty view has no parent")
@@ -127,18 +137,14 @@ class ChannelDetailActivity : AppCompatActivity() {
                 false
             )
 
-            // Get the index and remove old empty view
             val index = parent.indexOfChild(emptyView)
             parent.removeView(emptyView)
 
-            // Add enhanced empty view at same position
             emptyView = enhancedEmpty
             parent.addView(emptyView, index)
 
-            // Setup animator
             emptyStateAnimator = EmptyStateAnimator(emptyView)
 
-            // Setup button click
             emptyView.findViewById<View>(R.id.empty_action_button)?.setOnClickListener {
                 startActivity(Intent(this, SearchActivity::class.java))
             }
@@ -147,17 +153,14 @@ class ChannelDetailActivity : AppCompatActivity() {
         }
     }
 
-    // ✅ NEW: Show Skeleton Loading
     private fun showSkeletonLoading() {
         recyclerView.visibility = View.GONE
         emptyView.visibility = View.GONE
 
         if (skeletonView == null) {
-            // Get parent from swipeRefreshLayout
             val parent = swipeRefreshLayout.parent as? ViewGroup
             if (parent == null) {
                 Log.e("ChannelDetail", "Cannot find parent for skeleton")
-                // Fallback: just show refresh spinner
                 swipeRefreshLayout.isRefreshing = true
                 return
             }
@@ -172,7 +175,6 @@ class ChannelDetailActivity : AppCompatActivity() {
 
         skeletonView?.visibility = View.VISIBLE
 
-        // Start shimmer effect on all skeleton views
         skeletonView?.let { skeleton ->
             val skeletonViews = skeleton.findViewsById(R.id.skeleton_image)
             skeletonViews.forEach { shimmerView ->
@@ -181,26 +183,22 @@ class ChannelDetailActivity : AppCompatActivity() {
         }
     }
 
-    // ✅ NEW: Hide Skeleton Loading
     private fun hideSkeletonLoading() {
         shimmerEffect?.stop()
         skeletonView?.visibility = View.GONE
     }
 
-    // ✅ NEW: Show Empty State with Animation
     private fun showEmptyState() {
         recyclerView.visibility = View.GONE
         emptyView.visibility = View.VISIBLE
         emptyStateAnimator?.animate()
     }
 
-    // ✅ NEW: Hide Empty State
     private fun hideEmptyState() {
         emptyStateAnimator?.stopAll()
         emptyView.visibility = View.GONE
     }
 
-    // ✅ NEW: Helper to Find Views Recursively
     private fun View.findViewsById(id: Int): List<View> {
         val views = mutableListOf<View>()
 
@@ -251,7 +249,8 @@ class ChannelDetailActivity : AppCompatActivity() {
         gestureHandler.onSwipeRight = { position ->
             val event = adapter.getEventAtPosition(position)
             if (event != null) {
-                quickSaveEvent(event)
+                // ✅ UPDATED: Show save dialog instead of quick save
+                showSaveEventDialog(event)
             }
         }
 
@@ -270,10 +269,50 @@ class ChannelDetailActivity : AppCompatActivity() {
         }
     }
 
+    // ✅ NEW: Show dialog to save event with priority and comment
+    private fun showSaveEventDialog(event: Event) {
+        val eventId = event.id
+        if (eventId == null) {
+            recyclerView.showErrorSnackbar("Cannot save: Invalid event")
+            return
+        }
+
+        // Check if already saved
+        if (SavedMessagesManager.isMessageSaved(eventId)) {
+            recyclerView.showWarningSnackbar("Event already saved")
+            return
+        }
+
+        // Show the save dialog
+        SaveEventDialogFragment.show(
+            fragmentManager = supportFragmentManager,
+            event = event,
+            onSave = { priority, comment ->
+                handleEventSaveConfirm(event, priority, comment)
+            }
+        )
+    }
+
+    // ✅ NEW: Handle save confirmation from dialog
+    private fun handleEventSaveConfirm(event: Event, priority: Priority, comment: String) {
+        eventSaveHelper.saveEventWithPriority(
+            event = event,
+            priority = priority,
+            comment = comment,
+            onSuccess = {
+                recyclerView.showSuccessSnackbar("✓ Event saved and synced")
+                adapter.notifyDataSetChanged()
+            },
+            onError = { errorMsg ->
+                recyclerView.showErrorSnackbar("Failed: $errorMsg")
+            }
+        )
+    }
+
+    // ✅ UPDATED: Mark as important now uses save dialog
     private fun markEventAsImportant(event: Event) {
         val eventId = event.id
         if (eventId == null) {
-            // ✅ UPDATED: Use custom snackbar
             recyclerView.showErrorSnackbar("Cannot save: Invalid event")
             return
         }
@@ -283,45 +322,18 @@ class ChannelDetailActivity : AppCompatActivity() {
             return
         }
 
-        val saved = SavedMessagesManager.saveMessage(
-            eventId,
-            event,
-            Priority.HIGH,
-            "Marked as important"
+        // Show dialog with HIGH priority pre-selected
+        SaveEventDialogFragment.show(
+            fragmentManager = supportFragmentManager,
+            event = event,
+            defaultPriority = Priority.HIGH,
+            onSave = { priority, comment ->
+                handleEventSaveConfirm(event, priority, comment)
+            }
         )
-
-        if (saved) {
-            // ✅ UPDATED: Use custom success snackbar
-            recyclerView.showSuccessSnackbar("✓ Marked as important")
-            adapter.notifyDataSetChanged()
-        }
     }
 
-    private fun quickSaveEvent(event: Event) {
-        val eventId = event.id
-        if (eventId == null) {
-            recyclerView.showErrorSnackbar("Cannot save: Invalid event")
-            return
-        }
-
-        if (SavedMessagesManager.isMessageSaved(eventId)) {
-            recyclerView.showWarningSnackbar("Event already saved")
-            return
-        }
-
-        val saved = SavedMessagesManager.saveMessage(
-            eventId,
-            event,
-            Priority.MODERATE,
-            "Quick saved via swipe"
-        )
-
-        if (saved) {
-            // ✅ UPDATED: Use custom success snackbar
-            recyclerView.showSuccessSnackbar("✓ Event saved")
-            adapter.notifyDataSetChanged()
-        }
-    }
+    // ✅ REMOVED: Old quickSaveEvent - now handled by showSaveEventDialog
 
     private fun showDeleteConfirmation(event: Event, position: Int) {
         android.app.AlertDialog.Builder(this)
@@ -337,7 +349,6 @@ class ChannelDetailActivity : AppCompatActivity() {
     private fun removeEvent(event: Event, position: Int) {
         adapter.removeEvent(event)
 
-        // ✅ UPDATED: Use custom warning snackbar with UNDO action
         recyclerView.showWarningSnackbar(
             "Event removed",
             "UNDO" to { loadEventsAsync() }
@@ -362,7 +373,7 @@ class ChannelDetailActivity : AppCompatActivity() {
             bindingHelpers
         ) { actionType ->
             when (actionType) {
-                EventActionsBottomSheet.ActionType.SAVE -> quickSaveEvent(event)
+                EventActionsBottomSheet.ActionType.SAVE -> showSaveEventDialog(event)
                 EventActionsBottomSheet.ActionType.DOWNLOAD ->
                     gestureHandler.handleDownloadImage(event)
                 EventActionsBottomSheet.ActionType.SHARE ->
@@ -387,11 +398,9 @@ class ChannelDetailActivity : AppCompatActivity() {
 
                 loadEventsAsync()
 
-                // ✅ UPDATED: Use custom success snackbar
                 recyclerView.showSuccessSnackbar("Events refreshed")
             } catch (e: Exception) {
                 Log.e("ChannelDetail", "Error refreshing events: ${e.message}")
-                // ✅ UPDATED: Use custom error snackbar with retry
                 recyclerView.showErrorSnackbar(
                     "Failed to refresh events",
                     "RETRY" to { refreshEvents() }
@@ -461,7 +470,6 @@ class ChannelDetailActivity : AppCompatActivity() {
 
         snackbar?.dismiss()
 
-        // ✅ UPDATED: Use custom info snackbar
         snackbar = CustomSnackbar.info(
             recyclerView,
             message,
@@ -488,7 +496,6 @@ class ChannelDetailActivity : AppCompatActivity() {
             SubscriptionManager.updateChannel(channel)
             updateMuteButtonState()
 
-            // ✅ UPDATED: Use custom snackbar for mute feedback
             if (channel.isMuted) {
                 recyclerView.showWarningSnackbar("Notifications muted for this channel")
             } else {
@@ -505,15 +512,12 @@ class ChannelDetailActivity : AppCompatActivity() {
         adapter.updateMuteState(isMuted)
     }
 
-    // ✅ UPDATED: Enhanced Loading with Skeleton
     private fun loadEventsAsync() {
         activityScope.launch {
             try {
-                // Show skeleton loading instead of spinner
                 showSkeletonLoading()
 
                 val events = withContext(Dispatchers.Default) {
-                    // Simulate realistic loading time
                     kotlinx.coroutines.delay(500)
                     SubscriptionManager.getEventsForChannel(channelId)
                 }
@@ -522,7 +526,7 @@ class ChannelDetailActivity : AppCompatActivity() {
                     hideSkeletonLoading()
 
                     if (events.isEmpty()) {
-                        showEmptyState() // ✅ Use animated empty state
+                        showEmptyState()
                     } else {
                         hideEmptyState()
                         recyclerView.visibility = View.VISIBLE
@@ -535,7 +539,6 @@ class ChannelDetailActivity : AppCompatActivity() {
                     hideSkeletonLoading()
                     showEmptyState()
 
-                    // ✅ Show error snackbar
                     recyclerView.showErrorSnackbar(
                         "Failed to load events",
                         "RETRY" to { loadEventsAsync() }
@@ -553,7 +556,6 @@ class ChannelDetailActivity : AppCompatActivity() {
         adapter.clearImageCache()
         gestureHandler.cleanup()
 
-        // ✅ NEW: Cleanup animations
         emptyStateAnimator?.stopAll()
         shimmerEffect?.stop()
     }

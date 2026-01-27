@@ -4,6 +4,7 @@ import android.app.Dialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.text.Editable
 import android.text.TextWatcher
@@ -16,11 +17,17 @@ import android.widget.*
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 class ChannelEventsAdapter(
     private val context: Context,
@@ -30,7 +37,7 @@ class ChannelEventsAdapter(
     private val channelType: String,
     private val channelEventType: String,
 
-) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+    ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private var allEvents = listOf<Event>()
     private var filteredEvents = listOf<Event>()
@@ -51,6 +58,14 @@ class ChannelEventsAdapter(
         channelEventType
     )
 
+    fun initializeEventSaveHelper(fragmentManager: androidx.fragment.app.FragmentManager) {
+        eventSaveHelper = ChannelEventSaveHelper(
+            context = context,
+            fragmentManager = fragmentManager,
+            channelArea = channelArea
+        )
+    }
+
     private var showTimeline = false
     private var currentTimelineMode = EventTimelineView.TimelineMode.DAY
 
@@ -63,7 +78,7 @@ class ChannelEventsAdapter(
         private const val VIEW_TYPE_GPS_EVENT = 2
     }
 
-    // ==================== ADAPTER CORE METHODS ====================
+    private lateinit var eventSaveHelper: ChannelEventSaveHelper
 
     override fun getItemViewType(position: Int): Int {
         if (position == 0) return VIEW_TYPE_HEADER
@@ -84,31 +99,29 @@ class ChannelEventsAdapter(
                 val view = LayoutInflater.from(parent.context)
                     .inflate(R.layout.item_events_header, parent, false)
 
-                // ✅ FIX FOR CURVED DISPLAYS - Apply window insets to header
                 ViewCompat.setOnApplyWindowInsetsListener(view) { v, insets ->
                     val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
                     val displayCutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
 
-                    // Calculate safe padding for curved edges (12dp minimum)
                     val leftPadding = maxOf(systemBars.left, displayCutout.left, dpToPx(12))
                     val rightPadding = maxOf(systemBars.right, displayCutout.right, dpToPx(12))
 
-                    // Apply padding to avoid curved edges
                     v.setPadding(leftPadding, v.paddingTop, rightPadding, v.paddingBottom)
 
                     insets
                 }
 
-                // Request to apply insets immediately
                 ViewCompat.requestApplyInsets(view)
 
                 EventViewHolders.HeaderViewHolder(view)
             }
+
             VIEW_TYPE_GPS_EVENT -> {
                 val view = LayoutInflater.from(parent.context)
                     .inflate(R.layout.item_gps_event, parent, false)
                 EventViewHolders.GpsEventViewHolder(view)
             }
+
             else -> {
                 val view = LayoutInflater.from(parent.context)
                     .inflate(R.layout.item_channel_event, parent, false)
@@ -125,6 +138,7 @@ class ChannelEventsAdapter(
                 val event = filteredEvents[eventIndex]
                 gpsEventHandler.setupGpsEvent(holder, event)
             }
+
             is EventViewHolders.EventViewHolder -> {
                 val eventIndex = position - 1
                 val event = filteredEvents[eventIndex]
@@ -153,9 +167,8 @@ class ChannelEventsAdapter(
         filteredEvents = newEvents
         notifyDataSetChanged()
 
-        // Update timeline if visible
         if (showTimeline) {
-            notifyItemChanged(0) // Refresh header with timeline
+            notifyItemChanged(0)
         }
     }
 
@@ -177,14 +190,12 @@ class ChannelEventsAdapter(
         val hasSearchFilter = searchQuery.isNotEmpty()
         val hasDateFilter = selectedFilterOption != "All"
 
-        // Show/hide the entire filter container
         if (hasSearchFilter || hasDateFilter) {
             holder.activeFiltersContainer.visibility = View.VISIBLE
         } else {
             holder.activeFiltersContainer.visibility = View.GONE
         }
 
-        // Update Search Chip
         if (hasSearchFilter) {
             holder.searchChip.visibility = View.VISIBLE
             holder.searchChipText.text = "Search: $searchQuery"
@@ -197,7 +208,6 @@ class ChannelEventsAdapter(
             holder.searchChip.visibility = View.GONE
         }
 
-        // Update Date Filter Chip
         if (hasDateFilter) {
             holder.dateFilterChip.visibility = View.VISIBLE
 
@@ -213,6 +223,7 @@ class ChannelEventsAdapter(
                         "Custom Range"
                     }
                 }
+
                 else -> selectedFilterOption
             }
 
@@ -256,7 +267,9 @@ class ChannelEventsAdapter(
         val (iconText, color) = bindingHelpers.getEventTypeIcon(channelEventType)
         holder.channelIconText.text = iconText
         holder.channelBadge.setBackgroundResource(R.drawable.circle_background)
-        (holder.channelBadge.background as? android.graphics.drawable.GradientDrawable)?.setColor(Color.parseColor(color))
+        (holder.channelBadge.background as? android.graphics.drawable.GradientDrawable)?.setColor(
+            Color.parseColor(color)
+        )
 
         if (filteredEvents.isNotEmpty()) {
             val firstEventDate = bindingHelpers.getEventDate(filteredEvents[0])
@@ -269,20 +282,13 @@ class ChannelEventsAdapter(
             showMenuPopup(holder)
         }
 
-        // ✅ NEW: Setup Timeline
         setupTimeline(holder)
-
-        // ✅ NEW: Update filter chips display
         updateFilterChipsDisplay(holder)
     }
 
-    // Update setupTimeline() method in ChannelEventsAdapter
-
     private fun setupTimeline(holder: EventViewHolders.HeaderViewHolder) {
-        // Initial visibility
         holder.timelineContainer.visibility = if (showTimeline) View.VISIBLE else View.GONE
 
-        // Toggle timeline visibility
         holder.toggleTimelineButton.setOnClickListener {
             showTimeline = !showTimeline
             holder.timelineContainer.visibility = if (showTimeline) View.VISIBLE else View.GONE
@@ -304,16 +310,12 @@ class ChannelEventsAdapter(
         holder.timelineView.setEvents(filteredEvents)
         holder.timelineView.setTimelineMode(currentTimelineMode)
 
-        // ✅ FIXED: Handle period selection - show filtered events but DON'T replace filteredEvents
         holder.timelineView.onPeriodSelected = { period, events ->
-            // Store original filtered events
             val originalFiltered = filteredEvents
 
-            // Temporarily show only selected period events
             filteredEvents = events
             notifyDataSetChanged()
 
-            // Smooth scroll to show filtered events
             (holder.itemView.parent as? RecyclerView)?.smoothScrollToPosition(1)
 
             Toast.makeText(
@@ -322,21 +324,16 @@ class ChannelEventsAdapter(
                 Toast.LENGTH_SHORT
             ).show()
 
-            // ✅ NEW: Add reset button or auto-reset on timeline deselect
             holder.timelineView.clearSelection()
 
-            // Allow user to see other periods by clicking timeline again
             holder.timelineView.onPeriodSelected = { newPeriod, newEvents ->
                 if (newPeriod == period) {
-                    // Same period clicked again - reset to show all
                     filteredEvents = originalFiltered
                     notifyDataSetChanged()
                     Toast.makeText(context, "Showing all events", Toast.LENGTH_SHORT).show()
 
-                    // Restore original behavior
                     setupTimeline(holder)
                 } else {
-                    // Different period - show new period
                     filteredEvents = newEvents
                     notifyDataSetChanged()
                     Toast.makeText(
@@ -348,12 +345,10 @@ class ChannelEventsAdapter(
             }
         }
 
-        // Handle timeline mode changes
         holder.timelineView.onTimelineModeChanged = { mode ->
             currentTimelineMode = mode
             updateTimelineModeButtons(holder, mode)
 
-            // ✅ FIXED: Reset to show all events when mode changes
             applyFilters()
             holder.timelineView.setEvents(filteredEvents)
         }
@@ -384,7 +379,6 @@ class ChannelEventsAdapter(
         holder: EventViewHolders.HeaderViewHolder,
         mode: EventTimelineView.TimelineMode
     ) {
-        // Reset all buttons
         val buttons = listOf(
             holder.hourButton,
             holder.dayButton,
@@ -397,7 +391,6 @@ class ChannelEventsAdapter(
             button.setTextColor(Color.parseColor("#757575"))
         }
 
-        // Highlight selected button
         val selectedButton = when (mode) {
             EventTimelineView.TimelineMode.HOUR -> holder.hourButton
             EventTimelineView.TimelineMode.DAY -> holder.dayButton
@@ -409,7 +402,6 @@ class ChannelEventsAdapter(
         selectedButton.setTextColor(Color.parseColor("#FFFFFF"))
     }
 
-
     private fun showMenuPopup(holder: EventViewHolders.HeaderViewHolder) {
         val popup = PopupMenu(holder.itemView.context, holder.menuButton)
         popup.inflate(R.menu.channel_events_menu)
@@ -420,14 +412,17 @@ class ChannelEventsAdapter(
                     showSearchDialog()
                     true
                 }
+
                 R.id.action_filter -> {
                     showFilterDialog()
                     true
                 }
+
                 R.id.action_download_pdf -> {
                     handleBulkPdfDownload()
                     true
                 }
+
                 else -> false
             }
         }
@@ -449,7 +444,6 @@ class ChannelEventsAdapter(
         val clearButton = dialog.findViewById<Button>(R.id.clear_search_button)
         val searchButton = dialog.findViewById<Button>(R.id.search_button)
 
-        // Set current search query
         searchInput.setText(searchQuery)
 
         clearButton.setOnClickListener {
@@ -485,7 +479,6 @@ class ChannelEventsAdapter(
         val clearFilterButton = dialog.findViewById<Button>(R.id.clear_filter_button)
         val applyFilterButton = dialog.findViewById<Button>(R.id.apply_filter_button)
 
-        // Setup spinner
         val filterOptions = arrayOf("All", "Today", "Yesterday", "Custom Date Range")
         val adapter = ArrayAdapter(
             context,
@@ -495,13 +488,11 @@ class ChannelEventsAdapter(
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         dateFilterSpinner.adapter = adapter
 
-        // Set current selection
         val currentIndex = filterOptions.indexOf(selectedFilterOption)
         if (currentIndex >= 0) {
             dateFilterSpinner.setSelection(currentIndex)
         }
 
-        // Update button texts if dates are set
         if (customFromDate != null) {
             fromDateTimeButton.text = bindingHelpers.displayDateTimeFormat.format(customFromDate)
         }
@@ -510,7 +501,12 @@ class ChannelEventsAdapter(
         }
 
         dateFilterSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) {
                 if (filterOptions[position] == "Custom Date Range") {
                     customDateContainer.visibility = View.VISIBLE
                 } else {
@@ -560,7 +556,11 @@ class ChannelEventsAdapter(
 
             if (selectedOption == "Custom Date Range") {
                 if (customFromDate == null || customToDate == null) {
-                    Toast.makeText(context, "Please select both from and to date/time", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        "Please select both from and to date/time",
+                        Toast.LENGTH_SHORT
+                    ).show()
                     return@setOnClickListener
                 }
             }
@@ -594,6 +594,7 @@ class ChannelEventsAdapter(
                         true
                     }
                 }
+
                 else -> true
             }
 
@@ -602,7 +603,6 @@ class ChannelEventsAdapter(
 
         notifyDataSetChanged()
 
-        // ✅ Refresh timeline with filtered events
         if (showTimeline) {
             notifyItemChanged(0)
         }
@@ -633,7 +633,6 @@ class ChannelEventsAdapter(
         }
     }
 
-
     private fun setupEvent(holder: EventViewHolders.EventViewHolder, event: Event) {
         holder.eventType.text = event.typeDisplay ?: "Unknown Event"
 
@@ -647,7 +646,11 @@ class ChannelEventsAdapter(
         val (iconText, color) = bindingHelpers.getEventTypeIcon(event.type ?: "")
         holder.iconText.text = iconText
         holder.badge.setBackgroundResource(R.drawable.circle_background)
-        (holder.badge.background as? android.graphics.drawable.GradientDrawable)?.setColor(Color.parseColor(color))
+        (holder.badge.background as? android.graphics.drawable.GradientDrawable)?.setColor(
+            Color.parseColor(
+                color
+            )
+        )
 
         bindingHelpers.setupPrioritySpinner(holder.prioritySpinner)
 
@@ -661,8 +664,12 @@ class ChannelEventsAdapter(
         loadEventImage(event, holder)
     }
 
+    /**
+     * ✅ UPDATED: Save button now shows dialog instead of inline save
+     */
     private fun setupSaveButton(holder: EventViewHolders.EventViewHolder, event: Event) {
-        val isSaved = event.id?.let { SavedMessagesManager.isMessageSaved(it) } ?: false
+        val eventId = event.id ?: return
+        val isSaved = SavedMessagesManager.isMessageSaved(eventId)
 
         if (isSaved) {
             holder.saveEventButton.text = "Saved ✓"
@@ -680,8 +687,10 @@ class ChannelEventsAdapter(
                 return@setOnClickListener
             }
 
-            holder.savePrioritySection.visibility = View.VISIBLE
-            holder.actionButtonsContainer.visibility = View.GONE
+            Log.d(TAG, "💾 Save clicked for: ${event.id}")
+
+            // ✅ Show save dialog (NOT inline save)
+            showSaveEventDialog(event)
         }
 
         holder.cancelSaveButton.setOnClickListener {
@@ -689,32 +698,78 @@ class ChannelEventsAdapter(
             holder.commentInput.text.clear()
             holder.prioritySpinner.setSelection(0)
         }
+    }
 
-        holder.confirmSaveButton.setOnClickListener {
-            val eventId = event.id
-            if (eventId == null) {
-                Toast.makeText(context, "Cannot save: Invalid event", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
+    /**
+     * ✅ NEW: Show save dialog
+     */
+    private fun showSaveEventDialog(event: Event) {
+        try {
+            val fragmentActivity = context as? androidx.fragment.app.FragmentActivity
+            if (fragmentActivity == null) {
+                Log.e(TAG, "❌ Cannot show dialog - context is not FragmentActivity")
+                Toast.makeText(context, "Error: Cannot show dialog", Toast.LENGTH_SHORT).show()
+                return
             }
 
-            val priorityIndex = holder.prioritySpinner.selectedItemPosition
-            val priority = Priority.values()[priorityIndex]
-            val comment = holder.commentInput.text.toString().trim()
+            Log.d(TAG, "📋 Showing SaveEventDialogFragment")
 
-            val saved = SavedMessagesManager.saveMessage(eventId, event, priority, comment)
+            SaveEventDialogFragment.show(
+                fragmentManager = fragmentActivity.supportFragmentManager,
+                event = event,
+                onSave = { priority, comment ->
+                    Log.d(
+                        TAG,
+                        "✅ Dialog submitted: Priority=${priority.displayName}, Comment=$comment"
+                    )
 
-            if (saved) {
-                Toast.makeText(context, "Event saved successfully", Toast.LENGTH_SHORT).show()
-                holder.saveEventButton.text = "Saved ✓"
-                holder.saveEventButton.isEnabled = false
-                holder.saveEventButton.alpha = 0.6f
-                holder.savePrioritySection.visibility = View.GONE
-                holder.commentInput.text.clear()
-                holder.prioritySpinner.setSelection(0)
-            } else {
-                Toast.makeText(context, "Event already saved", Toast.LENGTH_SHORT).show()
-            }
+                    // ✅ Handle save with local + API sync
+                    handleSaveFromDialog(event, priority, comment)
+                }
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error showing dialog: ${e.message}", e)
+            Toast.makeText(context, "Error opening dialog", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun handleSaveFromDialog(event: Event, priority: Priority, comment: String) {
+        val eventId = event.id
+        if (eventId == null) {
+            Toast.makeText(context, "Cannot save: Invalid event", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        Log.d(TAG, "")
+        Log.d(TAG, "════════════════════════════════════════")
+        Log.d(TAG, "🚀 SAVE WORKFLOW STARTED")
+        Log.d(TAG, "════════════════════════════════════════")
+        Log.d(TAG, "Event ID: $eventId")
+        Log.d(TAG, "Area: ${event.area}")
+        Log.d(TAG, "Priority: ${priority.displayName}")
+        Log.d(TAG, "Comment: $comment")
+
+        // ✅ CRITICAL: Use ChannelEventSaveHelper which does API check
+        eventSaveHelper.saveEventWithPriority(
+            event = event,
+            priority = priority,
+            comment = comment,
+            onSuccess = {
+                Log.d(TAG, "")
+                Log.d(TAG, "✅✅✅ SAVE COMPLETE ✅✅✅")
+                Log.d(TAG, "════════════════════════════════════════")
+
+                Toast.makeText(context, "✓ Event saved and synced", Toast.LENGTH_SHORT).show()
+                notifyDataSetChanged() // Update the adapter to show "Saved ✓"
+            },
+            onError = { errorMsg ->
+                Log.e(TAG, "")
+                Log.e(TAG, "❌ SAVE FAILED: $errorMsg")
+                Log.e(TAG, "════════════════════════════════════════")
+
+                Toast.makeText(context, "Failed: $errorMsg", Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     private fun setupMoreActionsButton(holder: EventViewHolders.EventViewHolder, event: Event) {
@@ -725,7 +780,6 @@ class ChannelEventsAdapter(
                 holder.actionButtonsContainer.visibility = View.VISIBLE
                 holder.savePrioritySection.visibility = View.GONE
 
-                // ✅ Auto-scroll to show expanded actions
                 holder.itemView.post {
                     val recyclerView = holder.itemView.parent as? RecyclerView
                     recyclerView?.smoothScrollToPosition(holder.bindingAdapterPosition)
@@ -733,6 +787,7 @@ class ChannelEventsAdapter(
             }
         }
     }
+
     private fun setupEventActionButtons(holder: EventViewHolders.EventViewHolder, event: Event) {
         holder.downloadImageButton.setOnClickListener {
             downloadEventImage(event)
@@ -776,7 +831,11 @@ class ChannelEventsAdapter(
         }
     }
 
-    private fun displayEventImage(holder: EventViewHolders.EventViewHolder, event: Event, bitmap: Bitmap) {
+    private fun displayEventImage(
+        holder: EventViewHolders.EventViewHolder,
+        event: Event,
+        bitmap: Bitmap
+    ) {
         holder.loadingContainer.visibility = View.GONE
         holder.errorContainer.visibility = View.GONE
         holder.eventImage.visibility = View.VISIBLE
@@ -840,7 +899,10 @@ class ChannelEventsAdapter(
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "image/jpeg"
                     putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_TEXT, "Event: ${event.typeDisplay}\nLocation: ${event.data["location"]}")
+                    putExtra(
+                        Intent.EXTRA_TEXT,
+                        "Event: ${event.typeDisplay}\nLocation: ${event.data["location"]}"
+                    )
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
                 context.startActivity(Intent.createChooser(shareIntent, "Share Event Image"))
@@ -851,7 +913,7 @@ class ChannelEventsAdapter(
     }
 
     fun getEventAtPosition(position: Int): Event? {
-        val eventIndex = position - 1 // Account for header
+        val eventIndex = position - 1
         return if (eventIndex >= 0 && eventIndex < filteredEvents.size) {
             filteredEvents[eventIndex]
         } else null
@@ -861,7 +923,7 @@ class ChannelEventsAdapter(
         val index = filteredEvents.indexOf(event)
         if (index >= 0) {
             filteredEvents = filteredEvents.toMutableList().apply { removeAt(index) }
-            notifyItemRemoved(index + 1) // +1 for header
+            notifyItemRemoved(index + 1)
         }
     }
 
@@ -882,6 +944,47 @@ class ChannelEventsAdapter(
             } else {
                 Toast.makeText(context, "Failed to generate PDF", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+
+    private fun getHttpUrlForArea(area: String): String {
+        val normalizedArea = area.lowercase().replace(" ", "").replace("_", "")
+
+        if (BackendConfig.isCCL()) {
+            return when (normalizedArea) {
+                "barkasayal" -> "https://barkasayal.cclai.in"
+                "argada" -> "https://argada.cclai.in"
+                "northkaranpura" -> "https://nk.cclai.in"
+                "bokarokargali" -> "https://bk.cclai.in"
+                "kathara" -> "https://kathara.cclai.in"
+                "giridih" -> "https://giridih.cclai.in"
+                "amrapali" -> "https://amrapali.cclai.in"
+                "magadh" -> "https://magadh.cclai.in"
+                "rajhara" -> "https://rajhara.cclai.in"
+                "kuju" -> "https://kuju.cclai.in"
+                "hazaribagh" -> "https://hazaribagh.cclai.in"
+                "rajrappa" -> "https://rajrappa.cclai.in"
+                "dhori" -> "https://dhori.cclai.in"
+                "piparwar" -> "https://piparwar.cclai.in"
+                else -> "https://barkasayal.cclai.in"
+            }
+        }
+
+        return when (normalizedArea) {
+            "sijua", "katras" -> "http://a5va.bccliccc.in:10050"
+            "kusunda" -> "http://a6va.bccliccc.in:5050"
+            "bastacolla" -> "http://a9va.bccliccc.in:5050"
+            "lodna" -> "http://a10va.bccliccc.in:5050"
+            "govindpur" -> "http://103.208.173.163:5050"
+            "barora" -> "http://103.208.173.131:5050"
+            "block2" -> "http://103.208.173.147:5050"
+            "pbarea" -> "http://103.208.173.195:5050"
+            "wjarea" -> "http://103.208.173.211:5050"
+            "ccwo" -> "http://103.208.173.179:5050"
+            "cvarea" -> "http://103.210.88.211:5050"
+            "ej" -> "http://103.210.88.194:5050"
+            else -> "http://a5va.bccliccc.in:10050"
         }
     }
 }

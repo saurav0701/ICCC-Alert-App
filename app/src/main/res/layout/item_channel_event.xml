@@ -139,7 +139,6 @@
 
                 </LinearLayout>
 
-                <!-- ✅ NEW: Quick action overlay buttons -->
                 <LinearLayout
                     android:id="@+id/quick_actions_overlay"
                     android:layout_width="wrap_content"
@@ -175,14 +174,12 @@
 
             </FrameLayout>
 
-            <!-- ✅ ENHANCED: Better content spacing and hierarchy -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="20dp">
 
-                <!-- ✅ ENHANCED: Title with better typography -->
                 <TextView
                     android:id="@+id/event_type"
                     android:layout_width="wrap_content"
@@ -197,7 +194,6 @@
                     android:maxLines="2"
                     android:ellipsize="end" />
 
-                <!-- ✅ ENHANCED: Better location display -->
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -226,7 +222,6 @@
 
                 </LinearLayout>
 
-                <!-- ✅ ENHANCED: Subtle divider -->
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
@@ -234,7 +229,6 @@
                     android:layout_marginTop="16dp"
                     android:layout_marginBottom="16dp" />
 
-                <!-- ✅ ENHANCED: Better time display -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

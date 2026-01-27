@@ -10,16 +10,16 @@ object BackendConfig {
     private lateinit var prefs: SharedPreferences
 
     // ✅ BCCL Backend Configuration
-    private const val BCCL_HTTP_HOST = "192.168.29.69"
+    private const val BCCL_HTTP_HOST = "103.208.173.227"
     private const val BCCL_HTTP_PORT = 8890        // ← API Server Port
-    private const val BCCL_WS_HOST = "192.168.29.69"
-    private const val BCCL_WS_PORT = 2222          // ← WebSocket Server Port
+    private const val BCCL_WS_HOST = "103.208.173.227"
+    private const val BCCL_WS_PORT = 2222
 
     // ✅ CCL Backend Configuration
-    private const val CCL_HTTP_HOST = "192.168.29.69"
-    private const val CCL_HTTP_PORT = 39071        // ← API Server Port
-    private const val CCL_WS_HOST = "192.168.29.69"
-    private const val CCL_WS_PORT = 39072          // ← WebSocket Server Port
+    private const val CCL_HTTP_HOST = "20.207.231.162"
+    private const val CCL_HTTP_PORT = 39071
+    private const val CCL_WS_HOST = "20.207.231.162"
+    private const val CCL_WS_PORT = 39072
 
     fun initialize(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
