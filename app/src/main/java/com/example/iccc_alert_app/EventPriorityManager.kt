@@ -39,7 +39,13 @@ class EventPriorityManager(
                 val baseUrl = getHttpUrlForArea(area)
                 val apiUrl = "$baseUrl/api/va/events"
 
-                Log.d(TAG, "🔍 Checking API for existing comments: $eventId")
+                Log.d(TAG, "")
+                Log.d(TAG, "════════════════════════════════════════")
+                Log.d(TAG, "🔍 CHECKING API FOR EXISTING COMMENTS")
+                Log.d(TAG, "════════════════════════════════════════")
+                Log.d(TAG, "Event ID: $eventId")
+                Log.d(TAG, "Area: $area")
+                Log.d(TAG, "API URL: $apiUrl")
 
                 val eventTimeStr = event.data["eventTime"] as? String
                 val eventTimestamp = if (eventTimeStr != null) {
@@ -72,6 +78,8 @@ class EventPriorityManager(
                 )
 
                 val jsonBody = gson.toJson(requestBody)
+                Log.d(TAG, "📤 Request body: $jsonBody")
+
                 val body = jsonBody.toRequestBody("application/json; charset=utf-8".toMediaType())
 
                 val request = Request.Builder()
@@ -85,19 +93,65 @@ class EventPriorityManager(
                 response.use { resp ->
                     val responseBody = resp.body?.string()
 
+                    Log.d(TAG, "📥 Response code: ${resp.code}")
+                    Log.d(TAG, "📥 Response body length: ${responseBody?.length ?: 0}")
+
                     if (!resp.isSuccessful || responseBody.isNullOrEmpty()) {
+                        Log.w(TAG, "❌ API request failed or empty response")
                         return@withContext null
+                    }
+
+                    if (responseBody.length > 500) {
+                        Log.d(TAG, "📥 Response preview: ${responseBody.substring(0, 500)}...")
+                    } else {
+                        Log.d(TAG, "📥 Full response: $responseBody")
                     }
 
                     val jsonElement = JsonParser.parseString(responseBody)
 
-                    if (!jsonElement.isJsonArray) {
-                        return@withContext null
+                    val eventsArray = when {
+                        jsonElement.isJsonArray -> {
+                            Log.d(TAG, "✅ Response is a JSON array")
+                            jsonElement.asJsonArray
+                        }
+                        jsonElement.isJsonObject -> {
+                            val obj = jsonElement.asJsonObject
+                            Log.d(TAG, "✅ Response is a JSON object with keys: ${obj.keySet()}")
+
+                            when {
+                                obj.has("data") && obj.get("data").isJsonArray -> {
+                                    Log.d(TAG, "✅ Found 'data' field containing events array")
+                                    obj.get("data").asJsonArray
+                                }
+                                obj.has("events") && obj.get("events").isJsonArray -> {
+                                    Log.d(TAG, "✅ Found 'events' field containing events array")
+                                    obj.get("events").asJsonArray
+                                }
+                                obj.has("results") && obj.get("results").isJsonArray -> {
+                                    Log.d(TAG, "✅ Found 'results' field containing events array")
+                                    obj.get("results").asJsonArray
+                                }
+                                obj.has("rows") && obj.get("rows").isJsonArray -> {
+                                    Log.d(TAG, "✅ Found 'rows' field containing events array")
+                                    obj.get("rows").asJsonArray
+                                }
+                                else -> {
+                                    Log.w(TAG, "❌ Response is object but no known events array field found")
+                                    Log.w(TAG, "Available keys: ${obj.keySet().joinToString()}")
+                                    return@withContext null
+                                }
+                            }
+                        }
+                        else -> {
+                            Log.w(TAG, "❌ Response is neither array nor object")
+                            return@withContext null
+                        }
                     }
 
-                    val eventsArray = jsonElement.asJsonArray
+                    Log.d(TAG, "📊 Found ${eventsArray.size()} events in API response")
 
                     if (eventsArray.size() == 0) {
+                        Log.d(TAG, "✅ No events found in API")
                         return@withContext null
                     }
 
@@ -109,6 +163,7 @@ class EventPriorityManager(
                                 val foundEventId = obj.get("eventId").asString
                                 if (foundEventId == eventId) {
                                     targetEvent = obj
+                                    Log.d(TAG, "✅ Found matching event in API: $eventId")
                                     break
                                 }
                             }
@@ -116,22 +171,29 @@ class EventPriorityManager(
                     }
 
                     if (targetEvent == null) {
+                        Log.d(TAG, "❌ Event $eventId not found in API response")
                         return@withContext null
                     }
 
-                    // Extract severity
+                    Log.d(TAG, "")
+                    Log.d(TAG, "════════════════════════════════════════")
+                    Log.d(TAG, "📋 PARSING EVENT DATA FROM API")
+                    Log.d(TAG, "════════════════════════════════════════")
+
                     val severity = if (targetEvent.has("severity") && !targetEvent.get("severity").isJsonNull) {
                         targetEvent.get("severity").asString
                     } else {
                         null
                     }
+                    Log.d(TAG, "Priority/Severity: ${severity ?: "null"}")
 
-                    // Extract remarks
                     val remarks = if (targetEvent.has("remarks") && !targetEvent.get("remarks").isJsonNull) {
                         targetEvent.get("remarks")
                     } else {
                         null
                     }
+                    Log.d(TAG, "Remarks present: ${remarks != null}")
+                    Log.d(TAG, "Remarks JSON: ${remarks?.toString()}")
 
                     val hasSeverity = severity != null &&
                             severity.isNotEmpty() &&
@@ -139,18 +201,24 @@ class EventPriorityManager(
 
                     val hasRemarks = remarks != null && !remarks.isJsonNull
 
+                    Log.d(TAG, "Has severity: $hasSeverity")
+                    Log.d(TAG, "Has remarks: $hasRemarks")
+
                     if (!hasSeverity && !hasRemarks) {
+                        Log.d(TAG, "✅ No severity or remarks found - event is clean")
                         return@withContext null
                     }
 
-                    // ✅ FIXED: Parse remarks properly
                     val parsedComments = if (hasRemarks) {
                         parseRemarksFromJson(remarks)
                     } else {
                         emptyList()
                     }
 
+                    Log.d(TAG, "Parsed ${parsedComments.size} comments from remarks")
+
                     if (parsedComments.isEmpty() && !hasSeverity) {
+                        Log.d(TAG, "✅ Remarks exist but no parseable comments + no severity")
                         return@withContext null
                     }
 
@@ -164,7 +232,14 @@ class EventPriorityManager(
                         )
                     }
 
-                    Log.d(TAG, "⚠️ Existing data found - Priority: $severity, Comments: ${parsedComments.size}")
+                    Log.d(TAG, "")
+                    Log.d(TAG, "⚠️⚠️⚠️ EXISTING DATA FOUND ⚠️⚠️⚠️")
+                    Log.d(TAG, "════════════════════════════════════════")
+                    Log.d(TAG, "Priority: $severity")
+                    Log.d(TAG, "Latest comment: ${latestComment.comment}")
+                    Log.d(TAG, "Comment by: ${latestComment.user}")
+                    Log.d(TAG, "Total comments: ${parsedComments.size}")
+                    Log.d(TAG, "════════════════════════════════════════")
 
                     return@withContext EventCommentInfo(
                         hasPreviousComments = true,
@@ -177,46 +252,79 @@ class EventPriorityManager(
 
             } catch (e: Exception) {
                 Log.e(TAG, "❌ API check error: ${e.message}", e)
+                e.printStackTrace()
                 return@withContext null
             }
         }
     }
 
-    /**
-     * ✅ FIXED: Properly parse remarks JSON structure
-     */
     private fun parseRemarksFromJson(remarksJson: com.google.gson.JsonElement?): List<CommentEntry> {
-        if (remarksJson == null || remarksJson.isJsonNull) return emptyList()
+        if (remarksJson == null || remarksJson.isJsonNull) {
+            Log.d(TAG, "❌ remarksJson is null or JsonNull")
+            return emptyList()
+        }
 
         try {
-            // Case 1: remarks is a JSON object with "comment" field
+            Log.d(TAG, "🔍 Parsing remarks: ${remarksJson.javaClass.simpleName}")
+
             if (remarksJson.isJsonObject) {
                 val obj = remarksJson.asJsonObject
+                Log.d(TAG, "📦 Remarks is a JSON object with keys: ${obj.keySet()}")
 
                 if (obj.has("comment")) {
-                    val commentStr = obj.get("comment").asString
-                    val user = if (obj.has("user")) obj.get("user").asString else "Unknown"
-                    val timestamp = if (obj.has("timestamp")) obj.get("timestamp").asString
-                    else System.currentTimeMillis().toString()
+                    val commentElement = obj.get("comment")
 
-                    // Check if comment contains REMARKS_HISTORY
+                    // ✅ FIX: Handle both string and non-string comment values
+                    val commentStr = if (commentElement.isJsonPrimitive && commentElement.asJsonPrimitive.isString) {
+                        commentElement.asString
+                    } else {
+                        commentElement.toString()
+                    }
+
+                    val user = if (obj.has("user")) {
+                        val userElement = obj.get("user")
+                        if (userElement.isJsonPrimitive && userElement.asJsonPrimitive.isString) {
+                            userElement.asString
+                        } else {
+                            "Unknown"
+                        }
+                    } else {
+                        "Unknown"
+                    }
+
+                    val timestamp = if (obj.has("timestamp")) {
+                        val tsElement = obj.get("timestamp")
+                        if (tsElement.isJsonPrimitive && tsElement.asJsonPrimitive.isString) {
+                            tsElement.asString
+                        } else {
+                            System.currentTimeMillis().toString()
+                        }
+                    } else {
+                        System.currentTimeMillis().toString()
+                    }
+
+                    Log.d(TAG, "✅ Found comment: user=$user, comment=$commentStr, timestamp=$timestamp")
+
                     if (commentStr.startsWith("REMARKS_HISTORY:")) {
+                        Log.d(TAG, "🔄 Comment contains REMARKS_HISTORY, parsing nested structure")
                         return parseRemarksHistory(commentStr)
                     }
 
-                    // Check if comment contains EVENT_CLOSED_BY_USER
                     if (commentStr.startsWith("EVENT_CLOSED_BY_USER:")) {
+                        Log.d(TAG, "🔒 Comment contains EVENT_CLOSED_BY_USER, parsing nested structure")
                         return parseEventClosedByUser(commentStr)
                     }
 
-                    // Simple comment
+                    Log.d(TAG, "✅ Returning simple comment")
                     return listOf(CommentEntry(user, commentStr, timestamp))
+                } else {
+                    Log.w(TAG, "⚠️ Remarks object exists but has no 'comment' field. Keys: ${obj.keySet()}")
                 }
             }
 
-            // Case 2: remarks is a string
             if (remarksJson.isJsonPrimitive && remarksJson.asJsonPrimitive.isString) {
                 val remarksStr = remarksJson.asString
+                Log.d(TAG, "📝 Remarks is a string: $remarksStr")
 
                 if (remarksStr.startsWith("REMARKS_HISTORY:")) {
                     return parseRemarksHistory(remarksStr)
@@ -235,8 +343,8 @@ class EventPriorityManager(
                 )
             }
 
-            // Case 3: remarks is an array of comments
             if (remarksJson.isJsonArray) {
+                Log.d(TAG, "📚 Remarks is an array")
                 val comments = mutableListOf<CommentEntry>()
                 remarksJson.asJsonArray.forEach { element ->
                     if (element.isJsonObject) {
@@ -254,16 +362,16 @@ class EventPriorityManager(
                 return comments.sortedByDescending { parseTimestamp(it.timestamp) }
             }
 
+            Log.w(TAG, "⚠️ Unknown remarks format: ${remarksJson.javaClass.simpleName}")
+
         } catch (e: Exception) {
-            Log.e(TAG, "Error parsing remarks: ${e.message}")
+            Log.e(TAG, "❌ Error parsing remarks: ${e.message}", e)
+            e.printStackTrace()
         }
 
         return emptyList()
     }
 
-    /**
-     * ✅ NEW: Parse REMARKS_HISTORY structure
-     */
     private fun parseRemarksHistory(remarksStr: String): List<CommentEntry> {
         try {
             val historyJson = remarksStr.removePrefix("REMARKS_HISTORY:")
@@ -289,9 +397,6 @@ class EventPriorityManager(
         return emptyList()
     }
 
-    /**
-     * ✅ NEW: Parse EVENT_CLOSED_BY_USER structure
-     */
     private fun parseEventClosedByUser(commentStr: String): List<CommentEntry> {
         try {
             val eventDataJson = commentStr.removePrefix("EVENT_CLOSED_BY_USER:")
@@ -505,6 +610,7 @@ class EventPriorityManager(
         return when (normalizedArea) {
             "sijua", "katras" -> "http://a5va.bccliccc.in:10050"
             "kusunda" -> "http://a6va.bccliccc.in:5050"
+            "Lodna" -> "http://a10va.bccliccc.in:5050"
             else -> "http://a5va.bccliccc.in:10050"
         }
     }

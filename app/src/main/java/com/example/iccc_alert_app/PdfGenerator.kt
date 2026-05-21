@@ -708,11 +708,10 @@ class PdfGenerator(private val context: Context) {
         canvas.drawRect(MARGIN, startY, PAGE_WIDTH - MARGIN, startY + 4, paint)
         paint.shader = null
 
-        // Column 1: Event Number with circular badge
+        // ===== Column 1: Event Number with circular badge =====
         val numberText = "#$eventNumber"
         paint.textSize = 14f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.color = Color.parseColor(COLOR_PRIMARY)
 
         val circleDiameter = 36f
         val circleX = currentX + (COL_SNO_WIDTH - circleDiameter) / 2
@@ -739,27 +738,30 @@ class PdfGenerator(private val context: Context) {
         drawVerticalLine(canvas, paint, currentX, startY + 5, ROW_HEIGHT - 10)
         currentX += 8
 
-        // Column 2: Event Type
+        // ===== Column 2: Event Type =====
+        val colStartX = currentX
+        var contentY = startY + 15  // Start with padding from top
+
         val eventType = event.typeDisplay ?: event.type ?: "Unknown"
         paint.textSize = 11f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         paint.color = Color.parseColor(COLOR_TEXT_PRIMARY)
 
         val typeLines = wrapText(eventType, COL_TYPE_WIDTH - 16, paint)
-        var typeY = startY + (ROW_HEIGHT - (typeLines.size * 14)) / 2 + 14
         typeLines.forEach { line ->
-            canvas.drawText(line, currentX, typeY, paint)
-            typeY += 14
+            canvas.drawText(line, colStartX, contentY, paint)
+            contentY += 14
         }
 
         // Vehicle number for GPS events
         if (event.type in listOf("off-route", "tamper", "overspeed")) {
-            val vehicleNum = event.data["vehicleNumber"] as? String
+            val vehicleNum = event.vehicleNumber ?: event.data["vehicleNumber"] as? String
             if (vehicleNum != null) {
+                contentY += 6
                 paint.textSize = 9f
                 paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
                 paint.color = Color.parseColor(COLOR_PRIMARY)
-                canvas.drawText("🚗 $vehicleNum", currentX, typeY + 5, paint)
+                canvas.drawText("🚗 $vehicleNum", colStartX, contentY, paint)
             }
         }
 
@@ -769,30 +771,34 @@ class PdfGenerator(private val context: Context) {
         drawVerticalLine(canvas, paint, currentX, startY + 5, ROW_HEIGHT - 10)
         currentX += 8
 
-        // Column 3: Location
-        paint.textSize = 9f
+        // ===== Column 3: Location =====
+        contentY = startY + 15
+
+        paint.textSize = 8f  // Smaller header
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
-        canvas.drawText("LOCATION", currentX, startY + 10, paint)
+        canvas.drawText("LOCATION", currentX, contentY, paint)
+
+        contentY += 14
 
         paint.textSize = 10f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
         paint.color = Color.BLACK
         val location = event.data["location"] as? String ?: "Unknown"
         val locationLines = wrapText(location, COL_LOCATION_WIDTH - 16, paint)
-        var locY = startY + 25
-        locationLines.take(2).forEach { line ->
-            canvas.drawText(line, currentX, locY, paint)
-            locY += 12
+        locationLines.take(3).forEach { line ->  // Show up to 3 lines
+            canvas.drawText(line, currentX, contentY, paint)
+            contentY += 12
         }
 
         // GPS coordinates for GPS events
         val alertLoc = extractAlertLocation(event.data)
         if (alertLoc != null) {
-            paint.textSize = 9f
+            contentY += 8
+            paint.textSize = 8f
             paint.color = Color.parseColor(COLOR_PRIMARY)
-            val coordText = String.format("📍 %.6f, %.6f", alertLoc.latitude, alertLoc.longitude)
-            canvas.drawText(coordText, currentX, startY + 75, paint)
+            val coordText = String.format("%.5f, %.5f", alertLoc.latitude, alertLoc.longitude)  // 5 decimals for space
+            canvas.drawText("📍 $coordText", currentX, contentY, paint)
         }
 
         currentX += COL_LOCATION_WIDTH
@@ -801,11 +807,15 @@ class PdfGenerator(private val context: Context) {
         drawVerticalLine(canvas, paint, currentX, startY + 5, ROW_HEIGHT - 10)
         currentX += 8
 
-        // Column 4: Date & Time
-        paint.textSize = 9f
+        // ===== Column 4: Date & Time =====
+        contentY = startY + 15
+
+        paint.textSize = 8f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
-        canvas.drawText("DATE & TIME", currentX, startY + 10, paint)
+        canvas.drawText("DATE & TIME", currentX, contentY, paint)
+
+        contentY += 14
 
         val eventDate = getEventDate(event)
         paint.textSize = 10f
@@ -813,12 +823,13 @@ class PdfGenerator(private val context: Context) {
         paint.color = Color.BLACK
 
         val dateStr = "📅 ${dateFormat.format(eventDate)}"
-        val timeStr = "🕒 ${timeFormat.format(eventDate)}"
+        canvas.drawText(dateStr, currentX, contentY, paint)
 
-        canvas.drawText(dateStr, currentX, startY + 30, paint)
+        contentY += 16
 
         paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
-        canvas.drawText(timeStr, currentX, startY + 50, paint)
+        val timeStr = "🕒 ${timeFormat.format(eventDate)}"
+        canvas.drawText(timeStr, currentX, contentY, paint)
 
         currentX += COL_DATETIME_WIDTH
 
@@ -826,7 +837,7 @@ class PdfGenerator(private val context: Context) {
         drawVerticalLine(canvas, paint, currentX, startY + 5, ROW_HEIGHT - 10)
         currentX += 8
 
-        // Column 5: Image/Map
+        // ===== Column 5: Image/Map =====
         val imageRect = RectF(
             currentX,
             startY + 8,
@@ -995,11 +1006,33 @@ class PdfGenerator(private val context: Context) {
     }
 
     private fun extractAlertLocation(data: Map<String, Any>?): GeoPoint? {
-        if (data == null) return null
-        val alertLoc = data["alertLocation"] as? Map<*, *> ?: return null
-        val lat = (alertLoc["lat"] as? Number)?.toDouble() ?: return null
-        val lng = (alertLoc["lng"] as? Number)?.toDouble() ?: return null
-        return GeoPoint(lat, lng)
+        try {
+            if (data == null) {
+                Log.d(TAG, "No data provided for alert location extraction")
+                return null
+            }
+
+            val alertLoc = data["alertLocation"] as? Map<*, *>
+            if (alertLoc == null) {
+                Log.d(TAG, "No alertLocation field in data")
+                return null
+            }
+
+            val lat = (alertLoc["lat"] as? Number)?.toDouble()
+            val lng = (alertLoc["lng"] as? Number)?.toDouble()
+
+            if (lat == null || lng == null) {
+                Log.e(TAG, "Invalid lat/lng in alertLocation: lat=$lat, lng=$lng")
+                return null
+            }
+
+            Log.d(TAG, "✅ Alert location extracted: $lat, $lng")
+            return GeoPoint(lat, lng)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error extracting alert location: ${e.message}", e)
+            return null
+        }
     }
 
     private fun getEventDate(event: Event): Date {
@@ -1064,27 +1097,54 @@ class PdfGenerator(private val context: Context) {
 
     private suspend fun captureMapPreview(event: Event): Bitmap? = withContext(Dispatchers.Default) {
         try {
-            val alertLoc = extractAlertLocation(event.data) ?: return@withContext null
+            Log.d(TAG, "🗺️ Starting map preview capture for event: ${event.id}")
+
+            val alertLoc = extractAlertLocation(event.data)
+            if (alertLoc == null) {
+                Log.e(TAG, "❌ No alert location found in event data")
+                return@withContext null
+            }
+
+            Log.d(TAG, "✅ Alert location: ${alertLoc.latitude}, ${alertLoc.longitude}")
 
             // High resolution for better quality
-            val mapWidth = 800
-            val mapHeight = 500
+            val mapWidth = 1200  // Increased resolution
+            val mapHeight = 800
             val bitmap = Bitmap.createBitmap(mapWidth, mapHeight, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 isFilterBitmap = true
+                isDither = false
             }
 
-            // Background
+            // Background - light gray
             paint.color = Color.parseColor("#F5F7FA")
             canvas.drawRect(0f, 0f, mapWidth.toFloat(), mapHeight.toFloat(), paint)
 
             // Extract geofence data
             val geofenceData = extractGeofenceData(event.data)
+            if (geofenceData != null) {
+                Log.d(TAG, "✅ Geofence found: type=${geofenceData.type}, points=${geofenceData.points.size}, color=${geofenceData.color}")
+            } else {
+                Log.d(TAG, "⚠️ No geofence data available")
+            }
 
             // Calculate bounds
             val allPoints = mutableListOf(alertLoc)
-            geofenceData?.points?.let { allPoints.addAll(it) }
+            geofenceData?.points?.let {
+                allPoints.addAll(it)
+                Log.d(TAG, "Added ${it.size} geofence points to bounds calculation")
+            }
+
+            // If no geofence, add padding points around alert location
+            if (geofenceData == null) {
+                val paddingDegrees = 0.01 // ~1km padding
+                allPoints.add(GeoPoint(alertLoc.latitude + paddingDegrees, alertLoc.longitude))
+                allPoints.add(GeoPoint(alertLoc.latitude - paddingDegrees, alertLoc.longitude))
+                allPoints.add(GeoPoint(alertLoc.latitude, alertLoc.longitude + paddingDegrees))
+                allPoints.add(GeoPoint(alertLoc.latitude, alertLoc.longitude - paddingDegrees))
+                Log.d(TAG, "Added padding points for tamper event without geofence")
+            }
 
             val minLat = allPoints.minOf { it.latitude }
             val maxLat = allPoints.maxOf { it.latitude }
@@ -1094,17 +1154,23 @@ class PdfGenerator(private val context: Context) {
             val latRange = maxLat - minLat
             val lngRange = maxLng - minLng
 
-            val padding = 0.5
-            val paddedLatRange = latRange * (1 + padding)
-            val paddedLngRange = lngRange * (1 + padding)
+            // Add padding (30% for geofence, 50% for single point)
+            val padding = if (geofenceData != null) 0.3 else 0.5
+            val paddedLatRange = maxOf(latRange * (1 + padding), 0.01) // Minimum range
+            val paddedLngRange = maxOf(lngRange * (1 + padding), 0.01)
 
             val centerLat = (minLat + maxLat) / 2
             val centerLng = (minLng + maxLng) / 2
 
-            val mapPadding = 60f
+            Log.d(TAG, "Map bounds: lat[$minLat, $maxLat], lng[$minLng, $maxLng]")
+            Log.d(TAG, "Center: $centerLat, $centerLng")
+
+            val mapPadding = 80f
             val scaleX = (mapWidth - 2 * mapPadding) / paddedLngRange
             val scaleY = (mapHeight - 2 * mapPadding) / paddedLatRange
             val scale = minOf(scaleX, scaleY)
+
+            Log.d(TAG, "Scale: $scale (scaleX=$scaleX, scaleY=$scaleY)")
 
             fun toCanvasX(lng: Double): Float {
                 return ((lng - centerLng) * scale + mapWidth / 2).toFloat()
@@ -1114,113 +1180,265 @@ class PdfGenerator(private val context: Context) {
                 return (mapHeight / 2 - (lat - centerLat) * scale).toFloat()
             }
 
-            // Draw geofence
+            // Draw grid pattern (subtle)
+            paint.color = Color.parseColor("#E0E0E0")
+            paint.strokeWidth = 1f
+            paint.alpha = 100
+            val gridSpacing = 50f
+            for (x in 0 until mapWidth step gridSpacing.toInt()) {
+                canvas.drawLine(x.toFloat(), 0f, x.toFloat(), mapHeight.toFloat(), paint)
+            }
+            for (y in 0 until mapHeight step gridSpacing.toInt()) {
+                canvas.drawLine(0f, y.toFloat(), mapWidth.toFloat(), y.toFloat(), paint)
+            }
+            paint.alpha = 255
+
+            // Draw geofence FIRST (so it's behind the pin)
             geofenceData?.let { geoData ->
+                Log.d(TAG, "Drawing geofence: ${geoData.type}")
+
                 val color = try {
-                    Color.parseColor(if (geoData.color.startsWith("#")) geoData.color else "#${geoData.color}")
+                    val colorStr = if (geoData.color.startsWith("#")) geoData.color else "#${geoData.color}"
+                    Color.parseColor(colorStr)
                 } catch (e: Exception) {
+                    Log.w(TAG, "Failed to parse color '${geoData.color}', using default")
                     Color.parseColor("#3388ff")
                 }
 
                 when (geoData.type) {
                     "LineString" -> {
+                        Log.d(TAG, "Drawing LineString with ${geoData.points.size} points")
+
                         paint.color = color
-                        paint.strokeWidth = 5f
+                        paint.strokeWidth = 8f
                         paint.style = Paint.Style.STROKE
                         paint.strokeCap = Paint.Cap.ROUND
+                        paint.strokeJoin = Paint.Join.ROUND
 
                         val path = Path()
                         geoData.points.forEachIndexed { index, point ->
                             val x = toCanvasX(point.longitude)
                             val y = toCanvasY(point.latitude)
-                            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                            if (index == 0) {
+                                path.moveTo(x, y)
+                                Log.d(TAG, "LineString start: ($x, $y)")
+                            } else {
+                                path.lineTo(x, y)
+                            }
                         }
                         canvas.drawPath(path, paint)
-                    }
-                    "Polygon" -> {
-                        // Fill
-                        paint.color = Color.argb(30, Color.red(color), Color.green(color), Color.blue(color))
+
+                        // Draw points on the line for visibility
                         paint.style = Paint.Style.FILL
+                        geoData.points.forEach { point ->
+                            val x = toCanvasX(point.longitude)
+                            val y = toCanvasY(point.latitude)
+                            canvas.drawCircle(x, y, 6f, paint)
+                        }
+                    }
+
+                    "Polygon" -> {
+                        Log.d(TAG, "Drawing Polygon with ${geoData.points.size} points")
 
                         val path = Path()
                         geoData.points.forEachIndexed { index, point ->
                             val x = toCanvasX(point.longitude)
                             val y = toCanvasY(point.latitude)
-                            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                            if (index == 0) {
+                                path.moveTo(x, y)
+                                Log.d(TAG, "Polygon start: ($x, $y)")
+                            } else {
+                                path.lineTo(x, y)
+                            }
                         }
                         path.close()
+
+                        // Fill
+                        paint.color = Color.argb(40, Color.red(color), Color.green(color), Color.blue(color))
+                        paint.style = Paint.Style.FILL
                         canvas.drawPath(path, paint)
 
                         // Stroke
                         paint.color = color
-                        paint.strokeWidth = 4f
+                        paint.strokeWidth = 6f
                         paint.style = Paint.Style.STROKE
                         canvas.drawPath(path, paint)
                     }
+
                     "Point" -> {
+                        Log.d(TAG, "Drawing Point geofence")
+
                         val point = geoData.points.first()
                         val x = toCanvasX(point.longitude)
                         val y = toCanvasY(point.latitude)
 
-                        paint.color = Color.argb(50, Color.red(color), Color.green(color), Color.blue(color))
-                        paint.style = Paint.Style.FILL
-                        canvas.drawCircle(x, y, 40f, paint)
+                        Log.d(TAG, "Point location: ($x, $y)")
 
+                        // Outer circle (fill)
+                        paint.color = Color.argb(60, Color.red(color), Color.green(color), Color.blue(color))
+                        paint.style = Paint.Style.FILL
+                        canvas.drawCircle(x, y, 80f, paint)
+
+                        // Middle circle (stroke)
                         paint.color = color
-                        paint.strokeWidth = 3f
+                        paint.strokeWidth = 4f
                         paint.style = Paint.Style.STROKE
-                        canvas.drawCircle(x, y, 40f, paint)
+                        canvas.drawCircle(x, y, 60f, paint)
+
+                        // Inner circle (fill)
+                        paint.style = Paint.Style.FILL
+                        canvas.drawCircle(x, y, 12f, paint)
                     }
                 }
             }
 
-            // Draw alert pin (on top)
+            // Draw alert pin (ON TOP of geofence)
             val alertX = toCanvasX(alertLoc.longitude)
             val alertY = toCanvasY(alertLoc.latitude)
 
+            Log.d(TAG, "Alert pin position: ($alertX, $alertY)")
+
             paint.style = Paint.Style.FILL
+            paint.isAntiAlias = true
 
-            // Pin shadow
-            paint.color = Color.argb(100, 0, 0, 0)
-            canvas.drawCircle(alertX + 3, alertY + 3, 16f, paint)
+// Pin shadow (offset down and right)
+            paint.color = Color.argb(120, 0, 0, 0)
+            val shadowPath = Path().apply {
+                moveTo(alertX + 4, alertY - 35 + 4)  // Top of pin
+                lineTo(alertX - 15 + 4, alertY - 10 + 4)  // Left side
+                lineTo(alertX + 4, alertY + 4)  // Bottom point
+                lineTo(alertX + 15 + 4, alertY - 10 + 4)  // Right side
+                close()
+            }
+            canvas.drawPath(shadowPath, paint)
 
-            // Red pin
-            paint.color = Color.RED
-            canvas.drawCircle(alertX, alertY, 16f, paint)
+// Pin shape - create location marker shape
+            val pinPath = Path().apply {
+                // Start at top center
+                moveTo(alertX, alertY - 35)
+                // Left curve
+                cubicTo(
+                    alertX - 18, alertY - 35,  // Control point 1
+                    alertX - 18, alertY - 15,   // Control point 2
+                    alertX - 12, alertY - 8     // End point
+                )
+                // Left side to point
+                lineTo(alertX, alertY)
+                // Right side from point
+                lineTo(alertX + 12, alertY - 8)
+                // Right curve
+                cubicTo(
+                    alertX + 18, alertY - 15,
+                    alertX + 18, alertY - 35,
+                    alertX, alertY - 35
+                )
+                close()
+            }
 
-            // White center
+// Draw red pin
+            paint.color = Color.parseColor("#E53935")  // Material red
+            canvas.drawPath(pinPath, paint)
+
+// Draw white circle in the middle of pin (not at point)
             paint.color = Color.WHITE
-            canvas.drawCircle(alertX, alertY, 8f, paint)
+            canvas.drawCircle(alertX, alertY - 22, 8f, paint)
 
-            // Coordinates label
-            val coordText = String.format("%.6f, %.6f", alertLoc.latitude, alertLoc.longitude)
-            paint.textSize = 12f
+// Optional: Add a small dot in the center
+            paint.color = Color.parseColor("#E53935")
+            canvas.drawCircle(alertX, alertY - 22, 4f, paint)
+
+// Draw event type label ABOVE the pin
+            val eventTypeText = when (event.type) {
+                "off-route" -> "📍 OFF-ROUTE"
+                "tamper" -> "⚠️ TAMPER"
+                "overspeed" -> "⚡ OVERSPEED"
+                else -> "📍 ALERT"
+            }
+
+            paint.textSize = 22f
             paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             paint.color = Color.WHITE
-            paint.setShadowLayer(3f, 0f, 0f, Color.BLACK)
+            paint.setShadowLayer(4f, 0f, 2f, Color.BLACK)
+
+            val eventTextWidth = paint.measureText(eventTypeText)
+            val eventTextBgRect = RectF(
+                alertX - eventTextWidth / 2 - 16,
+                alertY - 85,  // Moved up above pin
+                alertX + eventTextWidth / 2 + 16,
+                alertY - 50
+            )
+
+// Event type background
+            paint.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+            paint.color = Color.parseColor("#E53935")
+            paint.style = Paint.Style.FILL
+            canvas.drawRoundRect(eventTextBgRect, 8f, 8f, paint)
+
+// Event type text
+            paint.color = Color.WHITE
+            paint.textAlign = Paint.Align.CENTER
+            canvas.drawText(eventTypeText, alertX, alertY - 58, paint)
+            paint.textAlign = Paint.Align.LEFT
+
+// Coordinates label (below pin) - with better background
+            val coordText = String.format("%.6f, %.6f", alertLoc.latitude, alertLoc.longitude)
+            paint.textSize = 18f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
 
             val textWidth = paint.measureText(coordText)
             val textBgRect = RectF(
-                alertX - textWidth / 2 - 8,
-                alertY + 20,
-                alertX + textWidth / 2 + 8,
+                alertX - textWidth / 2 - 14,
+                alertY + 12,
+                alertX + textWidth / 2 + 14,
                 alertY + 40
             )
 
+// Coord background - solid black with slight transparency
             paint.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
-            paint.color = Color.argb(153, 0, 0, 0)
+            paint.color = Color.argb(220, 0, 0, 0)
             paint.style = Paint.Style.FILL
-            canvas.drawRoundRect(textBgRect, 4f, 4f, paint)
+            canvas.drawRoundRect(textBgRect, 6f, 6f, paint)
 
-            paint.color = Color.WHITE
+// Coord text - bright yellow for visibility
+            paint.color = Color.parseColor("#FFEB3B")
             paint.textAlign = Paint.Align.CENTER
-            canvas.drawText(coordText, alertX, alertY + 35, paint)
-            paint.textAlign = Paint.Align.LEFT
+            paint.setShadowLayer(2f, 0f, 1f, Color.BLACK)
+            canvas.drawText(coordText, alertX, alertY + 33, paint)
             paint.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+            paint.textAlign = Paint.Align.LEFT
 
+// Draw vehicle number if available
+            val vehicleNum = event.vehicleNumber ?: event.data["vehicleNumber"] as? String
+            if (vehicleNum != null) {
+                val vehicleText = "🚗 $vehicleNum"
+                paint.textSize = 18f
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+
+                val vehicleWidth = paint.measureText(vehicleText)
+                val vehicleBgRect = RectF(
+                    alertX - vehicleWidth / 2 - 12,
+                    alertY + 50,
+                    alertX + vehicleWidth / 2 + 12,
+                    alertY + 78
+                )
+
+                // Vehicle background
+                paint.color = Color.parseColor("#1976D2")
+                canvas.drawRoundRect(vehicleBgRect, 6f, 6f, paint)
+
+                // Vehicle text
+                paint.color = Color.WHITE
+                paint.textAlign = Paint.Align.CENTER
+                canvas.drawText(vehicleText, alertX, alertY + 70, paint)
+                paint.textAlign = Paint.Align.LEFT
+            }
+
+            Log.d(TAG, "✅ Map preview generated successfully: ${mapWidth}x${mapHeight}")
             bitmap
+
         } catch (e: Exception) {
-            Log.e(TAG, "Error capturing map preview: ${e.message}", e)
+            Log.e(TAG, "❌ Error capturing map preview: ${e.message}", e)
+            e.printStackTrace()
             null
         }
     }
@@ -1232,55 +1450,122 @@ class PdfGenerator(private val context: Context) {
     )
 
     private fun extractGeofenceData(data: Map<String, Any>?): GeofenceData? {
-        if (data == null) return null
-
-        val geofenceMap = data["geofence"] as? Map<*, *> ?: return null
-        val geojsonMap = geofenceMap["geojson"] as? Map<*, *> ?: return null
-        val type = geojsonMap["type"] as? String ?: return null
-        val coordinates = geojsonMap["coordinates"] ?: return null
-
-        val attributesMap = geofenceMap["attributes"] as? Map<*, *>
-        val color = attributesMap?.get("color") as? String
-        val polylineColor = attributesMap?.get("polylineColor") as? String
-        val finalColor = polylineColor ?: color ?: "#3388ff"
-
-        val points = when (type) {
-            "Point" -> {
-                val coord = coordinates as? List<*> ?: return null
-                listOf(GeoPoint(
-                    (coord[1] as? Number)?.toDouble() ?: return null,
-                    (coord[0] as? Number)?.toDouble() ?: return null
-                ))
+        try {
+            if (data == null) {
+                Log.d(TAG, "No event data provided")
+                return null
             }
-            "LineString" -> {
-                val coords = coordinates as? List<*> ?: return null
-                coords.mapNotNull { coordPair ->
-                    val pair = coordPair as? List<*> ?: return@mapNotNull null
-                    if (pair.size < 2) return@mapNotNull null
-                    GeoPoint(
-                        (pair[1] as? Number)?.toDouble() ?: return@mapNotNull null,
-                        (pair[0] as? Number)?.toDouble() ?: return@mapNotNull null
-                    )
+
+            val geofenceMap = data["geofence"] as? Map<*, *>
+            if (geofenceMap == null) {
+                Log.d(TAG, "No geofence field in event data")
+                return null
+            }
+
+            val geojsonMap = geofenceMap["geojson"] as? Map<*, *>
+            if (geojsonMap == null) {
+                Log.d(TAG, "No geojson in geofence data")
+                return null
+            }
+
+            val type = geojsonMap["type"] as? String
+            if (type == null) {
+                Log.d(TAG, "No type in geojson")
+                return null
+            }
+
+            val coordinates = geojsonMap["coordinates"]
+            if (coordinates == null) {
+                Log.d(TAG, "No coordinates in geojson")
+                return null
+            }
+
+            Log.d(TAG, "Extracting geofence: type=$type")
+
+            // Extract color from attributes
+            val attributesMap = geofenceMap["attributes"] as? Map<*, *>
+            val color = attributesMap?.get("color") as? String
+            val polylineColor = attributesMap?.get("polylineColor") as? String
+            val geofenceType = geofenceMap["type"] as? String
+
+            // Priority: polylineColor > color > type-based default > fallback
+            val finalColor = when {
+                polylineColor != null -> polylineColor
+                color != null -> color
+                geofenceType == "P" -> "#FFC107" // Yellow for path
+                else -> "#3388ff" // Blue default
+            }
+
+            Log.d(TAG, "Geofence color: $finalColor (from polylineColor=$polylineColor, color=$color, type=$geofenceType)")
+
+            val points = when (type) {
+                "Point" -> {
+                    val coord = coordinates as? List<*>
+                    if (coord == null || coord.size < 2) {
+                        Log.e(TAG, "Invalid Point coordinates")
+                        return null
+                    }
+                    listOf(GeoPoint(
+                        (coord[1] as? Number)?.toDouble() ?: return null,
+                        (coord[0] as? Number)?.toDouble() ?: return null
+                    ))
+                }
+
+                "LineString" -> {
+                    val coords = coordinates as? List<*>
+                    if (coords == null) {
+                        Log.e(TAG, "Invalid LineString coordinates")
+                        return null
+                    }
+                    coords.mapNotNull { coordPair ->
+                        val pair = coordPair as? List<*> ?: return@mapNotNull null
+                        if (pair.size < 2) return@mapNotNull null
+                        GeoPoint(
+                            (pair[1] as? Number)?.toDouble() ?: return@mapNotNull null,
+                            (pair[0] as? Number)?.toDouble() ?: return@mapNotNull null
+                        )
+                    }
+                }
+
+                "Polygon" -> {
+                    val rings = coordinates as? List<*>
+                    if (rings == null) {
+                        Log.e(TAG, "Invalid Polygon coordinates")
+                        return null
+                    }
+                    val outerRing = rings.firstOrNull() as? List<*>
+                    if (outerRing == null) {
+                        Log.e(TAG, "No outer ring in Polygon")
+                        return null
+                    }
+                    outerRing.mapNotNull { coordPair ->
+                        val pair = coordPair as? List<*> ?: return@mapNotNull null
+                        if (pair.size < 2) return@mapNotNull null
+                        GeoPoint(
+                            (pair[1] as? Number)?.toDouble() ?: return@mapNotNull null,
+                            (pair[0] as? Number)?.toDouble() ?: return@mapNotNull null
+                        )
+                    }
+                }
+
+                else -> {
+                    Log.e(TAG, "Unknown geofence type: $type")
+                    return null
                 }
             }
-            "Polygon" -> {
-                val rings = coordinates as? List<*> ?: return null
-                val outerRing = rings.firstOrNull() as? List<*> ?: return null
-                outerRing.mapNotNull { coordPair ->
-                    val pair = coordPair as? List<*> ?: return@mapNotNull null
-                    if (pair.size < 2) return@mapNotNull null
-                    GeoPoint(
-                        (pair[1] as? Number)?.toDouble() ?: return@mapNotNull null,
-                        (pair[0] as? Number)?.toDouble() ?: return@mapNotNull null
-                    )
-                }
+
+            if (points.isEmpty()) {
+                Log.e(TAG, "No valid points extracted from geofence")
+                return null
             }
-            else -> return null
+
+            Log.d(TAG, "✅ Extracted ${points.size} points from $type geofence")
+            return GeofenceData(points, type, finalColor)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error extracting geofence data: ${e.message}", e)
+            return null
         }
-
-        if (points.isEmpty()) return null
-
-        return GeofenceData(points, type, finalColor)
     }
 
     private fun getHttpUrlForArea(area: String): String {

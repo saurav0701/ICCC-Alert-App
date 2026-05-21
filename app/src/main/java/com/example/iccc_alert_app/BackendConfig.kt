@@ -61,8 +61,6 @@ object BackendConfig {
         }
     }
 
-    //20.207.231.162
-
     fun getWsUrl(): String {
         return "${getWsBaseUrl()}/ws"
     }
@@ -71,23 +69,14 @@ object BackendConfig {
         return "${getHttpBaseUrl()}/cameras"
     }
 
-    /**
-     * ✅ Get cameras by area endpoint
-     */
     fun getCamerasByAreaUrl(area: String): String {
         return "${getHttpBaseUrl()}/cameras/area/$area"
     }
 
-    /**
-     * ✅ Get online cameras endpoint
-     */
     fun getOnlineCamerasUrl(): String {
         return "${getHttpBaseUrl()}/cameras/online"
     }
 
-    /**
-     * ✅ Get camera stats endpoint
-     */
     fun getCameraStatsUrl(): String {
         return "${getHttpBaseUrl()}/cameras/stats"
     }
@@ -97,9 +86,6 @@ object BackendConfig {
         android.util.Log.d("BackendConfig", "Organization cleared")
     }
 
-    /**
-     * Get complete backend configuration info
-     */
     fun getOrganizationInfo(): Map<String, String> {
         val org = getOrganization()
         return mapOf(
@@ -115,9 +101,6 @@ object BackendConfig {
         )
     }
 
-    /**
-     * Log current configuration
-     */
     fun logConfiguration() {
         val info = getOrganizationInfo()
         android.util.Log.d("BackendConfig", """

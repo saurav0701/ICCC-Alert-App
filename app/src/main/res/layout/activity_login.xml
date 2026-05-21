@@ -56,7 +56,7 @@
             android:id="@+id/subtitle_text"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Sign in to access ICCC Alert"
+            android:text="Sign in to access ICCC Alerts"
             android:textSize="15sp"
             android:textColor="#757575"
             android:gravity="center"
@@ -233,7 +233,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="New to ICCC Alert? "
+                android:text="New to CCL ICCC ? "
                 android:textSize="14sp"
                 android:textColor="#757575" />
 

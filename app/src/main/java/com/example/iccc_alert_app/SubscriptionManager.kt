@@ -22,15 +22,15 @@ object SubscriptionManager {
     private const val KEY_LAST_RUNTIME_CHECK = "last_runtime_check"
     private const val KEY_SERVICE_STARTED_AT = "service_started_at"
 
-    // ✅ CRITICAL: Use adaptive save intervals - frequent saves only during high load
-    private const val SAVE_DELAY_NORMAL = 1000L      // 1 second for normal operation
-    private const val SAVE_DELAY_HIGHLOAD = 2000L    // 2 seconds during high event rate
-    private const val SAVE_DELAY_CATCHUP = 1500L     // 1.5 seconds during catch-up
-    private const val HIGH_LOAD_THRESHOLD = 100       // Events in queue = high load
+    // ✅ Save intervals
+    private const val SAVE_DELAY_NORMAL = 1000L
+    private const val SAVE_DELAY_HIGHLOAD = 2000L
+    private const val SAVE_DELAY_CATCHUP = 1500L
+    private const val HIGH_LOAD_THRESHOLD = 100
 
-    // ✅ NEW: Event retention with NO hard limits during live operation
+    // ✅ MEMORY FIX: Limit events per channel to prevent OOM
+    private const val MAX_EVENTS_PER_CHANNEL = 500  // ← CRITICAL: Prevent unlimited growth
     private const val MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000L  // 7 days
-    private const val MAX_EVENTS_PER_CHANNEL_STORAGE = 10000  // Only for storage optimization after 7 days
     private const val CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000L  // Every 6 hours
 
     private lateinit var prefs: SharedPreferences
@@ -40,20 +40,16 @@ object SubscriptionManager {
 
     private val eventsCache = ConcurrentHashMap<String, MutableList<Event>>()
     private val unreadCountCache = ConcurrentHashMap<String, Int>()
-
-    // ✅ FIX #3: Cache last event per channel for O(1) lookup
     private val lastEventCache = ConcurrentHashMap<String, Event?>()
 
     private val handler = Handler(Looper.getMainLooper())
     private val saveEventsPending = AtomicBoolean(false)
     private val saveUnreadPending = AtomicBoolean(false)
 
-    // ✅ CRITICAL: Track unsaved changes count to force save when necessary
     private val unsavedEventCount = AtomicInteger(0)
-    private const val FORCE_SAVE_THRESHOLD = 50  // Force save every 50 unsaved events
-    private const val CATCHUP_SAVE_THRESHOLD = 25  // Force save every 25 events during catch-up
+    private const val FORCE_SAVE_THRESHOLD = 50
+    private const val CATCHUP_SAVE_THRESHOLD = 25
 
-    // ✅ CRITICAL: Deduplication during catch-up ONLY
     private val recentEventIds = ConcurrentHashMap.newKeySet<String>()
     private val eventTimestamps = ConcurrentHashMap<String, Long>()
     private var inCatchUpMode = false
@@ -170,38 +166,54 @@ object SubscriptionManager {
         }, 60 * 1000)
     }
 
-    // ✅ CRITICAL: Only clean up events older than 7 days, never drop recent events
+    // ✅ MEMORY FIX: More aggressive cleanup to prevent OOM
     private fun startEventCleanup() {
         handler.postDelayed(object : Runnable {
             override fun run() {
                 val now = System.currentTimeMillis()
                 val cutoffTime = now - MAX_EVENT_AGE_MS
                 var totalCleaned = 0
+                var totalTrimmed = 0
 
                 eventsCache.forEach { (channelId, events) ->
                     synchronized(events) {
                         val initialSize = events.size
 
                         // ✅ FIX #6: Never delete unread events
-                        // Only delete if: event is older than 7 days AND there are no unread events in this channel
                         events.removeAll { event ->
                             event.timestamp < cutoffTime &&
                                     (unreadCountCache[channelId] ?: 0) <= 0
                         }
 
+                        // ✅ MEMORY FIX: If channel has too many events, trim oldest
+                        if (events.size > MAX_EVENTS_PER_CHANNEL) {
+                            val toRemove = events.size - MAX_EVENTS_PER_CHANNEL
+                            val removed = events.drop(toRemove)
+                            for (event in removed) {
+                                event.id?.let {
+                                    recentEventIds.remove(it)
+                                    eventTimestamps.remove(it)
+                                }
+                            }
+                            repeat(toRemove) {
+                                events.removeAt(events.lastIndex)
+                            }
+                            totalTrimmed += toRemove
+                            Log.d(TAG, "🔪 Trimmed $toRemove oldest events from $channelId (size: ${events.size})")
+                        }
+
                         val cleaned = initialSize - events.size
                         if (cleaned > 0) {
                             totalCleaned += cleaned
-                            Log.d(TAG, "🗑️ Cleaned $cleaned old events older than 7 days from $channelId")
+                            Log.d(TAG, "🗑️ Cleaned $cleaned old events from $channelId")
                         }
                     }
                 }
 
-                if (totalCleaned > 0) {
-                    // Mark for save on next cycle
-                    unsavedEventCount.addAndGet(totalCleaned)
+                if (totalCleaned > 0 || totalTrimmed > 0) {
+                    unsavedEventCount.addAndGet(totalCleaned + totalTrimmed)
                     scheduleSaveEventsCache()
-                    Log.i(TAG, "🗑️ Event cleanup: removed $totalCleaned old events")
+                    Log.i(TAG, "🗑️ Cleanup: removed $totalCleaned old, trimmed $totalTrimmed excess events")
                 }
 
                 handler.postDelayed(this, CLEANUP_INTERVAL_MS)
@@ -247,7 +259,7 @@ object SubscriptionManager {
             }
             eventsCache.remove(channelId)
             unreadCountCache.remove(channelId)
-            lastEventCache.remove(channelId)  // ✅ FIX #3: Remove from cache
+            lastEventCache.remove(channelId)
 
             ChannelSyncState.clearChannel(channelId)
 
@@ -289,9 +301,7 @@ object SubscriptionManager {
         val timestamp = event.timestamp
         val now = System.currentTimeMillis()
 
-        // ✅ CRITICAL: Check for duplicates only during catch-up mode
         if (inCatchUpMode) {
-            // Check if event already exists in cache
             val channelEvents = eventsCache[channelId]
             if (channelEvents != null) {
                 synchronized(channelEvents) {
@@ -302,7 +312,6 @@ object SubscriptionManager {
                 }
             }
 
-            // Check recent IDs
             val lastSeenTime = eventTimestamps[eventId]
             if (lastSeenTime != null && (now - lastSeenTime) < 5 * 60 * 1000) {
                 Log.d(TAG, "⏭️ CATCH-UP: Duplicate event $eventId in recent IDs")
@@ -315,31 +324,36 @@ object SubscriptionManager {
         }
 
         synchronized(events) {
-            // ✅ CRITICAL: Always check if already in cache to avoid duplicates within single call
             if (events.any { it.id == eventId }) {
                 Log.d(TAG, "⏭️ Event $eventId already in cache")
                 return false
             }
+
+            // ✅ MEMORY FIX: Don't exceed max events per channel
+            if (events.size >= MAX_EVENTS_PER_CHANNEL) {
+                Log.w(TAG, "⚠️ Channel $channelId at max capacity (${MAX_EVENTS_PER_CHANNEL}), removing oldest")
+                val removed = events.removeAt(events.lastIndex)
+                removed.id?.let {
+                    recentEventIds.remove(it)
+                    eventTimestamps.remove(it)
+                }
+            }
+
             events.add(0, event)
         }
 
-        // ✅ FIX #3: Update cache immediately when new event arrives
         lastEventCache[channelId] = event
 
-        // ✅ Track for deduplication
         recentEventIds.add(eventId)
         eventTimestamps[eventId] = timestamp
 
         unreadCountCache.compute(channelId) { _, count -> (count ?: 0) + 1 }
 
-        // ✅ CRITICAL: Increment unsaved count
         unsavedEventCount.incrementAndGet()
 
-        // ✅ NEW: During catch-up, save immediately every 25 events
         if (inCatchUpMode) {
             saveEventsCacheImmediateIfCatchUp()
         } else {
-            // Normal mode: force save every 50 events
             if (unsavedEventCount.get() >= FORCE_SAVE_THRESHOLD) {
                 Log.d(TAG, "⚠️ Force saving: ${unsavedEventCount.get()} unsaved events")
                 saveEventsCacheNow()
@@ -400,10 +414,8 @@ object SubscriptionManager {
         )
     }
 
-    // ✅ CRITICAL: Adaptive save delays based on load
     private fun scheduleSaveEventsCache() {
         if (saveEventsPending.compareAndSet(false, true)) {
-            // ✅ Use unsaved count as indicator of load
             val delay = when {
                 inCatchUpMode -> SAVE_DELAY_CATCHUP
                 unsavedEventCount.get() > HIGH_LOAD_THRESHOLD -> SAVE_DELAY_HIGHLOAD
@@ -426,6 +438,7 @@ object SubscriptionManager {
         }
     }
 
+    // ✅ MEMORY FIX: Better error handling for OOM
     private fun saveEventsCacheNow() {
         try {
             val snapshot = HashMap<String, List<Event>>()
@@ -435,19 +448,40 @@ object SubscriptionManager {
                 }
             }
 
+            Log.d(TAG, "💾 Attempting to save ${snapshot.values.sumOf { it.size }} events across ${snapshot.size} channels")
+
             val json = gson.toJson(snapshot)
             val success = prefs.edit().putString(KEY_EVENTS, json).commit()
 
             if (success) {
                 val totalEvents = snapshot.values.sumOf { it.size }
-                Log.d(TAG, "💾 Saved $totalEvents events across ${snapshot.size} channels")
+                Log.d(TAG, "✅ Saved $totalEvents events across ${snapshot.size} channels")
                 unsavedEventCount.set(0)
             } else {
                 Log.e(TAG, "❌ Failed to save events")
             }
+        } catch (e: OutOfMemoryError) {
+            Log.e(TAG, "❌ OUT OF MEMORY while saving - triggering aggressive cleanup", e)
+            // Trigger immediate cleanup
+            handler.post {
+                eventsCache.forEach { (channelId, events) ->
+                    synchronized(events) {
+                        if (events.size > 100) {
+                            val toRemove = events.size - 100
+                            repeat(toRemove) {
+                                val removed = events.removeAt(events.lastIndex)
+                                removed.id?.let {
+                                    recentEventIds.remove(it)
+                                    eventTimestamps.remove(it)
+                                }
+                            }
+                            Log.w(TAG, "🔪 Emergency trimmed $toRemove events from $channelId")
+                        }
+                    }
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error saving events cache: ${e.message}", e)
-            // Retry on next cycle
         }
     }
 
@@ -461,15 +495,10 @@ object SubscriptionManager {
         }
     }
 
-    /**
-     * CRITICAL: Immediate save during catch-up to prevent data loss on app kill
-     * Only called when inCatchUpMode = true
-     */
     private fun saveEventsCacheImmediateIfCatchUp() {
         if (!inCatchUpMode) {
-            return // Normal delayed save is fine
+            return
         }
-        // Force immediate save every 25 events during catch-up
         val unsaved = unsavedEventCount.get()
         if (unsaved >= CATCHUP_SAVE_THRESHOLD) {
             Log.d(TAG, "⚡ CATCH-UP: Force saving $unsaved events immediately")
@@ -485,15 +514,12 @@ object SubscriptionManager {
         }
     }
 
-    // ✅ FIX #3: Return from cache first (O(1) lookup), fallback to list
     fun getLastEvent(channelId: String): Event? {
-        // ✅ Return from cache first - much faster
         val cached = lastEventCache[channelId]
         if (cached != null) {
             return cached
         }
 
-        // Fallback to list if not cached (shouldn't happen normally)
         val events = eventsCache[channelId] ?: return null
         synchronized(events) {
             return events.firstOrNull()
@@ -546,7 +572,6 @@ object SubscriptionManager {
         saveEventsPending.set(false)
         saveUnreadPending.set(false)
 
-        // ✅ FIX #7: Atomic counter sync - mark all current unsaved as saved
         val unsavedCount = unsavedEventCount.getAndSet(0)
 
         saveEventsCacheNow()
@@ -597,7 +622,7 @@ object SubscriptionManager {
     fun clearAllEvents() {
         eventsCache.clear()
         unreadCountCache.clear()
-        lastEventCache.clear()  // ✅ FIX #3: Clear cache too!
+        lastEventCache.clear()
         recentEventIds.clear()
         eventTimestamps.clear()
         unsavedEventCount.set(0)
@@ -609,7 +634,7 @@ object SubscriptionManager {
         saveEventsCacheNow()
         saveUnreadCacheNow()
 
-        Log.d(TAG, "✅ Cleared all events and unread counts")
+        Log.d(TAG, "✅ Cleared all events and caches")
         notifyListeners()
     }
 }
