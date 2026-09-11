@@ -8,9 +8,9 @@
         android:enabled="true" />
 
     <item
-        android:id="@+id/nav_alerts"
-        android:icon="@drawable/ic_notifications"
-        android:title="Alerts"
+        android:id="@+id/nav_camera_streams"
+        android:icon="@drawable/ic_videocam"
+        android:title="Cameras"
         android:enabled="true" />
 
     <item

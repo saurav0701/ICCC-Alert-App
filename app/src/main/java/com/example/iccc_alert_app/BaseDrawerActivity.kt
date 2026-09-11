@@ -183,9 +183,9 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
                     }
                     true
                 }
-                R.id.nav_alerts -> {
-                    if (this !is AlertsActivity) {
-                        navigateToActivity(AlertsActivity::class.java)
+                R.id.nav_camera_streams -> {
+                    if (this !is CameraStreamsActivity) {
+                        navigateToActivity(CameraStreamsActivity::class.java)
                     }
                     true
                 }
@@ -208,7 +208,7 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
     private fun isCurrentActivity(itemId: Int): Boolean {
         return when (itemId) {
             R.id.nav_channels -> this is MainActivity
-            R.id.nav_alerts -> this is AlertsActivity
+            R.id.nav_camera_streams -> this is CameraStreamsActivity
             R.id.nav_saved_messages -> this is SavedMessagesActivity
             R.id.nav_profile -> this is ProfileActivity
             else -> false
