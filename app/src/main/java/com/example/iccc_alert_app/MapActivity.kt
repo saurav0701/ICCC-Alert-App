@@ -185,7 +185,29 @@ class MapActivity : AppCompatActivity() {
         ) : GeofenceOverlay()
     }
 
-    private fun prepareMapData(): MapData {
+    /**
+     * Fetches fence geometry from bbstate for alerts that have a meaningful
+     * fence. Returns null for stoppage and overspeed, which carry none, and
+     * whenever the lookup fails - the caller then falls back to the fence
+     * embedded in the event.
+     */
+    private suspend fun fetchRemoteGeofence(event: GpsEvent): VtsApiService.Geofence? {
+        if (!VtsAlertTypes.hasGeofence(event.type)) return null
+
+        // Prefer the explicit id: it is present even when the backend could not
+        // resolve the fence itself, which is exactly when bbstate is needed.
+        val geofenceId = event.data?.geofenceId ?: event.data?.geofence?.id ?: return null
+        if (geofenceId <= 0) return null
+
+        return try {
+            VtsApiService.fetchGeofence(geofenceId)
+        } catch (e: Exception) {
+            Log.w(TAG, "bbstate fence $geofenceId lookup failed, using embedded copy", e)
+            null
+        }
+    }
+
+    private suspend fun prepareMapData(): MapData {
         val event = gpsEvent ?: throw IllegalStateException("No GPS event")
 
         val markers = mutableListOf<MarkerData>()
@@ -245,8 +267,44 @@ class MapActivity : AppCompatActivity() {
             }
         }
 
+        // Fence geometry comes from the bbstate cache - the same source the CCL
+        // Alert Dashboard draws from - so the app and the dashboard show the
+        // same shape. The copy embedded in the event is only a fallback, used
+        // when bbstate is unreachable or does not know the fence.
+        val remoteFence = fetchRemoteGeofence(event)
+
+        remoteFence?.let { fence ->
+            val points = fence.points.map { (lat, lng) -> GeoPoint(lat, lng) }
+            boundingPoints.addAll(points)
+
+            val color = parseColor(fence.color) ?: Color.parseColor("#FFA500")
+            val isPath = fence.geotype == "P" || fence.geometryType == "LineString"
+
+            geofenceOverlays.add(
+                if (isPath) {
+                    GeofenceOverlay.PolylineOverlay(
+                        points = points,
+                        strokeColor = color,
+                        strokeWidth = 8f,
+                        name = fence.name,
+                        description = null
+                    )
+                } else {
+                    GeofenceOverlay.PolygonOverlay(
+                        points = points,
+                        fillColor = Color.argb(40, Color.red(color), Color.green(color), Color.blue(color)),
+                        strokeColor = color,
+                        strokeWidth = 5f,
+                        name = fence.name,
+                        description = null
+                    )
+                }
+            )
+            Log.d(TAG, "Using bbstate fence ${fence.id} (${fence.name}), ${points.size} points")
+        }
+
         // Prepare geofence overlays (optional - for context only)
-        event.data?.geofence?.let { geofence ->
+        event.data?.geofence?.takeIf { remoteFence == null }?.let { geofence ->
             Log.d(TAG, "Processing geofence: id=${geofence.id}, name=${geofence.name}, type=${geofence.type}, geoJsonType=${geofence.geojson?.type}")
 
             val coordinates = geofence.geojson?.getCoordinatesAsList()

@@ -24,7 +24,13 @@ data class GpsEventData(
     @SerializedName("timestamp") val timestamp: String? = null,
     @SerializedName("alertSubType") val alertSubType: String? = null,
     @SerializedName("allocatedGeofence") val allocatedGeofence: List<String>? = null,
-    @SerializedName("geofence") val geofence: GeofenceInfo? = null
+    @SerializedName("geofence") val geofence: GeofenceInfo? = null,
+    /** Fence id sent by the backend, present even when it could not resolve the fence itself. */
+    @SerializedName("geofenceId") val geofenceId: Int? = null,
+    /** True when the backend reclassified an off-route breach as off-area. */
+    @SerializedName("isOffAreaAlert") val isOffAreaAlert: Boolean? = null,
+    /** Display name of the area whose fence was breached, for off-area alerts. */
+    @SerializedName("offAreaForArea") val offAreaForArea: String? = null
 )
 
 data class GpsLocation(
@@ -114,7 +120,10 @@ fun Event.toGpsEvent(): GpsEvent? {
         timestamp = data["timestamp"] as? String,
         alertSubType = data["alertSubType"] as? String,
         allocatedGeofence = (data["allocatedGeofence"] as? List<*>)?.mapNotNull { it as? String },
-        geofence = geofenceData
+        geofence = geofenceData,
+        geofenceId = (data["geofenceId"] as? Number)?.toInt(),
+        isOffAreaAlert = data["isOffAreaAlert"] as? Boolean,
+        offAreaForArea = data["offAreaForArea"] as? String
     )
 
     return GpsEvent(
