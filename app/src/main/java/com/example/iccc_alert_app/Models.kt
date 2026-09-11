@@ -147,10 +147,8 @@ object AvailableChannels {
         "us" to "Unloading Status",
         "ct" to "Camera Tampering",
         "sh" to "Safety Hazard",
-        "ii" to "Insufficient Illumination",
-        "off-route" to "Off-Route Alert",
-        "tamper" to "Tamper Alert"
-    )
+        "ii" to "Insufficient Illumination"
+    ) + VtsAlertTypes.ALL.map { it to VtsAlertTypes.displayName(it) }
 
     fun getAreas(): List<Pair<String, String>> {
         return if (BackendConfig.isCCL()) {

@@ -131,7 +131,10 @@ class AreaGroupAdapter(
                     "us" -> Pair("US", "#9C27B0")
                     "ii" -> Pair("II", "#607D8B")
                     "off-route" -> Pair("OR", "#FF5722")
+                    "off-area" -> Pair("OA", "#FF1744")
                     "tamper" -> Pair("TM", "#F44336")
+                    "overspeed" -> Pair("OS", "#FF9800")
+                    "stoppage" -> Pair("ST", "#E67E22")
                     else -> Pair("??", "#9E9E9E")
                 }
 

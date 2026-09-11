@@ -187,11 +187,8 @@ class GpsEventHandler(
             alpha = 200
         }
 
-        val eventTypeText = when (event.type) {
-            "off-route" -> "📍 Off-Route Alert"
-            "tamper" -> "⚠️ Tamper Alert"
-            else -> "📍 GPS Alert"
-        }
+        val eventTypeText =
+            "${VtsAlertTypes.emoji(event.type)} ${VtsAlertTypes.displayName(event.type)}"
 
         canvas.drawText(eventTypeText, width / 2f, 250f, typePaint)
 

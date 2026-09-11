@@ -110,12 +110,7 @@ class MapActivity : AppCompatActivity() {
         }
 
         // Update legend text based on event type
-        val legendText = when (event.type) {
-            "off-route" -> "Off-Route Point"
-            "tamper" -> "Tamper Location"
-            "overspeed" -> "Overspeed Point"
-            else -> "Alert Location"
-        }
+        val legendText = VtsAlertTypes.locationLabel(event.type)
         findViewById<TextView>(R.id.legend_alert_text)?.text = legendText
     }
 
@@ -215,12 +210,8 @@ class MapActivity : AppCompatActivity() {
         // Always show alert location (primary marker)
         event.data?.alertLocation?.let { loc ->
             val position = GeoPoint(loc.lat, loc.lng)
-            val (title, iconRes) = when (event.type) {
-                "off-route" -> Pair("Off-Route Location", R.drawable.ic_location_red)
-                "tamper" -> Pair("Tamper Alert", R.drawable.ic_location_red)
-                "overspeed" -> Pair("Overspeed Location", R.drawable.ic_location_red)
-                else -> Pair("Alert Location", R.drawable.ic_location_red)
-            }
+            val (title, iconRes) =
+                Pair(VtsAlertTypes.locationLabel(event.type), R.drawable.ic_location_red)
 
             markers.add(
                 MarkerData(

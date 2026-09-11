@@ -58,7 +58,7 @@ class ChannelListAdapter(
         if (lastEvent != null) {
             val location = lastEvent.data["location"] as? String ?: "Unknown"
             holder.subtitle.text = location
-            holder.subtitle.setTextColor(android.graphics.Color.parseColor("#8A8A8A"))
+            holder.subtitle.setTextColor(android.graphics.Color.parseColor("#64748B"))
 
             val eventTimeStr = lastEvent.data["eventTime"] as? String
             val date = if (eventTimeStr != null) {
@@ -85,31 +85,34 @@ class ChannelListAdapter(
             holder.timestamp.visibility = View.VISIBLE
         } else {
             holder.subtitle.text = "No events received"
-            holder.subtitle.setTextColor(android.graphics.Color.parseColor("#BDBDBD"))
+            holder.subtitle.setTextColor(android.graphics.Color.parseColor("#94A3B8"))
             holder.timestamp.text = "Waiting..."
             holder.timestamp.visibility = View.VISIBLE
-            holder.timestamp.setTextColor(android.graphics.Color.parseColor("#BDBDBD"))
+            holder.timestamp.setTextColor(android.graphics.Color.parseColor("#94A3B8"))
         }
 
         val (iconText, color) = when (channel.eventType) {
-            "cd" -> Pair("CD", "#FF5722")
-            "id" -> Pair("ID", "#F44336")
-            "ct" -> Pair("CT", "#E91E63")
-            "sh" -> Pair("SH", "#FF9800")
-            "vd" -> Pair("VD", "#2196F3")
-            "pd" -> Pair("PD", "#4CAF50")
-            "vc" -> Pair("VC", "#FFC107")
-            "ls" -> Pair("LS", "#00BCD4")
-            "us" -> Pair("US", "#9C27B0")
-            "ii" -> Pair("II", "#607D8B")
-            "off-route" -> Pair("OR", "#FF5722")
-            "tamper" -> Pair("TM", "#F44336")
-            else -> Pair("??", "#9E9E9E")
+            "cd"        -> Pair("CD", "#DC2626")   // Crowd Detection    – red
+            "id"        -> Pair("ID", "#B91C1C")   // Intrusion Detect   – deep red
+            "ct"        -> Pair("CT", "#9333EA")   // Camera Tamper      – purple
+            "sh"        -> Pair("SH", "#D97706")   // Speed / Speeding   – amber
+            "vd"        -> Pair("VD", "#1D4ED8")   // Vehicle Detect     – blue
+            "pd"        -> Pair("PD", "#059669")   // Person Detect      – green
+            "vc"        -> Pair("VC", "#0891B2")   // Vehicle Count      – cyan
+            "ls"        -> Pair("LS", "#0284C7")   // Line Stop          – sky blue
+            "us"        -> Pair("US", "#7C3AED")   // Unknown / Signal   – violet
+            "ii"        -> Pair("II", "#475569")   // Info / Inactive    – slate
+            "off-route" -> Pair("OR", "#C2410C")   // Off-Route          – orange-red
+            "off-area"  -> Pair("OA", "#E11D48")   // Off-Area           – crimson
+            "tamper"    -> Pair("TM", "#BE123C")   // Tamper             – rose
+            "overspeed" -> Pair("OS", "#EA580C")   // Over Speed         – amber-orange
+            "stoppage"  -> Pair("ST", "#B45309")   // Unauth. Stoppage   – bronze
+            else        -> Pair("??", "#64748B")   // Unknown            – neutral slate
         }
 
         holder.iconText.text = iconText
-        holder.iconBackground.setBackgroundResource(R.drawable.circle_background)
-        (holder.iconBackground.background as? android.graphics.drawable.GradientDrawable)?.setColor(Color.parseColor(color))
+        // Severity bar: solid color strip on left edge of card
+        holder.iconBackground.setBackgroundColor(Color.parseColor(color))
 
         val unreadCount = SubscriptionManager.getUnreadCount(channel.id)
         setupSmartUnreadBadge(holder, unreadCount, lastEvent)
@@ -159,10 +162,10 @@ class ChannelListAdapter(
         val ageMs = System.currentTimeMillis() - eventTime
 
         return when {
-            ageMs < ONE_MINUTE_MS -> Color.parseColor("#F44336")        // Red - CRITICAL
-            ageMs < FIVE_MINUTES_MS -> Color.parseColor("#FF9800")      // Orange - URGENT
-            ageMs < 30 * 60 * 1000 -> Color.parseColor("#2196F3")       // Blue - RECENT
-            else -> Color.parseColor("#757575")                          // Gray - NORMAL
+            ageMs < ONE_MINUTE_MS   -> Color.parseColor("#DC2626")  // Critical – red
+            ageMs < FIVE_MINUTES_MS -> Color.parseColor("#D97706")  // Urgent   – amber
+            ageMs < 30 * 60 * 1000 -> Color.parseColor("#1D4ED8")  // Recent   – blue
+            else                    -> Color.parseColor("#64748B")  // Normal   – slate
         }
     }
 

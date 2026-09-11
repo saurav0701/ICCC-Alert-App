@@ -9,11 +9,14 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.graphics.Color
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsetsController
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -64,6 +67,21 @@ class ChannelDetailActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // ── Edge-to-edge so the navy header bleeds into the status bar ──
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.decorView.post {
+                window.insetsController?.setSystemBarsAppearance(
+                    0, // white icons on navy = no LIGHT flag
+                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                )
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = 0
+        }
+
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_channel_detail)
 
@@ -110,6 +128,11 @@ class ChannelDetailActivity : AppCompatActivity() {
         recyclerView.adapter = adapter
 
         setupGestureHandler()
+
+        // Re-request insets now that adapter exists so the status-bar spacer gets sized
+        recyclerView.post {
+            ViewCompat.requestApplyInsets(swipeRefreshLayout)
+        }
 
         recyclerView.post {
             ViewCompat.requestApplyInsets(recyclerView)
@@ -356,13 +379,10 @@ class ChannelDetailActivity : AppCompatActivity() {
     }
 
     private fun openEventDetails(event: Event) {
-        when (event.type) {
-            "off-route", "tamper", "overspeed" -> {
-                bindingHelpers.openMapView(event)
-            }
-            else -> {
-                recyclerView.showInfoSnackbar("Loading image...")
-            }
+        if (VtsAlertTypes.isVtsAlert(event.type)) {
+            bindingHelpers.openMapView(event)
+        } else {
+            recyclerView.showInfoSnackbar("Loading image...")
         }
     }
 
@@ -452,12 +472,18 @@ class ChannelDetailActivity : AppCompatActivity() {
         ViewCompat.setOnApplyWindowInsetsListener(swipeRefreshLayout) { view, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             val displayCutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
+            val topInset = maxOf(systemBars.top, displayCutout.top)
+
+            // Pass status-bar height to adapter so the header spacer is sized correctly
+            if (::adapter.isInitialized) {
+                adapter.setStatusBarHeight(topInset)
+            }
 
             view.setPadding(
                 maxOf(systemBars.left, displayCutout.left, 0),
                 view.paddingTop,
                 maxOf(systemBars.right, displayCutout.right, 0),
-                view.paddingBottom
+                systemBars.bottom
             )
 
             insets

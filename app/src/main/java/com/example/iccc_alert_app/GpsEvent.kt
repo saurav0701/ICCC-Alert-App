@@ -15,9 +15,7 @@ data class GpsEvent(
     @SerializedName("vehicleTransporter") val vehicleTransporter: String? = null,
     @SerializedName("data") val data: GpsEventData? = null
 ) {
-    fun isGpsEvent(): Boolean {
-        return type == "off-route" || type == "tamper" || type == "overspeed"
-    }
+    fun isGpsEvent(): Boolean = VtsAlertTypes.isVtsAlert(type)
 }
 
 data class GpsEventData(
@@ -69,7 +67,7 @@ data class GeoJsonGeometry(
 }
 
 fun Event.toGpsEvent(): GpsEvent? {
-    if (type != "off-route" && type != "tamper" && type != "overspeed") {
+    if (!VtsAlertTypes.isVtsAlert(type)) {
         return null
     }
 

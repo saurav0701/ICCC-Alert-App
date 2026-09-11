@@ -98,11 +98,10 @@ class PdfGenerator(private val context: Context) {
             yPosition += 20
 
             // Load and draw image/map with high quality
-            val bitmap = when (event.type) {
-                "off-route", "tamper", "overspeed" -> {
-                    captureMapPreview(event) ?: loadEventImage(event)
-                }
-                else -> loadEventImage(event)
+            val bitmap = if (VtsAlertTypes.isVtsAlert(event.type)) {
+                captureMapPreview(event) ?: loadEventImage(event)
+            } else {
+                loadEventImage(event)
             }
 
             if (bitmap != null) {
@@ -359,7 +358,7 @@ class PdfGenerator(private val context: Context) {
         y += 20
 
         // Vehicle number for GPS events
-        if (event.type in listOf("off-route", "tamper", "overspeed")) {
+        if (VtsAlertTypes.isVtsAlert(event.type)) {
             val vehicleNum = event.data["vehicleNumber"] as? String
             if (vehicleNum != null) {
                 paint.color = Color.parseColor(COLOR_TEXT_SECONDARY)
@@ -754,7 +753,7 @@ class PdfGenerator(private val context: Context) {
         }
 
         // Vehicle number for GPS events
-        if (event.type in listOf("off-route", "tamper", "overspeed")) {
+        if (VtsAlertTypes.isVtsAlert(event.type)) {
             val vehicleNum = event.vehicleNumber ?: event.data["vehicleNumber"] as? String
             if (vehicleNum != null) {
                 contentY += 6
@@ -1664,5 +1663,5 @@ class PdfGenerator(private val context: Context) {
 
     // Helper property to check if event is GPS type
     private val Event.isGpsEvent: Boolean
-        get() = type in listOf("off-route", "tamper", "overspeed")
+        get() = VtsAlertTypes.isVtsAlert(type)
 }

@@ -43,6 +43,15 @@ class ChannelEventsAdapter(
     private var filteredEvents = listOf<Event>()
     private var eventBitmaps = mutableMapOf<String, Bitmap>()
     private var isMuted = false
+    private var statusBarHeight = 0
+
+    /** Called by ChannelDetailActivity after window insets are resolved. */
+    fun setStatusBarHeight(px: Int) {
+        if (px != statusBarHeight) {
+            statusBarHeight = px
+            notifyItemChanged(0) // rebind header to apply new spacer height
+        }
+    }
 
     // Filter state
     private var searchQuery = ""
@@ -86,7 +95,7 @@ class ChannelEventsAdapter(
         val eventIndex = position - 1
         val event = filteredEvents[eventIndex]
 
-        return if (event.type == "off-route" || event.type == "tamper" || event.type == "overspeed") {
+        return if (VtsAlertTypes.isVtsAlert(event.type)) {
             VIEW_TYPE_GPS_EVENT
         } else {
             VIEW_TYPE_EVENT
@@ -243,6 +252,10 @@ class ChannelEventsAdapter(
     // ==================== HEADER SETUP ====================
 
     private fun setupHeader(holder: EventViewHolders.HeaderViewHolder) {
+        // Size the navy spacer to fill the system status bar exactly
+        val spacer = holder.itemView.findViewById<View>(R.id.status_bar_spacer)
+        spacer?.layoutParams = spacer?.layoutParams?.also { it.height = statusBarHeight }
+
         holder.backButton.setOnClickListener {
             onBackClick()
         }
@@ -647,10 +660,10 @@ class ChannelEventsAdapter(
         holder.iconText.text = iconText
         holder.badge.setBackgroundResource(R.drawable.circle_background)
         (holder.badge.background as? android.graphics.drawable.GradientDrawable)?.setColor(
-            Color.parseColor(
-                color
-            )
+            Color.parseColor(color)
         )
+        // Colour the left accent bar to match the event type
+        holder.accentBar.setBackgroundColor(Color.parseColor(color))
 
         bindingHelpers.setupPrioritySpinner(holder.prioritySpinner)
 
