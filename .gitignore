@@ -13,3 +13,9 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Signing material. The upload keystore cannot be rotated - if it leaks or is
+# lost, this app can never be updated on Play again.
+*.jks
+*.keystore
+keystore.properties

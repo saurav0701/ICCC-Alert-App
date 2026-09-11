@@ -1,8 +1,25 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
+
+// Release signing credentials come from local.properties (gitignored) or from
+// environment variables on a build server. They must never be committed: the
+// upload keystore is the one secret that cannot be rotated - lose it and this
+// app can no longer be updated on Play.
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) FileInputStream(f).use { load(it) }
+}
+
+fun signingProp(name: String): String? =
+    localProps.getProperty(name) ?: System.getenv(name)
+
+val hasReleaseSigning = signingProp("RELEASE_STORE_FILE") != null
 
 android {
     namespace = "com.example.iccc_alert_app"
@@ -18,8 +35,33 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            if (hasReleaseSigning) {
+                storeFile = file(signingProp("RELEASE_STORE_FILE")!!)
+                storePassword = signingProp("RELEASE_STORE_PASSWORD")
+                keyAlias = signingProp("RELEASE_KEY_ALIAS")
+                keyPassword = signingProp("RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            // Falls back to unsigned when the keystore is not configured, so a
+            // fresh clone still builds. A Play upload needs it configured.
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                null
+            }
+
+            // Deliberately off for the first release. The app's models are
+            // deserialised by Gson through @SerializedName, so R8 stripping or
+            // renaming those fields breaks parsing in release builds only -
+            // it cannot be caught by a debug build. proguard-rules.pro now
+            // carries the keep rules; turn this on once a release build has
+            // been installed and smoke-tested end to end.
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
