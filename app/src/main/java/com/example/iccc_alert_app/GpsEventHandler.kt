@@ -22,6 +22,9 @@ class GpsEventHandler(
 
     private val activeJobs = ConcurrentHashMap<Int, Job>()
 
+    /** Scope for VTS comment submissions; cancelled in [clearCache]. */
+    private val uiScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
     fun setupGpsEvent(holder: EventViewHolders.GpsEventViewHolder, event: Event) {
         activeJobs[holder.hashCode()]?.cancel()
 
@@ -320,10 +323,42 @@ class GpsEventHandler(
                 holder.saveGpsPrioritySection.visibility = View.GONE
                 holder.gpsCommentInput.text.clear()
                 holder.gpsPrioritySpinner.setSelection(0)
+
+                // Saving locally is not enough for a VTS alert: the remark also
+                // has to reach the VTS database, which is what the dashboard
+                // reads. Same endpoint the dashboard writes through.
+                if (comment.isNotBlank()) {
+                    submitCommentToVts(event, comment)
+                }
             } else {
                 Toast.makeText(context, errorMsg ?: "GPS event already saved", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    /**
+     * Pushes the comment to the VTS database so it shows up against the same
+     * alert on the CCL Alert Dashboard. Handles the "already has a remark"
+     * confirmation and the retry while the alert is still being recorded.
+     */
+    private fun submitCommentToVts(event: Event, comment: String) {
+        VtsCommentSubmitter.submit(
+            context = context,
+            scope = uiScope,
+            event = event,
+            comment = comment,
+            onProgress = { status ->
+                Toast.makeText(context, status, Toast.LENGTH_SHORT).show()
+            },
+            onResult = { success, message ->
+                Log.d(TAG, "VTS comment result: success=$success, $message")
+                Toast.makeText(
+                    context,
+                    message,
+                    if (success) Toast.LENGTH_SHORT else Toast.LENGTH_LONG
+                ).show()
+            }
+        )
     }
 
     private fun setupGpsMoreActionsButton(holder: EventViewHolders.GpsEventViewHolder, event: Event) {
@@ -407,5 +442,6 @@ class GpsEventHandler(
         mapPreviewCache.clear()
         activeJobs.values.forEach { it.cancel() }
         activeJobs.clear()
+        uiScope.coroutineContext.cancelChildren()
     }
 }
