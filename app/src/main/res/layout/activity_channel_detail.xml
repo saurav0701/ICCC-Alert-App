@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F8F9FA">
+    android:background="#EFF9FF">
 
-    <!-- ✅ NEW: SwipeRefreshLayout wraps the entire content -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipe_refresh_layout"
         android:layout_width="match_parent"
@@ -14,18 +14,17 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
-            <!-- RecyclerView for Events (Includes Header as first item) -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/events_recycler"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:paddingTop="8dp"
+                android:paddingTop="6dp"
                 android:paddingBottom="24dp"
                 android:scrollbars="none"
                 android:overScrollMode="never" />
 
-            <!-- Premium Empty State -->
+            <!-- Empty State -->
             <LinearLayout
                 android:id="@+id/empty_events_view"
                 android:layout_width="match_parent"
@@ -35,40 +34,42 @@
                 android:padding="48dp"
                 android:visibility="gone">
 
-                <FrameLayout
-                    android:layout_width="120dp"
-                    android:layout_height="120dp"
-                    android:background="@drawable/empty_state_bg">
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="88dp"
+                    android:layout_height="88dp"
+                    app:cardCornerRadius="44dp"
+                    app:cardBackgroundColor="@color/navy_50"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="1.5dp"
+                    app:strokeColor="@color/navy_100">
 
                     <ImageView
-                        android:layout_width="64dp"
-                        android:layout_height="64dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_image_error"
-                        android:tint="#BDBDBD"
+                        android:tint="@color/navy_600"
                         android:contentDescription="No events" />
 
-                </FrameLayout>
+                </com.google.android.material.card.MaterialCardView>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="No Events Yet"
                     android:textSize="20sp"
-                    android:textColor="#1A1A1A"
-                    android:fontFamily="sans-serif-medium"
-                    android:letterSpacing="0.01"
-                    android:layout_marginTop="24dp" />
+                    android:textColor="@color/text_primary"
+                    android:textStyle="bold"
+                    android:layout_marginTop="20dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Events will appear here as they occur"
                     android:textSize="14sp"
-                    android:textColor="#757575"
-                    android:fontFamily="sans-serif"
+                    android:textColor="@color/text_secondary"
                     android:textAlignment="center"
-                    android:lineSpacingExtra="2dp"
+                    android:lineSpacingExtra="3dp"
                     android:layout_marginTop="8dp" />
 
             </LinearLayout>
@@ -76,5 +77,4 @@
         </RelativeLayout>
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-
 </RelativeLayout>

@@ -42,6 +42,7 @@ object EventViewHolders {
         val timestamp: TextView = view.findViewById(R.id.event_timestamp)
         val eventDate: TextView = view.findViewById(R.id.event_date)
         val badge: View = view.findViewById(R.id.event_badge)
+        val accentBar: View = view.findViewById(R.id.event_accent_bar)
         val iconText: TextView = view.findViewById(R.id.event_icon_text)
         val eventImage: ImageView = view.findViewById(R.id.event_image)
         val imageFrame: FrameLayout = view.findViewById(R.id.image_frame)

@@ -10,6 +10,8 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import com.example.iccc_alert_app.auth.AuthManager
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 
 class ProfileActivity : BaseDrawerActivity() {
 
@@ -18,10 +20,12 @@ class ProfileActivity : BaseDrawerActivity() {
     private lateinit var designationText: TextView
     private lateinit var areaText: TextView
     private lateinit var workingForText: TextView
+    private lateinit var roleChip: TextView
     private lateinit var subscribedChannelsContainer: LinearLayout
     private lateinit var loadingView: ProgressBar
     private lateinit var contentView: View
-    private lateinit var logoutButton: Button  // ✅ NEW
+    private lateinit var logoutButton: Button
+    private var channelCountBadge: TextView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,7 +58,9 @@ class ProfileActivity : BaseDrawerActivity() {
             designationText = findViewById(R.id.profile_designation)
             areaText = findViewById(R.id.profile_area)
             workingForText = findViewById(R.id.profile_working_for)
+            roleChip = findViewById(R.id.profile_role_chip)
             subscribedChannelsContainer = findViewById(R.id.subscribed_channels_container)
+            channelCountBadge = findViewById(R.id.profile_channel_count_badge)
             loadingView = findViewById(R.id.profile_loading)
             contentView = findViewById(R.id.profile_content)
             logoutButton = findViewById(R.id.logout_button)
@@ -143,6 +149,10 @@ class ProfileActivity : BaseDrawerActivity() {
 
                 workingForText.text = user.workingFor ?: "N/A"
 
+                // Populate role chip
+                val designation = user.designation ?: "Officer"
+                roleChip.text = "$designation · ICCC"
+
                 loadSubscribedChannels()
 
                 loadingView.visibility = View.GONE
@@ -166,65 +176,88 @@ class ProfileActivity : BaseDrawerActivity() {
             subscribedChannelsContainer.removeAllViews()
 
             val subscriptions = SubscriptionManager.getSubscriptions()
+            channelCountBadge?.text = subscriptions.size.toString()
 
             if (subscriptions.isEmpty()) {
-                val emptyView = layoutInflater.inflate(
-                    R.layout.item_empty_subscriptions,
-                    subscribedChannelsContainer,
-                    false
+                val empty = TextView(this)
+                empty.text = "No channels subscribed yet"
+                empty.textSize = 13f
+                empty.setTextColor(getColor(R.color.text_secondary))
+                val lp = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
                 )
-                subscribedChannelsContainer.addView(emptyView)
+                lp.setMargins(4, 4, 4, 4)
+                empty.layoutParams = lp
+                subscribedChannelsContainer.addView(empty)
                 return
             }
 
-            val groupedByArea = subscriptions.groupBy { it.area }
+            // Group channels by area
+            val byArea = subscriptions.groupBy { it.areaDisplay ?: "Other" }
+            val sortedAreas = byArea.keys.sorted()
 
-            groupedByArea.forEach { (area, channels) ->
-                val headerView = layoutInflater.inflate(
-                    R.layout.item_subscription_area_header,
-                    subscribedChannelsContainer,
-                    false
+            sortedAreas.forEachIndexed { index, area ->
+                val channels = byArea[area] ?: return@forEachIndexed
+
+                // Area label
+                val areaLabel = TextView(this)
+                areaLabel.text = area.uppercase()
+                areaLabel.textSize = 10f
+                areaLabel.setTextColor(getColor(R.color.text_tertiary))
+                areaLabel.typeface = android.graphics.Typeface.DEFAULT_BOLD
+                areaLabel.letterSpacing = 0.08f
+                val labelLp = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
                 )
+                labelLp.topMargin = if (index == 0) 0 else (12 * resources.displayMetrics.density).toInt()
+                labelLp.bottomMargin = 4
+                areaLabel.layoutParams = labelLp
+                subscribedChannelsContainer.addView(areaLabel)
 
-                val headerText = headerView.findViewById<TextView>(R.id.area_name)
-                headerText.text = "${area.uppercase()} (${channels.size})"
-                subscribedChannelsContainer.addView(headerView)
+                // ChipGroup for this area's channels
+                val chipGroup = ChipGroup(this)
+                chipGroup.layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
 
                 channels.forEach { channel ->
                     try {
-                        val channelView = layoutInflater.inflate(
-                            R.layout.item_subscription_channel,
-                            subscribedChannelsContainer,
-                            false
-                        )
-
-                        val channelName = channelView.findViewById<TextView>(R.id.channel_name)
-                        val eventCount = channelView.findViewById<TextView>(R.id.event_count)
-                        val muteIndicator = channelView.findViewById<View>(R.id.mute_indicator)
-
-                        channelName.text = channel.eventTypeDisplay
-                        val count = SubscriptionManager.getEventCount(channel.id)
-                        eventCount.text = "$count events"
-
-                        muteIndicator.visibility = if (channel.isMuted) View.VISIBLE else View.GONE
-
-                        subscribedChannelsContainer.addView(channelView)
-
+                        val chip = Chip(this)
+                        chip.text = channel.eventTypeDisplay
+                        chip.isClickable = true
+                        chip.isFocusable = true
+                        chip.isChipIconVisible = false
+                        chip.isCheckedIconVisible = false
+                        if (channel.isMuted) {
+                            chip.setChipBackgroundColorResource(R.color.surface_variant_light)
+                            chip.setTextColor(getColor(R.color.text_secondary))
+                            chip.alpha = 0.7f
+                        } else {
+                            chip.setChipBackgroundColorResource(R.color.navy_50)
+                            chip.setTextColor(getColor(R.color.navy_600))
+                            chip.chipStrokeColor = android.content.res.ColorStateList.valueOf(
+                                getColor(R.color.navy_100)
+                            )
+                            chip.chipStrokeWidth = resources.displayMetrics.density // 1dp
+                        }
+                        chip.setOnClickListener {
+                            val intent = Intent(this, ChannelDetailActivity::class.java)
+                            intent.putExtra("CHANNEL_ID", channel.id)
+                            intent.putExtra("CHANNEL_AREA", channel.areaDisplay)
+                            intent.putExtra("CHANNEL_TYPE", channel.eventTypeDisplay)
+                            startActivity(intent)
+                        }
+                        chipGroup.addView(chip)
                     } catch (e: Exception) {
-                        android.util.Log.e("ProfileActivity", "Error adding channel view", e)
+                        android.util.Log.e("ProfileActivity", "Error adding chip", e)
                     }
                 }
-            }
 
-            val totalView = layoutInflater.inflate(
-                R.layout.item_subscription_total,
-                subscribedChannelsContainer,
-                false
-            )
-            val totalText = totalView.findViewById<TextView>(R.id.total_text)
-            val totalCount = SubscriptionManager.getTotalEventCount()
-            totalText.text = "Total: ${subscriptions.size} channels • $totalCount events"
-            subscribedChannelsContainer.addView(totalView)
+                subscribedChannelsContainer.addView(chipGroup)
+            }
 
         } catch (e: Exception) {
             android.util.Log.e("ProfileActivity", "Error loading subscribed channels", e)
@@ -234,10 +267,10 @@ class ProfileActivity : BaseDrawerActivity() {
 
     override fun onDestroy() {
         try {
-            subscribedChannelsContainer.removeAllViews()
-        } catch (e: Exception) {
-            android.util.Log.e("ProfileActivity", "Error in onDestroy", e)
-        }
+            if (::subscribedChannelsContainer.isInitialized) {
+                subscribedChannelsContainer.removeAllViews()
+            }
+        } catch (_: Exception) { }
         super.onDestroy()
     }
 

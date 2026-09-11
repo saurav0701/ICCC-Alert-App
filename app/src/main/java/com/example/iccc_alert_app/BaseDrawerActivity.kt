@@ -55,6 +55,15 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
         )
         drawerLayout.addDrawerListener(toggle)
         toggle.syncState()
+        // Force white hamburger icon to match navy toolbar
+        toggle.drawerArrowDrawable.color = Color.WHITE
+
+        // Refresh counts every time the drawer opens
+        drawerLayout.addDrawerListener(object : androidx.drawerlayout.widget.DrawerLayout.SimpleDrawerListener() {
+            override fun onDrawerOpened(drawerView: android.view.View) {
+                refreshDrawerStats()
+            }
+        })
 
         navigationView.setNavigationItemSelectedListener(this)
 
@@ -84,15 +93,12 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
             window.navigationBarColor = Color.parseColor("#40000000")
         }
 
-        // Set status bar icons to dark/light based on theme
+        // Navy toolbar — always use white (light) status bar icons
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // ✅ Safe: insetsController will be available after we return from this method
             window.decorView.post {
                 window.insetsController?.apply {
-                    setSystemBarsAppearance(
-                        if (isDarkTheme()) 0 else WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
-                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
-                    )
+                    // Clear LIGHT flags so icons are white on the navy background
+                    setSystemBarsAppearance(0, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS)
                     setSystemBarsAppearance(
                         if (isDarkTheme()) 0 else WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
                         WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
@@ -104,7 +110,8 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
             window.decorView.systemUiVisibility = if (isDarkTheme()) {
                 0
             } else {
-                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+                // Only light navigation bar; keep status bar icons white for navy toolbar
+                View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
             }
         }
     }
@@ -176,9 +183,9 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
                     }
                     true
                 }
-                R.id.nav_camera_streams -> {
-                    if (this !is CameraStreamsActivity) {
-                        navigateToActivity(CameraStreamsActivity::class.java)
+                R.id.nav_alerts -> {
+                    if (this !is AlertsActivity) {
+                        navigateToActivity(AlertsActivity::class.java)
                     }
                     true
                 }
@@ -188,9 +195,9 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
                     }
                     true
                 }
-                R.id.nav_settings -> {
-                    if (this !is SettingsActivity) {
-                        navigateToActivity(SettingsActivity::class.java)
+                R.id.nav_profile -> {
+                    if (this !is ProfileActivity) {
+                        navigateToActivity(ProfileActivity::class.java)
                     }
                     true
                 }
@@ -201,9 +208,9 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
     private fun isCurrentActivity(itemId: Int): Boolean {
         return when (itemId) {
             R.id.nav_channels -> this is MainActivity
-            R.id.nav_camera_streams -> this is CameraStreamsActivity
+            R.id.nav_alerts -> this is AlertsActivity
             R.id.nav_saved_messages -> this is SavedMessagesActivity
-            R.id.nav_settings -> this is SettingsActivity
+            R.id.nav_profile -> this is ProfileActivity
             else -> false
         }
     }
@@ -231,23 +238,31 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
         val userPhone = headerView.findViewById<TextView>(R.id.user_phone)
         val userInfo = headerView.findViewById<TextView>(R.id.user_info)
         val userAvatar = headerView.findViewById<TextView>(R.id.user_avatar)
-        val viewProfileButton = headerView.findViewById<TextView>(R.id.view_profile_button)
+        val viewProfileButton = headerView.findViewById<View>(R.id.view_profile_button)
+        val channelCount = headerView.findViewById<TextView?>(R.id.header_channel_count)
+        val eventsCount = headerView.findViewById<TextView?>(R.id.header_events_count)
+        val savedCount = headerView.findViewById<TextView?>(R.id.header_saved_count)
 
         // Load user data from AuthManager
         val user = AuthManager.getCurrentUser()
         if (user != null) {
             userName.text = user.name
             userPhone.text = "+91 ${user.phone}"
-            userInfo.text = "${user.designation} • ${user.area}"
+            userInfo.text = "${user.designation} · ${user.area ?: "ICCC"}"
 
-            // ✅ Set avatar with user initials
+            // Set avatar with user initials
             userAvatar.text = getInitials(user.name)
         } else {
             userName.text = "ICCC User"
             userPhone.text = "+91 XXXXXXXXXX"
-            userInfo.text = "Tap to view profile"
+            userInfo.text = "Officer · ICCC"
             userAvatar.text = "IC"
         }
+
+        // Populate live stats
+        channelCount?.text = SubscriptionManager.getSubscriptions().size.toString()
+        eventsCount?.text = SubscriptionManager.getTotalEventCount().toString()
+        savedCount?.text = SavedMessagesManager.getSavedMessages().size.toString()
 
         // View profile button click with animation
         viewProfileButton.setOnClickListener {
@@ -269,36 +284,45 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
         }
     }
 
+    /** Refresh the three stat counts in the drawer header to stay in sync with Settings. */
+    private fun refreshDrawerStats() {
+        val headerView = navigationView.getHeaderView(0)
+        headerView.findViewById<TextView?>(R.id.header_channel_count)
+            ?.text = SubscriptionManager.getSubscriptions().size.toString()
+        headerView.findViewById<TextView?>(R.id.header_events_count)
+            ?.text = SubscriptionManager.getTotalEventCount().toString()
+        headerView.findViewById<TextView?>(R.id.header_saved_count)
+            ?.text = SavedMessagesManager.getSavedMessages().size.toString()
+    }
+
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.nav_channels -> {
-                if (this !is MainActivity) {
-                    navigateToActivity(MainActivity::class.java)
-                }
+                if (this !is MainActivity) navigateToActivity(MainActivity::class.java)
             }
-            R.id.nav_camera_streams -> {
-                if (this !is CameraStreamsActivity) {
-                    navigateToActivity(CameraStreamsActivity::class.java)
-                }
+            R.id.nav_alerts -> {
+                if (this !is AlertsActivity) navigateToActivity(AlertsActivity::class.java)
             }
             R.id.nav_saved_messages -> {
-                if (this !is SavedMessagesActivity) {
-                    navigateToActivity(SavedMessagesActivity::class.java)
-                }
+                if (this !is SavedMessagesActivity) navigateToActivity(SavedMessagesActivity::class.java)
             }
             R.id.nav_search -> {
                 startActivity(Intent(this, SearchActivity::class.java))
             }
-            R.id.nav_share -> {
-                shareApp()
+            R.id.nav_map -> {
+                startActivity(Intent(this, CameraMapActivity::class.java))
+            }
+            R.id.nav_camera_streams -> {
+                if (this !is CameraStreamsActivity) navigateToActivity(CameraStreamsActivity::class.java)
             }
             R.id.nav_profile -> {
-                startActivity(Intent(this, ProfileActivity::class.java))
+                if (this !is ProfileActivity) navigateToActivity(ProfileActivity::class.java)
             }
             R.id.nav_settings -> {
-                if (this !is SettingsActivity) {
-                    navigateToActivity(SettingsActivity::class.java)
-                }
+                if (this !is SettingsActivity) navigateToActivity(SettingsActivity::class.java)
+            }
+            R.id.nav_sign_out -> {
+                signOut()
             }
         }
 
@@ -306,13 +330,19 @@ abstract class BaseDrawerActivity : AppCompatActivity(), NavigationView.OnNaviga
         return true
     }
 
-    private fun shareApp() {
-        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "ICCC Alert App")
-            putExtra(Intent.EXTRA_TEXT, "Download the ICCC Alert App for real-time monitoring and alerts!")
-        }
-        startActivity(Intent.createChooser(shareIntent, "Share App"))
+    private fun signOut() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Sign Out")
+            .setMessage("Are you sure you want to sign out?")
+            .setPositiveButton("Sign Out") { _, _ ->
+                AuthManager.logout { _, _ ->
+                    val intent = Intent(this, LoginActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     protected fun setSelectedMenuItem(itemId: Int) {

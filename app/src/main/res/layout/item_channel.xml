@@ -4,38 +4,38 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="12dp"
-    android:layout_marginEnd="12dp"
-    android:layout_marginTop="6dp"
-    android:layout_marginBottom="6dp"
-    app:cardCornerRadius="12dp"
-    app:cardElevation="1dp"
-    app:strokeWidth="0.5dp"
-    app:strokeColor="#E5E5E5">
+    android:layout_marginStart="14dp"
+    android:layout_marginEnd="14dp"
+    android:layout_marginTop="5dp"
+    android:layout_marginBottom="5dp"
+    app:cardCornerRadius="14dp"
+    app:cardElevation="0dp"
+    app:cardBackgroundColor="@color/surface_light"
+    app:strokeWidth="1dp"
+    app:strokeColor="@color/divider">
 
-    <RelativeLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
         android:paddingTop="14dp"
         android:paddingBottom="14dp"
-        android:background="?attr/selectableItemBackground">
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
 
-        <!-- Channel Icon (Circular) -->
-        <FrameLayout
+        <!-- Channel icon circle -->
+        <com.google.android.material.card.MaterialCardView
             android:id="@+id/channel_icon_container"
-            android:layout_width="52dp"
-            android:layout_height="52dp"
-            android:layout_alignParentStart="true"
-            android:layout_centerVertical="true"
-            android:layout_marginEnd="12dp">
-
-            <View
-                android:id="@+id/channel_icon_background"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@drawable/circle_background" />
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="14dp"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="@color/navy_700">
 
             <TextView
                 android:id="@+id/channel_icon_text"
@@ -43,31 +43,28 @@
                 android:layout_height="match_parent"
                 android:gravity="center"
                 android:text="VD"
-                android:textSize="19sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="#FFFFFF" />
+                android:textColor="@color/white" />
 
-        </FrameLayout>
+        </com.google.android.material.card.MaterialCardView>
 
-        <!-- Channel Info -->
+        <!-- Channel info -->
         <LinearLayout
-            android:id="@+id/channel_info"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_toEndOf="@id/channel_icon_container"
-            android:layout_toStartOf="@id/subscribe_btn"
-            android:layout_centerVertical="true"
-            android:layout_marginEnd="12dp"
-            android:orientation="vertical">
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginEnd="12dp">
 
             <TextView
                 android:id="@+id/channel_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Sijua"
-                android:textSize="17sp"
-                android:textColor="#000000"
-                android:fontFamily="sans-serif-medium"
+                android:textSize="15sp"
+                android:textColor="@color/text_primary"
+                android:textStyle="bold"
                 android:maxLines="1"
                 android:ellipsize="end" />
 
@@ -76,31 +73,29 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Vehicle Detection"
-                android:textSize="15sp"
-                android:textColor="#8A8A8A"
-                android:layout_marginTop="3dp"
+                android:textSize="13sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="2dp"
                 android:maxLines="1"
                 android:ellipsize="end" />
 
         </LinearLayout>
 
         <!-- Subscribe Button -->
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/subscribe_btn"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
             android:text="Subscribe"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
+            android:textSize="12sp"
             android:textStyle="bold"
-            android:fontFamily="sans-serif-medium"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:background="@drawable/button_subscribe"
-            android:textAllCaps="false" />
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:textAllCaps="false"
+            app:cornerRadius="10dp"
+            app:backgroundTint="@color/navy_600"
+            style="@style/Widget.Material3.Button" />
 
-    </RelativeLayout>
+    </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>

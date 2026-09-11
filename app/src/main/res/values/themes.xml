@@ -1,24 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- ✅ Material 3 Base Theme -->
+
     <style name="Theme.ICCCAlertApp" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Primary colors -->
-        <item name="colorPrimary">@color/telegram_blue</item>
+
+        <!-- Primary — Deep Navy -->
+        <item name="colorPrimary">@color/navy_700</item>
         <item name="colorOnPrimary">@color/white</item>
-        <item name="colorPrimaryContainer">@color/telegram_blue_light</item>
-        <item name="colorOnPrimaryContainer">@color/telegram_blue_dark</item>
+        <item name="colorPrimaryContainer">@color/navy_100</item>
+        <item name="colorOnPrimaryContainer">@color/navy_700</item>
 
-        <!-- Secondary colors -->
-        <item name="colorSecondary">@color/teal_200</item>
-        <item name="colorOnSecondary">@color/black</item>
-        <item name="colorSecondaryContainer">@color/teal_100</item>
-        <item name="colorOnSecondaryContainer">@color/teal_700</item>
+        <!-- Secondary — Sky Blue -->
+        <item name="colorSecondary">@color/colorSecondary</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSecondaryContainer">@color/colorSecondaryContainer</item>
+        <item name="colorOnSecondaryContainer">@color/colorOnSecondaryContainer</item>
 
-        <!-- Tertiary colors -->
-        <item name="colorTertiary">@color/accent_orange</item>
+        <!-- Tertiary — Amber -->
+        <item name="colorTertiary">@color/colorTertiary</item>
         <item name="colorOnTertiary">@color/white</item>
 
-        <!-- Surface colors -->
+        <!-- Surface -->
         <item name="colorSurface">@color/surface_light</item>
         <item name="colorOnSurface">@color/on_surface_light</item>
         <item name="colorSurfaceVariant">@color/surface_variant_light</item>
@@ -28,18 +29,31 @@
         <item name="android:colorBackground">@color/background_light</item>
         <item name="colorOnBackground">@color/on_background_light</item>
 
-        <!-- Error colors -->
+        <!-- Error -->
         <item name="colorError">@color/error_red</item>
         <item name="colorOnError">@color/white</item>
 
-        <!-- Status bar (transparent for edge-to-edge) -->
+        <!-- Transparent status/nav bars (edge-to-edge) -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
-
-        <!-- Edge-to-edge -->
         <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="p">shortEdges</item>
         <item name="android:enforceNavigationBarContrast" tools:targetApi="q">false</item>
+
+        <!-- Toolbar style — Deep Ocean: dark bg, white text, cyan accent -->
+        <item name="toolbarStyle">@style/Widget.ICCCAlertApp.Toolbar</item>
+        <item name="colorControlNormal">@color/colorSecondary</item>
+        <item name="actionMenuTextColor">@color/white</item>
+
     </style>
+
+    <style name="Widget.ICCCAlertApp.Toolbar" parent="Widget.Material3.Toolbar">
+        <item name="titleTextColor">@color/white</item>
+        <item name="subtitleTextColor">@color/navy_100</item>
+        <item name="android:background">@color/navy_700</item>
+    </style>
+
+    <style name="Theme.ICCCAlertApp.NoActionBar" parent="Theme.ICCCAlertApp" />
+
 </resources>

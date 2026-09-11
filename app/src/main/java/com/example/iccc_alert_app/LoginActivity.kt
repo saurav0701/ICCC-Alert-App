@@ -10,6 +10,7 @@ import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.iccc_alert_app.auth.AuthManager
 
@@ -115,7 +116,7 @@ class LoginActivity : AppCompatActivity() {
                     startActivity(intent)
                     overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                 } else {
-                    showError(message)
+                    showErrorDialog(message)
                 }
             }
         }
@@ -135,8 +136,25 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Shows a brief Toast for simple validation hints (e.g. "enter 10 digits").
+     * For backend errors, use showErrorDialog instead.
+     */
     private fun showError(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * Shows a persistent AlertDialog for backend/network errors so
+     * the user can read the full message and act on it.
+     */
+    private fun showErrorDialog(message: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Sign In Failed")
+            .setMessage(message)
+            .setPositiveButton("OK", null)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .show()
     }
 
     private fun navigateToMain() {

@@ -14,7 +14,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import com.example.iccc_alert_app.auth.AuthManager
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 class MainActivity : BaseDrawerActivity() {
 
@@ -68,11 +67,6 @@ class MainActivity : BaseDrawerActivity() {
 
         supportActionBar?.title = "My Channels"
         setSelectedMenuItem(R.id.nav_channels)
-
-        val fab: FloatingActionButton = findViewById(R.id.fab_search)
-        fab.setOnClickListener {
-            startActivity(Intent(this, SearchActivity::class.java))
-        }
 
         if (savedInstanceState == null) {
             val fragment = ChannelsFragment()

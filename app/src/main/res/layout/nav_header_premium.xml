@@ -4,92 +4,211 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?attr/colorPrimary"
     android:orientation="vertical"
-    android:paddingStart="16dp"
-    android:paddingEnd="16dp"
-    android:paddingTop="24dp"
-    android:paddingBottom="16dp"
-    android:gravity="center_horizontal"
-    android:theme="@style/ThemeOverlay.AppCompat.Dark"
-    android:minHeight="160dp"
+    android:background="@color/navy_700"
+    android:paddingStart="18dp"
+    android:paddingEnd="18dp"
+    android:paddingTop="32dp"
+    android:paddingBottom="0dp"
     android:fitsSystemWindows="true">
 
-    <!-- User Avatar Circle with Initials -->
-    <com.google.android.material.card.MaterialCardView
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="12dp"
-        app:cardCornerRadius="32dp"
-        app:cardElevation="4dp">
-
-        <TextView
-            android:id="@+id/user_avatar"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/avatar_gradient"
-            android:gravity="center"
-            android:text="IC"
-            android:textColor="@color/white"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:fontFamily="sans-serif-medium" />
-    </com.google.android.material.card.MaterialCardView>
-
-    <!-- User Name -->
-    <TextView
-        android:id="@+id/user_name"
-        android:layout_width="wrap_content"
+    <!-- Top row: Avatar + Name/Role + Profile arrow -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="ICCC User"
-        android:textColor="@color/white"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:textAlignment="center"
-        android:layout_marginBottom="4dp"
-        android:fontFamily="sans-serif-medium" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-    <!-- User Phone -->
+        <!-- Avatar circle with initials -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="2dp"
+            app:strokeColor="#06B6D4"
+            app:cardBackgroundColor="#0D2D4A">
+
+            <TextView
+                android:id="@+id/user_avatar"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="IC"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Name + designation row -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="12dp">
+
+            <TextView
+                android:id="@+id/user_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ICCC User"
+                android:textColor="@color/white"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <!-- Role chip inline -->
+            <TextView
+                android:id="@+id/user_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Officer · ICCC"
+                android:textColor="#BAE6FD"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:background="@drawable/role_chip_bg"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp" />
+
+        </LinearLayout>
+
+        <!-- View profile arrow button -->
+        <ImageView
+            android:id="@+id/view_profile_button"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_arrow_forward"
+            android:tint="#BAE6FD"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="View Profile" />
+
+    </LinearLayout>
+
+    <!-- Phone number -->
     <TextView
         android:id="@+id/user_phone"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:layout_marginStart="60dp"
         android:text="+91 XXXXXXXXXX"
-        android:textColor="@color/white"
-        android:textSize="14sp"
-        android:alpha="0.9"
-        android:textAlignment="center"
-        android:layout_marginBottom="4dp" />
+        android:textColor="#7EAABF"
+        android:textSize="12sp" />
 
-    <!-- User Info (Designation • Area) -->
-    <TextView
-        android:id="@+id/user_info"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Officer • ICCC"
-        android:textColor="@color/white"
-        android:textSize="12sp"
-        android:alpha="0.7"
-        android:textAlignment="center"
-        android:layout_marginBottom="12dp"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp" />
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="14dp"
+        android:background="#1AFFFFFF" />
 
-    <!-- View Profile Button -->
-    <TextView
-        android:id="@+id/view_profile_button"
-        android:layout_width="wrap_content"
+    <!-- Stats bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="View Profile"
-        android:textColor="@color/white"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:background="?attr/selectableItemBackground"
-        android:padding="8dp"
-        android:drawableEnd="@android:drawable/ic_menu_edit"
-        android:drawablePadding="8dp"
-        android:drawableTint="@color/white"
-        android:fontFamily="sans-serif-medium" />
+        android:orientation="horizontal"
+        android:paddingTop="10dp"
+        android:paddingBottom="12dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <TextView
+                android:id="@+id/header_channel_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#22D3EE"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Channels"
+                android:textColor="#7EAABF"
+                android:textSize="10sp"
+                android:layout_marginTop="1dp" />
+
+        </LinearLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center_vertical"
+            android:background="#1AFFFFFF" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <TextView
+                android:id="@+id/header_events_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#22D3EE"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Events"
+                android:textColor="#7EAABF"
+                android:textSize="10sp"
+                android:layout_marginTop="1dp" />
+
+        </LinearLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center_vertical"
+            android:background="#1AFFFFFF" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <TextView
+                android:id="@+id/header_saved_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#22D3EE"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Saved"
+                android:textColor="#7EAABF"
+                android:textSize="10sp"
+                android:layout_marginTop="1dp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
 
 </LinearLayout>

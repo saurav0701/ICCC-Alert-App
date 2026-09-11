@@ -4,33 +4,20 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="#FFFFFF"
-    android:fitsSystemWindows="true">
+    android:background="@color/navy_700">
 
-    <!-- ✅ Status Bar Spacer for Camera Cutout -->
     <View
         android:id="@+id/status_bar_spacer"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:background="#FFFFFF" />
-
-    <!-- ✅ Top Divider Line to separate from status bar -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#E0E0E0" />
-
-    <!-- ✅ Additional padding below status bar -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="10dp"
-        android:background="#FFFFFF" />
+        android:background="@color/navy_700" />
 
     <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
+        android:layout_height="56dp"
         android:paddingStart="4dp"
-        android:paddingEnd="16dp">
+        android:paddingEnd="4dp"
+        android:background="@color/navy_700">
 
         <ImageView
             android:id="@+id/back_button_header"
@@ -42,51 +29,55 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:padding="12dp"
             android:contentDescription="Back"
-            android:tint="#1A1A1A" />
+            android:tint="#FFFFFF" />
 
         <LinearLayout
             android:id="@+id/channel_info_container"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_toEndOf="@id/back_button_header"
-            android:layout_centerVertical="true"
-            android:layout_marginStart="0dp"
             android:layout_toStartOf="@id/action_buttons_container"
+            android:layout_centerVertical="true"
             android:layout_marginEnd="8dp"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
-            <View
-                android:id="@+id/channel_badge"
+            <FrameLayout
                 android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="@drawable/circle_background" />
+                android:layout_height="36dp">
 
-            <TextView
-                android:id="@+id/channel_icon_text"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_marginStart="-36dp"
-                android:gravity="center"
-                android:text="VD"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:textColor="#FFFFFF" />
+                <View
+                    android:id="@+id/channel_badge"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@drawable/circle_background" />
+
+                <TextView
+                    android:id="@+id/channel_icon_text"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:gravity="center"
+                    android:text="VD"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFF" />
+
+            </FrameLayout>
 
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:layout_marginStart="12dp">
+                android:layout_marginStart="10dp">
 
                 <TextView
                     android:id="@+id/channel_name_header"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Sijua - Vehicle Detection"
-                    android:textSize="16sp"
+                    android:text="Sijua"
+                    android:textSize="15sp"
                     android:textStyle="bold"
-                    android:textColor="#1A1A1A"
+                    android:textColor="#FFFFFF"
                     android:maxLines="1"
                     android:ellipsize="end" />
 
@@ -96,8 +87,8 @@
                     android:layout_height="wrap_content"
                     android:text="24 events"
                     android:textSize="12sp"
-                    android:textColor="#757575"
-                    android:layout_marginTop="2dp" />
+                    android:textColor="#06B6D4"
+                    android:layout_marginTop="1dp" />
 
             </LinearLayout>
 
@@ -118,7 +109,7 @@
                 android:src="@drawable/ic_notifications"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:padding="12dp"
-                android:tint="#424242"
+                android:tint="#FFFFFF"
                 android:contentDescription="Mute notifications" />
 
             <ImageView
@@ -128,12 +119,17 @@
                 android:src="@drawable/ic_more_vert"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:padding="12dp"
-                android:tint="#424242"
+                android:tint="#FFFFFF"
                 android:contentDescription="More options" />
 
         </LinearLayout>
 
     </RelativeLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#2206B6D4" />
 
     <LinearLayout
         android:id="@+id/active_filters_container"
@@ -142,7 +138,9 @@
         android:orientation="horizontal"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
+        android:paddingTop="8dp"
         android:paddingBottom="8dp"
+        android:background="@color/navy_700"
         android:visibility="gone">
 
         <LinearLayout
@@ -165,7 +163,7 @@
                 android:layout_height="wrap_content"
                 android:text="Search: gate"
                 android:textSize="13sp"
-                android:textColor="#1A1A1A"
+                android:textColor="#0A1628"
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:maxWidth="150dp" />
@@ -178,7 +176,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:padding="4dp"
                 android:layout_marginStart="4dp"
-                android:tint="#757575"
+                android:tint="#475569"
                 android:contentDescription="Clear search" />
 
         </LinearLayout>
@@ -202,7 +200,7 @@
                 android:layout_height="wrap_content"
                 android:text="Today"
                 android:textSize="13sp"
-                android:textColor="#1A1A1A"
+                android:textColor="#0A1628"
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:maxWidth="150dp" />
@@ -215,7 +213,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:padding="4dp"
                 android:layout_marginStart="4dp"
-                android:tint="#757575"
+                android:tint="#475569"
                 android:contentDescription="Clear filter" />
 
         </LinearLayout>
@@ -227,35 +225,36 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
+        android:background="@color/navy_700"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
-        android:paddingBottom="8dp">
+        android:paddingTop="6dp"
+        android:paddingBottom="10dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp">
+            android:gravity="center_vertical">
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="Event Timeline"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
-                android:textColor="#1A1A1A" />
+                android:textColor="#BAE6FD"
+                android:letterSpacing="0.02" />
 
             <ImageView
                 android:id="@+id/toggle_timeline_button"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
                 android:src="@drawable/ic_expand_more"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:padding="6dp"
-                android:tint="?attr/colorPrimary"
+                android:padding="4dp"
+                android:tint="#06B6D4"
                 android:contentDescription="Toggle timeline" />
 
         </LinearLayout>
@@ -339,25 +338,54 @@
 
     </LinearLayout>
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#E0E0E0"
-        android:layout_marginTop="8dp" />
-
-    <TextView
-        android:id="@+id/date_divider"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="TODAY"
-        android:textSize="12sp"
-        android:textStyle="bold"
-        android:textColor="#757575"
-        android:letterSpacing="0.05"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="8dp"
-        android:background="#F8F9FA" />
+        android:orientation="vertical"
+        android:background="@color/colorBackground"
+        android:elevation="4dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="10dp">
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="#BAE6FD" />
+
+            <TextView
+                android:id="@+id/date_divider"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TODAY"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="#0E4D6E"
+                android:letterSpacing="0.08"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="5dp"
+                android:paddingBottom="5dp"
+                android:background="@drawable/date_divider_pill_bg"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="10dp" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="#BAE6FD" />
+
+        </LinearLayout>
+
+    </LinearLayout>
 
 </LinearLayout>

@@ -8,6 +8,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.iccc_alert_app.auth.AuthManager
 import com.example.iccc_alert_app.auth.RegistrationRequest
+import com.google.android.material.card.MaterialCardView
 
 
 class RegistrationActivity : AppCompatActivity() {
@@ -20,6 +21,8 @@ class RegistrationActivity : AppCompatActivity() {
     private lateinit var registerButton: Button
     private lateinit var loginText: TextView
     private lateinit var progressBar: ProgressBar
+    private lateinit var errorBanner: LinearLayout
+    private lateinit var errorBannerText: TextView
 
     private var allAreas = listOf<Pair<String, String>>()
     private var selectedAreaValues = mutableSetOf<String>()
@@ -50,6 +53,8 @@ class RegistrationActivity : AppCompatActivity() {
         registerButton = findViewById(R.id.register_button)
         loginText = findViewById(R.id.login_text)
         progressBar = findViewById(R.id.progress_bar)
+        errorBanner = findViewById(R.id.error_banner)
+        errorBannerText = findViewById(R.id.error_banner_text)
     }
 
     /**
@@ -216,6 +221,8 @@ class RegistrationActivity : AppCompatActivity() {
 
         setLoading(true)
 
+        hideErrorBanner()
+
         AuthManager.requestRegistration(this, request) { success, message ->
             runOnUiThread {
                 setLoading(false)
@@ -230,7 +237,7 @@ class RegistrationActivity : AppCompatActivity() {
                     overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                     finish()
                 } else {
-                    showError(message)
+                    showErrorBanner(message)
                 }
             }
         }
@@ -253,8 +260,34 @@ class RegistrationActivity : AppCompatActivity() {
         loginText.isEnabled = !loading
     }
 
+    /**
+     * Shows a brief inline validation error (field-level hints like "Phone must be 10 digits").
+     * These are quick and non-blocking.
+     */
     private fun showError(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        hideErrorBanner()
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * Shows a persistent error banner for backend/network errors.
+     * The banner stays visible so users can read the full message.
+     */
+    private fun showErrorBanner(message: String) {
+        errorBannerText.text = message
+        errorBanner.visibility = View.VISIBLE
+        // Also show an AlertDialog for server-side errors so they can't be missed
+        AlertDialog.Builder(this)
+            .setTitle("Registration Failed")
+            .setMessage(message)
+            .setPositiveButton("OK", null)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .show()
+    }
+
+    private fun hideErrorBanner() {
+        errorBanner.visibility = View.GONE
+        errorBannerText.text = ""
     }
 
     override fun onSupportNavigateUp(): Boolean {

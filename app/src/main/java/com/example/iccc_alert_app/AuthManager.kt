@@ -96,6 +96,42 @@ object AuthManager {
         Log.d(TAG, "✓ Auth data cleared")
     }
 
+    /**
+     * Maps raw backend/SQL error strings to user-friendly messages.
+     */
+    fun sanitizeErrorMessage(rawError: String?): String {
+        if (rawError == null) return "Something went wrong. Please try again."
+        return when {
+            rawError.contains("org_active", ignoreCase = true) ||
+            rawError.contains("sql:", ignoreCase = true) ||
+            rawError.contains("scan error", ignoreCase = true) ||
+            rawError.contains("converting NULL", ignoreCase = true) ->
+                "Your organisation is not yet activated on the server. Please contact your administrator."
+
+            rawError.contains("already exists", ignoreCase = true) ||
+            rawError.contains("duplicate", ignoreCase = true) ->
+                "This phone number is already registered. Please sign in instead."
+
+            rawError.contains("not found", ignoreCase = true) ->
+                "Organisation not found. Please verify your details."
+
+            rawError.contains("network", ignoreCase = true) ||
+            rawError.contains("timeout", ignoreCase = true) ||
+            rawError.contains("connection", ignoreCase = true) ->
+                "Network error. Please check your internet connection and try again."
+
+            rawError.contains("invalid phone", ignoreCase = true) ||
+            rawError.contains("phone number", ignoreCase = true) ->
+                "Invalid phone number. Please enter a valid 10-digit number."
+
+            rawError.contains("otp", ignoreCase = true) ||
+            rawError.contains("code", ignoreCase = true) ->
+                "Invalid or expired OTP. Please request a new one."
+
+            else -> rawError
+        }
+    }
+
     fun requestRegistration(
         context: Context,
         request: RegistrationRequest,
@@ -117,7 +153,7 @@ object AuthManager {
         client.newCall(httpRequest).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 Log.e(TAG, "Registration request failed", e)
-                callback(false, "Network error: ${e.message}")
+                callback(false, "Network error. Please check your connection and try again.")
             }
 
             override fun onResponse(call: Call, response: Response) {
@@ -128,13 +164,14 @@ object AuthManager {
                     if (it.isSuccessful) {
                         callback(true, "OTP sent to your WhatsApp")
                     } else {
-                        val errorMsg = try {
+                        val rawError = try {
                             val errorResponse = gson.fromJson(responseBody, ApiResponse::class.java)
-                            errorResponse.error ?: "Registration failed"
+                            errorResponse.error
                         } catch (e: Exception) {
-                            "Registration failed: ${it.code}"
+                            null
                         }
-                        callback(false, errorMsg)
+                        Log.w(TAG, "Registration error (raw): $rawError")
+                        callback(false, sanitizeErrorMessage(rawError))
                     }
                 }
             }
@@ -192,13 +229,14 @@ object AuthManager {
                             callback(false, "Failed to parse response", null)
                         }
                     } else {
-                        val errorMsg = try {
+                        val rawError = try {
                             val errorResponse = gson.fromJson(responseBody, ApiResponse::class.java)
-                            errorResponse.error ?: "Verification failed"
+                            errorResponse.error
                         } catch (e: Exception) {
-                            "Verification failed: ${it.code}"
+                            null
                         }
-                        callback(false, errorMsg, null)
+                        Log.w(TAG, "Verification error (raw): $rawError")
+                        callback(false, sanitizeErrorMessage(rawError), null)
                     }
                 }
             }
@@ -277,13 +315,14 @@ object AuthManager {
                         Log.d(TAG, "✅ Set organization to $organization based on user lookup")
                         callback(true, "OTP sent to your WhatsApp")
                     } else {
-                        val errorMsg = try {
+                        val rawError = try {
                             val errorResponse = gson.fromJson(responseBody, ApiResponse::class.java)
-                            errorResponse.error ?: "Failed on $organization"
+                            errorResponse.error
                         } catch (e: Exception) {
-                            "Failed on $organization: ${it.code}"
+                            null
                         }
-                        callback(false, errorMsg)
+                        Log.w(TAG, "$organization login error (raw): $rawError")
+                        callback(false, sanitizeErrorMessage(rawError))
                     }
                 }
             }
@@ -343,13 +382,14 @@ object AuthManager {
                             callback(false, "Failed to parse response", null)
                         }
                     } else {
-                        val errorMsg = try {
+                        val rawError = try {
                             val errorResponse = gson.fromJson(responseBody, ApiResponse::class.java)
-                            errorResponse.error ?: "Login failed"
+                            errorResponse.error
                         } catch (e: Exception) {
-                            "Login failed: ${it.code}"
+                            null
                         }
-                        callback(false, errorMsg, null)
+                        Log.w(TAG, "Login verification error (raw): $rawError")
+                        callback(false, sanitizeErrorMessage(rawError), null)
                     }
                 }
             }

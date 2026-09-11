@@ -11,6 +11,8 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 
 class ChannelsFragment : Fragment() {
 
@@ -20,9 +22,13 @@ class ChannelsFragment : Fragment() {
     private lateinit var activeFiltersText: TextView
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
 
+    // Filter chip group
+    private lateinit var filterChipGroup: ChipGroup
+
     // Filter state
     private var selectedArea: String = "All Areas"
     private var selectedDetectionType: String = "All Types"
+    private var activeChipFilter: String = "All"  // All | Subscribed | Live | Critical | Pinned
 
     private val subscriptionListener = {
         loadChannels()
@@ -40,6 +46,16 @@ class ChannelsFragment : Fragment() {
         recyclerView = view.findViewById(R.id.channels_recycler)
         emptyView = view.findViewById(R.id.empty_view)
         activeFiltersText = view.findViewById(R.id.active_filters_text)
+
+        // Initialize filter chip group
+        filterChipGroup = view.findViewById(R.id.filter_chips_row)
+
+        // Search card tap → open SearchActivity
+        view.findViewById<View>(R.id.search_card).setOnClickListener {
+            startActivity(Intent(requireContext(), SearchActivity::class.java))
+        }
+
+        setupFilterChips()
 
         // Setup SwipeRefreshLayout
         setupSwipeRefresh()
@@ -73,6 +89,23 @@ class ChannelsFragment : Fragment() {
     /**
      * Setup pull-to-refresh functionality
      */
+    private fun setupFilterChips() {
+        // Force "All" checked on every view creation — never trust state restoration
+        activeChipFilter = "All"
+        filterChipGroup.check(R.id.chip_all)
+
+        filterChipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            activeChipFilter = when {
+                checkedIds.contains(R.id.chip_subscribed) -> "Subscribed"
+                checkedIds.contains(R.id.chip_live)       -> "Live"
+                checkedIds.contains(R.id.chip_critical)   -> "Critical"
+                checkedIds.contains(R.id.chip_pinned)     -> "Pinned"
+                else                                      -> "All"
+            }
+            applyFilters()
+        }
+    }
+
     private fun setupSwipeRefresh() {
         // Set refresh colors to match app theme
         swipeRefreshLayout.setColorSchemeResources(
@@ -207,7 +240,18 @@ class ChannelsFragment : Fragment() {
             val matchesArea = selectedArea == "All Areas" || channel.areaDisplay == selectedArea
             val matchesType = selectedDetectionType == "All Types" || channel.eventTypeDisplay == selectedDetectionType
 
-            matchesArea && matchesType
+            // Apply quick-chip filter
+            val matchesChip = when (activeChipFilter) {
+                "Subscribed" -> true   // all channels from SubscriptionManager are subscribed
+                "Live"       -> (SubscriptionManager.getLastEvent(channel.id) != null)
+                "Critical"   -> channel.eventTypeDisplay.contains("Crowd", ignoreCase = true)
+                                || channel.eventTypeDisplay.contains("Intrusion", ignoreCase = true)
+                                || channel.eventTypeDisplay.contains("Tamper", ignoreCase = true)
+                "Pinned"     -> channel.isPinned
+                else         -> true   // "All"
+            }
+
+            matchesArea && matchesType && matchesChip
         }
 
         if (filteredChannels.isEmpty()) {

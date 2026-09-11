@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Main Navigation Items with improved spacing -->
+    <!-- Main navigation -->
     <group
         android:id="@+id/group_main"
         android:checkableBehavior="single">
@@ -9,53 +9,57 @@
         <item
             android:id="@+id/nav_channels"
             android:icon="@drawable/ic_channels"
-            android:title="My Channels"
-            android:iconTint="?attr/colorPrimary" />
+            android:title="Channels" />
+
+        <item
+            android:id="@+id/nav_alerts"
+            android:icon="@drawable/ic_notifications"
+            android:title="Alerts" />
 
         <item
             android:id="@+id/nav_saved_messages"
             android:icon="@drawable/ic_bookmark"
-            android:title="Saved Messages"
-            android:iconTint="?attr/colorPrimary" />
-
-        <item
-            android:id="@+id/nav_camera_streams"
-            android:icon="@drawable/ic_videocam"
-            android:title="Camera Streams"/>
+            android:title="Saved Messages" />
 
     </group>
 
-    <!-- Divider with improved section header -->
-    <item android:title="@string/nav_section_discover">
+    <!-- Discover / Tools -->
+    <item android:title="Tools">
         <menu>
             <item
                 android:id="@+id/nav_search"
                 android:icon="@drawable/ic_search"
-                android:title="Subscribe Channels"
-                android:iconTint="?attr/colorPrimary" />
+                android:title="Search Events" />
 
             <item
-                android:id="@+id/nav_share"
-                android:icon="@drawable/ic_share"
-                android:title="Share App"
-                android:iconTint="?attr/colorPrimary" />
+                android:id="@+id/nav_map"
+                android:icon="@drawable/ic_map"
+                android:title="Map View" />
+
+            <item
+                android:id="@+id/nav_camera_streams"
+                android:icon="@drawable/ic_videocam"
+                android:title="Camera Streams" />
         </menu>
     </item>
 
-    <!-- Account Section with better visual hierarchy -->
-    <item android:title="@string/nav_section_account">
+    <!-- Account -->
+    <item android:title="Account">
         <menu>
             <item
                 android:id="@+id/nav_profile"
                 android:icon="@drawable/ic_profile"
-                android:title="Profile"
-                android:iconTint="?attr/colorPrimary" />
+                android:title="Profile" />
 
             <item
                 android:id="@+id/nav_settings"
                 android:icon="@drawable/ic_settings"
-                android:title="Settings"
-                android:iconTint="?attr/colorPrimary" />
+                android:title="Settings" />
+
+            <item
+                android:id="@+id/nav_sign_out"
+                android:icon="@drawable/ic_logout"
+                android:title="Sign Out" />
         </menu>
     </item>
 
