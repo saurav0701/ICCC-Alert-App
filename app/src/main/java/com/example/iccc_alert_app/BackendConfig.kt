@@ -33,8 +33,13 @@ object BackendConfig {
         android.util.Log.d("BackendConfig", "✅ Organization set to: $organization")
     }
 
+    /**
+     * The app ships for CCL, so CCL is the default. It used to default to
+     * BCCL, which pointed a fresh install at the wrong backend for any call
+     * made before the user had signed in.
+     */
     fun getOrganization(): String {
-        return prefs.getString(KEY_ORGANIZATION, "BCCL") ?: "BCCL"
+        return prefs.getString(KEY_ORGANIZATION, "CCL") ?: "CCL"
     }
 
     fun isCCL(): Boolean {

@@ -16,10 +16,12 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 
 object AuthManager {
     private const val TAG = "AuthManager"
+
+    /** The only organisation this app serves. */
+    private const val ORGANIZATION_CCL = "CCL"
     private const val PREFS_NAME = "iccc_auth_prefs"
     private const val KEY_AUTH_TOKEN = "auth_token"
     private const val KEY_TOKEN_EXPIRY = "token_expiry"
@@ -111,6 +113,11 @@ object AuthManager {
             rawError.contains("already exists", ignoreCase = true) ||
             rawError.contains("duplicate", ignoreCase = true) ->
                 "This phone number is already registered. Please sign in instead."
+
+            rawError.contains("user", ignoreCase = true) &&
+            rawError.contains("not found", ignoreCase = true) ||
+            rawError.contains("not registered", ignoreCase = true) ->
+                "This number is not registered. Please register first."
 
             rawError.contains("not found", ignoreCase = true) ->
                 "Organisation not found. Please verify your details."
@@ -243,50 +250,24 @@ object AuthManager {
         })
     }
 
+    /**
+     * Requests a login OTP.
+     *
+     * This app serves CCL only, and registration already forces CCL, so login
+     * goes straight to the CCL backend. It used to probe BCCL first and fall
+     * back to CCL, which cost every login a failed round trip before it could
+     * start, and sent the user's phone number to an unrelated organisation's
+     * backend to do it.
+     */
     fun requestLogin(
         phone: String,
         callback: (Boolean, String) -> Unit
     ) {
-        Log.d(TAG, "Starting multi-backend login for: $phone")
+        BackendConfig.setOrganization(ORGANIZATION_CCL)
+        Log.d(TAG, "Starting login for: $phone")
 
-        val callbackInvoked = AtomicBoolean(false)
-
-        tryLoginOnBackend(phone, "BCCL") { bcclSuccess, bcclMessage ->
-            if (bcclSuccess) {
-                if (callbackInvoked.compareAndSet(false, true)) {
-                    Log.d(TAG, "✓ User found on BCCL")
-                    BackendConfig.setOrganization("BCCL")
-                    callback(true, bcclMessage)
-                }
-            } else {
-                Log.d(TAG, "BCCL failed: $bcclMessage, trying CCL...")
-
-                tryLoginOnBackend(phone, "CCL") { cclSuccess, cclMessage ->
-                    if (callbackInvoked.compareAndSet(false, true)) {
-                        if (cclSuccess) {
-                            Log.d(TAG, "✓ User found on CCL")
-                            BackendConfig.setOrganization("CCL")
-                            callback(true, cclMessage)
-                        } else {
-                            Log.d(TAG, "✗ User not found on either backend")
-                            callback(false, "User not registered. Please register first.")
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun tryLoginOnBackend(
-        phone: String,
-        organization: String,
-        callback: (Boolean, String) -> Unit
-    ) {
-        val baseUrl = if (organization == "CCL") {
-            "http://20.207.231.162:39071"
-        } else {
-            "http://103.208.173.227:8890"
-        }
+        val baseUrl = BackendConfig.getHttpBaseUrl()
+        val organization = ORGANIZATION_CCL
 
         val request = OTPRequest(phone = phone, purpose = "login")
         val json = gson.toJson(request)
@@ -302,7 +283,7 @@ object AuthManager {
         client.newCall(httpRequest).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 Log.e(TAG, "$organization login request failed: ${e.message}")
-                callback(false, "Network error on $organization: ${e.message}")
+                callback(false, "Network error. Please check your internet connection and try again.")
             }
 
             override fun onResponse(call: Call, response: Response) {
@@ -311,8 +292,6 @@ object AuthManager {
                     Log.d(TAG, "$organization response: ${it.code} - $responseBody")
 
                     if (it.isSuccessful) {
-                        BackendConfig.setOrganization(organization)
-                        Log.d(TAG, "✅ Set organization to $organization based on user lookup")
                         callback(true, "OTP sent to your WhatsApp")
                     } else {
                         val rawError = try {
