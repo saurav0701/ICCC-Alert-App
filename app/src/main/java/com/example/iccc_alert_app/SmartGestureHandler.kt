@@ -215,7 +215,7 @@ class SmartGestureHandler(
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "image/jpeg"
                     putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_TEXT, "Event: ${event.typeDisplay}\nLocation: ${event.data["location"]}")
+                    putExtra(Intent.EXTRA_TEXT, "Event: ${event.displayLabel}\nLocation: ${event.data["location"]}")
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
                 context.startActivity(Intent.createChooser(shareIntent, "Share Event Image"))

@@ -130,7 +130,7 @@ class SavedMessagesAdapter(
     private fun bindVAEvent(holder: VAEventViewHolder, savedMessage: SavedMessage) {
         val event = savedMessage.event
 
-        holder.eventType.text = event.typeDisplay ?: "Unknown Event"
+        holder.eventType.text = event.displayLabel
         val location = event.data["location"] as? String ?: "Unknown"
         holder.location.text = location
 
@@ -188,7 +188,7 @@ class SavedMessagesAdapter(
     private fun bindGPSEvent(holder: GPSEventViewHolder, savedMessage: SavedMessage) {
         val event = savedMessage.event
 
-        holder.eventType.text = event.typeDisplay ?: "GPS Alert"
+        holder.eventType.text = event.displayLabel
 
         val vehicleNum = event.vehicleNumber ?: "Unknown"
         val transporter = event.vehicleTransporter ?: "Unknown"
@@ -575,7 +575,7 @@ class SavedMessagesAdapter(
 
             val intent = Intent(context, ImageViewerActivity::class.java)
             intent.putExtra("IMAGE_URI", imageUri.toString())
-            intent.putExtra("EVENT_TYPE", event.typeDisplay ?: "Event")
+            intent.putExtra("EVENT_TYPE", event.displayLabel)
             intent.putExtra("EVENT_LOCATION", event.data["location"] as? String ?: "Unknown")
             context.startActivity(intent)
 

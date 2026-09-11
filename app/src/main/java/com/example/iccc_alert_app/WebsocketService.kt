@@ -836,7 +836,7 @@ class WebSocketService : Service() {
         val intent = Intent(this, ChannelDetailActivity::class.java).apply {
             putExtra("CHANNEL_ID", channelId)
             putExtra("CHANNEL_AREA", event.areaDisplay)
-            putExtra("CHANNEL_TYPE", event.typeDisplay)
+            putExtra("CHANNEL_TYPE", event.displayLabel)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
@@ -848,7 +848,7 @@ class WebSocketService : Service() {
         )
 
         val notification = NotificationCompat.Builder(this, ALERT_NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("${event.areaDisplay} - ${event.typeDisplay}")
+            .setContentTitle("${event.areaDisplay} - ${event.displayLabel}")
             .setContentText(location)
             .setSubText(timeFormat.format(eventTime))
             .setSmallIcon(R.drawable.ic_notifications)

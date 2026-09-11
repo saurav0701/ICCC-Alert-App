@@ -28,7 +28,7 @@ class GpsEventHandler(
     fun setupGpsEvent(holder: EventViewHolders.GpsEventViewHolder, event: Event) {
         activeJobs[holder.hashCode()]?.cancel()
 
-        holder.eventType.text = event.typeDisplay ?: "GPS Alert"
+        holder.eventType.text = event.displayLabel
 
         val eventDateTime = bindingHelpers.getEventDate(event)
         holder.timestamp.text = bindingHelpers.timeFormat.format(eventDateTime)
@@ -291,8 +291,10 @@ class GpsEventHandler(
                 return@setOnClickListener
             }
 
-            holder.saveGpsPrioritySection.visibility = View.VISIBLE
-            holder.gpsActionButtonsContainer.visibility = View.GONE
+            // Use the same dialog the VA cards use. The inline priority/comment
+            // section below sits inside the list item, so the soft keyboard
+            // covered the comment box and the user could not see what they typed.
+            showGpsSaveDialog(holder, event)
         }
 
         holder.cancelGpsSaveButton.setOnClickListener {
@@ -361,6 +363,63 @@ class GpsEventHandler(
         )
     }
 
+    /**
+     * Opens the shared save dialog for a VTS alert, then performs the same work
+     * the inline confirm button used to: save locally, and push the comment
+     * through to the VTS database so it appears on the dashboard.
+     */
+    private fun showGpsSaveDialog(
+        holder: EventViewHolders.GpsEventViewHolder,
+        event: Event
+    ) {
+        val activity = context as? androidx.fragment.app.FragmentActivity
+        if (activity == null) {
+            Log.e(TAG, "Cannot show save dialog - context is not a FragmentActivity")
+            Toast.makeText(context, "Unable to open save dialog", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val eventId = event.id
+        if (eventId == null) {
+            Toast.makeText(context, "Cannot save: Invalid GPS event", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        SaveEventDialogFragment.show(
+            fragmentManager = activity.supportFragmentManager,
+            event = event,
+            onSave = { priority, comment ->
+                val (saved, errorMsg) =
+                    SavedMessagesManager.saveMessage(eventId, event, priority, comment)
+
+                if (!saved) {
+                    Toast.makeText(
+                        context,
+                        errorMsg ?: "GPS event already saved",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@show
+                }
+
+                Toast.makeText(context, "GPS event saved successfully", Toast.LENGTH_SHORT).show()
+                markHolderSaved(holder)
+
+                // Saving locally is not enough for a VTS alert: the remark also
+                // has to reach the VTS database, which is what the dashboard reads.
+                if (comment.isNotBlank()) {
+                    submitCommentToVts(event, comment)
+                }
+            }
+        )
+    }
+
+    private fun markHolderSaved(holder: EventViewHolders.GpsEventViewHolder) {
+        holder.saveGpsEventButton.text = "Saved ✓"
+        holder.saveGpsEventButton.isEnabled = false
+        holder.saveGpsEventButton.alpha = 0.6f
+        holder.saveGpsPrioritySection.visibility = View.GONE
+    }
+
     private fun setupGpsMoreActionsButton(holder: EventViewHolders.GpsEventViewHolder, event: Event) {
         holder.moreGpsActionsButton.setOnClickListener {
             if (holder.gpsActionButtonsContainer.visibility == View.VISIBLE) {
@@ -411,7 +470,7 @@ class GpsEventHandler(
         }
 
         val vehicleInfo = "${event.vehicleNumber ?: "Unknown Vehicle"} - ${event.vehicleTransporter ?: "Unknown Transporter"}"
-        val eventType = event.typeDisplay ?: "GPS Alert"
+        val eventType = event.displayLabel
         val latitude = alertLocation.latitude
         val longitude = alertLocation.longitude
 

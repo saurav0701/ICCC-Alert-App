@@ -591,7 +591,7 @@ class ChannelEventsAdapter(
                 true
             } else {
                 val location = (event.data["location"] as? String ?: "").lowercase()
-                val eventType = (event.typeDisplay ?: "").lowercase()
+                val eventType = event.displayLabel.lowercase()
                 location.contains(searchQuery) || eventType.contains(searchQuery)
             }
 
@@ -647,7 +647,7 @@ class ChannelEventsAdapter(
     }
 
     private fun setupEvent(holder: EventViewHolders.EventViewHolder, event: Event) {
-        holder.eventType.text = event.typeDisplay ?: "Unknown Event"
+        holder.eventType.text = event.displayLabel
 
         val location = event.data["location"] as? String ?: "Unknown"
         holder.location.text = location
@@ -914,7 +914,7 @@ class ChannelEventsAdapter(
                     putExtra(Intent.EXTRA_STREAM, uri)
                     putExtra(
                         Intent.EXTRA_TEXT,
-                        "Event: ${event.typeDisplay}\nLocation: ${event.data["location"]}"
+                        "Event: ${event.displayLabel}\nLocation: ${event.data["location"]}"
                     )
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }

@@ -264,7 +264,7 @@ class AlertsAdapter(
         holder.typeAbbrev.text = abbrev
         holder.typeAbbrev.background.setTint(badgeColor)
 
-        holder.eventType.text = event.typeDisplay ?: event.type ?: "Unknown"
+        holder.eventType.text = event.displayLabel
         holder.area.text      = event.areaDisplay ?: event.area ?: "—"
         holder.location.text  = event.data["location"] as? String ?: "Unknown location"
         holder.timestamp.text = relativeTime(event.timestamp)

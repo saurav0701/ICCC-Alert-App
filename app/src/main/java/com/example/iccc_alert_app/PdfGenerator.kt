@@ -288,7 +288,7 @@ class PdfGenerator(private val context: Context) {
         y += 20
 
         // Event type badge
-        val eventType = event.typeDisplay ?: event.type ?: "Unknown"
+        val eventType = event.displayLabel
         val (icon, badgeColor) = getEventTypeIconAndColor(event.type ?: "")
 
         val badgeText = eventType  // Remove icon from badge text
@@ -741,7 +741,7 @@ class PdfGenerator(private val context: Context) {
         val colStartX = currentX
         var contentY = startY + 15  // Start with padding from top
 
-        val eventType = event.typeDisplay ?: event.type ?: "Unknown"
+        val eventType = event.displayLabel
         paint.textSize = 11f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         paint.color = Color.parseColor(COLOR_TEXT_PRIMARY)

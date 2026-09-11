@@ -243,7 +243,7 @@ object SavedMessagesManager {
         return savedMessages.filter { savedMessage ->
             val event = savedMessage.event
             val location = event.data["location"] as? String ?: ""
-            val eventType = event.typeDisplay ?: ""
+            val eventType = event.displayLabel
             val comment = savedMessage.comment
 
             location.lowercase().contains(lowerQuery) ||

@@ -219,7 +219,7 @@ class SaveEventDialogFragment : DialogFragment() {
 
         // Event Type
         val eventType = TextView(context).apply {
-            text = event.typeDisplay ?: "Event"
+            text = event.displayLabel
             textSize = 16f
             setTextColor(android.graphics.Color.parseColor("#1976D2"))
             setTypeface(null, android.graphics.Typeface.BOLD)

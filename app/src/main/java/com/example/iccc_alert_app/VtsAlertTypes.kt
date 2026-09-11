@@ -90,3 +90,23 @@ object VtsAlertTypes {
     fun hasGeofence(type: String?): Boolean =
         type == OFF_ROUTE || type == OFF_AREA || type == TAMPER
 }
+
+/**
+ * The label to show the user for an event.
+ *
+ * For VTS alerts this prefers the app's own table over the backend's
+ * typeDisplay. The two can disagree: an older backend deployment sends
+ * "Overspeed Alert" where the dashboard and this app both say "Over Speed
+ * Alert", which showed up as a channel titled one way and the card inside it
+ * titled another. Preferring the local table keeps every screen consistent
+ * regardless of which backend build is live.
+ *
+ * Video-analytics events keep using the backend's label, which is the only
+ * source for them.
+ */
+val Event.displayLabel: String
+    get() = if (VtsAlertTypes.isVtsAlert(type)) {
+        VtsAlertTypes.displayName(type)
+    } else {
+        typeDisplay ?: type ?: "Event"
+    }

@@ -81,7 +81,7 @@ class MapActivity : AppCompatActivity() {
     private fun setupInfoHeader() {
         val event = gpsEvent ?: return
 
-        findViewById<TextView>(R.id.event_type_text).text = event.typeDisplay ?: "GPS Alert"
+        findViewById<TextView>(R.id.event_type_text).text = VtsAlertTypes.displayName(event.type)
         findViewById<TextView>(R.id.vehicle_number_text).text = event.vehicleNumber ?: "N/A"
         findViewById<TextView>(R.id.vehicle_transporter_text).text = event.vehicleTransporter ?: "N/A"
 

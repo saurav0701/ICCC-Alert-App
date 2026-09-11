@@ -337,7 +337,7 @@ class EventBindingHelpers(
             )
 
             intent.putExtra("IMAGE_URI", uri.toString())
-            intent.putExtra("EVENT_TYPE", event.typeDisplay ?: "Event")
+            intent.putExtra("EVENT_TYPE", event.displayLabel)
             intent.putExtra("EVENT_LOCATION", event.data["location"] as? String ?: "Unknown")
             context.startActivity(intent)
         } catch (e: Exception) {

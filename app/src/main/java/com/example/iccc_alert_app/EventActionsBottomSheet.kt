@@ -62,7 +62,7 @@ class EventActionsBottomSheet(
         importantButton = view.findViewById(R.id.action_important)
 
         // Set event info
-        eventTitle.text = event.typeDisplay ?: "Event"
+        eventTitle.text = event.displayLabel
         eventLocation.text = event.data["location"] as? String ?: "Unknown"
         eventTime.text = bindingHelpers.timeFormat.format(
             bindingHelpers.getEventDate(event)
