@@ -12,7 +12,9 @@ import android.webkit.WebViewClient
 object WebViewManager {
 
     private const val TAG = "WebViewManager"
-    private const val STREAM_TIMEOUT_MS = 10000L
+    // Must exceed hls.js's own manifest timeout and retries, otherwise the
+    // app reports "camera offline" while the player is still connecting.
+    private const val STREAM_TIMEOUT_MS = 25000L
 
     interface WebViewCallback {
         fun onPageLoaded()
@@ -192,7 +194,12 @@ object WebViewManager {
             to { transform: rotate(360deg); }
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <!-- Bundled in the APK. Previously fetched from jsdelivr on every open,
+         which made a stream fail to start whenever the site network was weak -
+         exactly the areas where streams were reported as flaky. It was also
+         pinned to @latest, so an upstream release could break every stream in
+         the field without an app update. -->
+    <script src="hls.min.js"></script>
 </head>
 <body>
     <div id="video-container">
@@ -307,26 +314,41 @@ object WebViewManager {
             }, 100);
         }
 
+        var networkRetries = 0;
+        var MAX_NETWORK_RETRIES = 5;
+
         function initializeStream() {
             if (Hls.isSupported()) {
                 hls = new Hls({ 
                     lowLatencyMode: true,
                     enableWorker: true,
-                    maxBufferLength: 10,
+                    // A slightly deeper buffer rides out the jitter on site
+                    // links; 10s was thin enough to stall regularly.
+                    maxBufferLength: 20,
                     maxBufferSize: 30 * 1000 * 1000,
                     autoStartLoad: true,
                     startLevel: -1,
                     capLevelToPlayerSize: false,
                     maxLoadingDelay: 4,
-                    manifestLoadingTimeOut: 10000,
-                    manifestLoadingMaxRetry: 2,
-                    levelLoadingTimeOut: 10000,
-                    fragLoadingTimeOut: 20000
+                    manifestLoadingTimeOut: 15000,
+                    manifestLoadingMaxRetry: 4,
+                    manifestLoadingRetryDelay: 1000,
+                    levelLoadingTimeOut: 15000,
+                    levelLoadingMaxRetry: 4,
+                    fragLoadingTimeOut: 20000,
+                    fragLoadingMaxRetry: 6
                 });
                 
                 hls.loadSource('${streamUrl}');
                 hls.attachMedia(video);
                 
+                hls.on(Hls.Events.FRAG_BUFFERED, function() {
+                    // Back on its feet: restore the full retry budget so a
+                    // later blip gets its own attempts.
+                    networkRetries = 0;
+                    hideBuffering();
+                });
+
                 hls.on(Hls.Events.MANIFEST_PARSED, function() {
                     video.muted = false;
                     video.play().then(() => {
@@ -347,7 +369,17 @@ object WebViewManager {
                     if (data.fatal) {
                         switch(data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
-                                notifyStreamError('Network error');
+                                // Recoverable: retry with backoff before giving
+                                // up. Site links drop briefly and come back.
+                                if (networkRetries < MAX_NETWORK_RETRIES) {
+                                    networkRetries++;
+                                    showBuffering();
+                                    setTimeout(function() {
+                                        try { hls.startLoad(); } catch (e) {}
+                                    }, 1000 * networkRetries);
+                                } else {
+                                    notifyStreamError('Network error');
+                                }
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
                                 showBuffering();
@@ -442,7 +474,10 @@ object WebViewManager {
 </html>
         """.trimIndent()
 
-        webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+        // Base URL must be the asset folder so <script src="hls.min.js"> resolves.
+        webView.loadDataWithBaseURL(
+            "file:///android_asset/", html, "text/html", "UTF-8", null
+        )
     }
 
     private fun startTimeout() {

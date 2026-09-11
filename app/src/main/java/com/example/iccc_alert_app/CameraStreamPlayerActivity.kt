@@ -31,7 +31,9 @@ class CameraStreamPlayerActivity : AppCompatActivity() {
         private const val TAG = "CameraStreamPlayer"
         private const val CONTROLS_HIDE_DELAY = 4000L
         private const val REQUEST_STORAGE_PERMISSION = 100
-        private const val STREAM_TIMEOUT_MS = 10000L
+        // Must exceed hls.js's own manifest timeout and retries, otherwise the
+    // app reports "camera offline" while the player is still connecting.
+    private const val STREAM_TIMEOUT_MS = 25000L
         const val ACTION_MEDIA_CONTROL = "media_control"
         const val EXTRA_CONTROL_TYPE = "control_type"
         const val CONTROL_TYPE_PAUSE = 1
