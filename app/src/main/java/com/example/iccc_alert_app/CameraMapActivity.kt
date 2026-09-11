@@ -7,7 +7,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.os.Bundle
-import android.preference.PreferenceManager
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
@@ -19,9 +18,7 @@ import com.example.iccc_alert_app.auth.AuthManager
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import kotlinx.coroutines.*
-import org.osmdroid.config.Configuration
 import org.osmdroid.util.GeoPoint
-import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 
@@ -64,17 +61,7 @@ class CameraMapActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        try {
-            Configuration.getInstance().load(
-                applicationContext,
-                PreferenceManager.getDefaultSharedPreferences(applicationContext)
-            )
-            Configuration.getInstance().userAgentValue = packageName
-            Configuration.getInstance().tileFileSystemCacheMaxBytes = 50L * 1024L * 1024L
-            Configuration.getInstance().tileFileSystemCacheTrimBytes = 40L * 1024L * 1024L
-        } catch (e: Exception) {
-            Log.e(TAG, "Error initializing osmdroid: ${e.message}")
-        }
+        MapTileConfig.initialize(this)
 
         setContentView(R.layout.activity_camera_map_osm)
 
@@ -168,26 +155,7 @@ class CameraMapActivity : AppCompatActivity() {
     }
 
     private fun initializeMap() {
-        val baseUrls = arrayOf(
-            "https://mt0.google.com/vt/lyrs=y&hl=en",
-            "https://mt1.google.com/vt/lyrs=y&hl=en",
-            "https://mt2.google.com/vt/lyrs=y&hl=en",
-            "https://mt3.google.com/vt/lyrs=y&hl=en"
-        )
-
-        mapView.setTileSource(object : org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase(
-            "Google-Hybrid",
-            0, 22, 256, ".png",
-            baseUrls
-        ) {
-            override fun getTileURLString(pMapTileIndex: Long): String {
-                val zoom = MapTileIndex.getZoom(pMapTileIndex)
-                val x = MapTileIndex.getX(pMapTileIndex)
-                val y = MapTileIndex.getY(pMapTileIndex)
-                val serverIndex = (x + y) % baseUrls.size
-                return "${baseUrls[serverIndex]}&x=$x&y=$y&z=$zoom&s=Ga"
-            }
-        })
+        MapTileConfig.applyTileSource(mapView)
 
         mapView.setMultiTouchControls(true)
         mapView.setBuiltInZoomControls(false)

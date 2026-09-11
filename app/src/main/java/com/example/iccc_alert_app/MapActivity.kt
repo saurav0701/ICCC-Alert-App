@@ -2,7 +2,6 @@ package com.example.iccc_alert_app
 
 import android.graphics.Color
 import android.os.Bundle
-import android.preference.PreferenceManager
 import android.util.Log
 import android.view.View
 import android.widget.LinearLayout
@@ -16,7 +15,6 @@ import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -43,20 +41,7 @@ class MapActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize osmdroid configuration
-        try {
-            Configuration.getInstance().load(
-                applicationContext,
-                PreferenceManager.getDefaultSharedPreferences(applicationContext)
-            )
-            Configuration.getInstance().userAgentValue = packageName
-
-            // Set cache sizes to prevent memory issues
-            Configuration.getInstance().tileFileSystemCacheMaxBytes = 50L * 1024L * 1024L // 50MB
-            Configuration.getInstance().tileFileSystemCacheTrimBytes = 40L * 1024L * 1024L // 40MB
-        } catch (e: Exception) {
-            Log.e(TAG, "Error initializing osmdroid: ${e.message}")
-        }
+        MapTileConfig.initialize(this)
 
         setContentView(R.layout.activity_map)
 
@@ -362,26 +347,7 @@ class MapActivity : AppCompatActivity() {
         mapView = findViewById(R.id.map_view)
 
         // Configure map with Google Hybrid tiles (satellite + labels)
-        val baseUrls = arrayOf(
-            "https://mt0.google.com/vt/lyrs=y&hl=en",
-            "https://mt1.google.com/vt/lyrs=y&hl=en",
-            "https://mt2.google.com/vt/lyrs=y&hl=en",
-            "https://mt3.google.com/vt/lyrs=y&hl=en"
-        )
-
-        mapView.setTileSource(object : org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase(
-            "Google-Hybrid",
-            0, 22, 256, ".png",
-            baseUrls
-        ) {
-            override fun getTileURLString(pMapTileIndex: Long): String {
-                val zoom = org.osmdroid.util.MapTileIndex.getZoom(pMapTileIndex)
-                val x = org.osmdroid.util.MapTileIndex.getX(pMapTileIndex)
-                val y = org.osmdroid.util.MapTileIndex.getY(pMapTileIndex)
-                val serverIndex = (x + y) % baseUrls.size
-                return "${baseUrls[serverIndex]}&x=$x&y=$y&z=$zoom&s=Ga"
-            }
-        })
+        MapTileConfig.applyTileSource(mapView)
 
         mapView.setMultiTouchControls(true)
         mapView.setBuiltInZoomControls(false)

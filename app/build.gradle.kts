@@ -9,7 +9,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.iccc_alert_app"
+        applicationId = "in.cclai.icccalert"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -90,11 +90,9 @@ dependencies {
 
     // ==================== MAPS ====================
 
-    // ✅ Google Maps (you already have this configured)
-    implementation("com.google.android.gms:play-services-maps:18.2.0")
-    implementation("com.google.android.gms:play-services-location:21.1.0")
-
-    // OpenStreetMap (keep for GPS event maps - MapActivity)
+    // OpenStreetMap. Play Services Maps/Location were declared but never
+    // used anywhere in the app, and pulling in Location made the app look
+    // like it tracked users. Both removed.
     implementation("org.osmdroid:osmdroid-android:6.1.18")
 
     implementation("androidx.work:work-runtime-ktx:2.9.0")

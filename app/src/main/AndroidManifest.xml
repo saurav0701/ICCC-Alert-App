@@ -12,18 +12,13 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <!-- Storage permissions for screenshots -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
-    <!-- OSM Map Permissions -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- PiP Support -->
     <uses-feature
@@ -44,7 +39,7 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
 
-        <!-- No Google Maps API Key needed - Using OpenStreetMap with Google tiles -->
+        <!-- Maps use OpenStreetMap tiles via osmdroid. No API key required. -->
 
         <!-- FileProvider for sharing files -->
         <provider
