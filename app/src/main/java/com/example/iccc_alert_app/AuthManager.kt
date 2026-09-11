@@ -6,6 +6,7 @@ import android.provider.Settings
 import android.util.Log
 import com.example.iccc_alert_app.BackendConfig
 import com.example.iccc_alert_app.ChannelSyncState
+import com.example.iccc_alert_app.ClientIdManager
 import com.example.iccc_alert_app.PersistentLogger
 import com.example.iccc_alert_app.SavedMessagesManager
 import com.example.iccc_alert_app.SubscriptionManager
@@ -376,6 +377,94 @@ object AuthManager {
     }
 
     // ✅ NEW: Logout that preserves all data (like iOS)
+    /**
+     * Permanently deletes the signed-in user's account.
+     *
+     * Unlike [logout], which deliberately preserves local state so a returning
+     * user keeps their channels, this wipes everything: the account is gone
+     * server-side, so leaving subscriptions, saved messages and sync cursors
+     * behind would only strand data belonging to a user who no longer exists.
+     *
+     * Required by Google Play for any app that lets users create an account.
+     */
+    fun deleteAccount(callback: (Boolean, String) -> Unit) {
+        Log.d(TAG, "Starting account deletion")
+
+        val token = getAuthToken()
+        if (token == null) {
+            callback(false, "You are not signed in.")
+            return
+        }
+
+        val baseUrl = BackendConfig.getHttpBaseUrl()
+        val httpRequest = Request.Builder()
+            .url("$baseUrl/auth/account")
+            .addHeader("Authorization", "Bearer $token")
+            .delete()
+            .build()
+
+        client.newCall(httpRequest).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                // Do not wipe anything: the account still exists server-side,
+                // so the user must be able to retry.
+                Log.e(TAG, "Account deletion request failed: ${e.message}")
+                callback(false, "Network error. Please check your connection and try again.")
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                response.use {
+                    if (!it.isSuccessful) {
+                        val rawError = try {
+                            gson.fromJson(it.body?.string(), ApiResponse::class.java).error
+                        } catch (e: Exception) {
+                            null
+                        }
+                        Log.w(TAG, "Account deletion rejected: ${it.code}")
+                        callback(false, sanitizeErrorMessage(rawError))
+                        return
+                    }
+                }
+
+                Log.d(TAG, "Account deleted server-side, wiping local data")
+                wipeAllLocalData()
+                callback(true, "Your account has been permanently deleted.")
+            }
+        })
+    }
+
+    /**
+     * Clears every trace of the user from this device after their account has
+     * been deleted server-side.
+     */
+    private fun wipeAllLocalData() {
+        try {
+            WebSocketService.stop(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping WebSocket during account deletion: ${e.message}")
+        }
+
+        try {
+            SavedMessagesManager.clearAll()
+            ChannelSyncState.clearAll()
+            SubscriptionManager.clearAllEvents()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error clearing app data during account deletion: ${e.message}")
+        }
+
+        // Drops the auth token and the cached profile.
+        clearAuthData()
+
+        // A new client id on next sign-in, so a future account on this device
+        // does not inherit the deleted user's JetStream consumer.
+        try {
+            ClientIdManager.resetClientId(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error resetting client id during account deletion: ${e.message}")
+        }
+
+        Log.d(TAG, "Local data wiped after account deletion")
+    }
+
     fun logout(callback: (Boolean, String) -> Unit) {
         Log.d(TAG, "🚪 Starting logout process...")
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

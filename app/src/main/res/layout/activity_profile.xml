@@ -400,6 +400,22 @@
                     android:layout_marginBottom="24dp"
                     style="@style/Widget.Material3.Button" />
 
+                <!-- Deleting the account is permanent and irreversible, so it is
+                     styled as a quiet text button rather than a second big red
+                     button that could be hit by mistake next to Sign Out. -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/delete_account_button"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="Delete my account"
+                    android:textColor="#B91C1C"
+                    android:textSize="14sp"
+                    android:textAllCaps="false"
+                    android:letterSpacing="0"
+                    app:rippleColor="#FCA5A5"
+                    android:layout_marginBottom="24dp" />
+
             </LinearLayout>
 
         </LinearLayout>

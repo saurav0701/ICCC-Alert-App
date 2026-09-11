@@ -25,6 +25,7 @@ class ProfileActivity : BaseDrawerActivity() {
     private lateinit var loadingView: ProgressBar
     private lateinit var contentView: View
     private lateinit var logoutButton: Button
+    private lateinit var deleteAccountButton: Button
     private var channelCountBadge: TextView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,6 +65,7 @@ class ProfileActivity : BaseDrawerActivity() {
             loadingView = findViewById(R.id.profile_loading)
             contentView = findViewById(R.id.profile_content)
             logoutButton = findViewById(R.id.logout_button)
+            deleteAccountButton = findViewById(R.id.delete_account_button)
 
         } catch (e: Exception) {
             android.util.Log.e("ProfileActivity", "Error initializing views", e)
@@ -75,6 +77,72 @@ class ProfileActivity : BaseDrawerActivity() {
     private fun setupLogoutButton() {
         logoutButton.setOnClickListener {
             showLogoutConfirmation()
+        }
+
+        deleteAccountButton.setOnClickListener {
+            showDeleteAccountConfirmation()
+        }
+    }
+
+    /**
+     * Account deletion is permanent and cannot be undone, so it asks twice:
+     * once to explain exactly what is destroyed, and once more to confirm.
+     * Google Play requires the deletion path to be clear about its scope.
+     */
+    private fun showDeleteAccountConfirmation() {
+        AlertDialog.Builder(this)
+            .setTitle("Delete your account?")
+            .setMessage("""
+                This permanently deletes your account and cannot be undone.
+
+                What is removed:
+                • Your profile: name, phone number and designation
+                • Your ${SubscriptionManager.getSubscriptions().size} subscribed channels
+                • Your ${SavedMessagesManager.getSavedMessages().size} saved messages
+                • All sessions on every device
+
+                You will need to register again to use the app.
+            """.trimIndent())
+            .setPositiveButton("Continue") { _, _ ->
+                showDeleteAccountFinalConfirmation()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showDeleteAccountFinalConfirmation() {
+        AlertDialog.Builder(this)
+            .setTitle("Are you absolutely sure?")
+            .setMessage("Your account will be deleted immediately. This cannot be reversed.")
+            .setPositiveButton("Delete my account") { _, _ ->
+                performAccountDeletion()
+            }
+            .setNegativeButton("Keep my account", null)
+            .show()
+    }
+
+    private fun performAccountDeletion() {
+        deleteAccountButton.isEnabled = false
+        logoutButton.isEnabled = false
+        deleteAccountButton.text = "Deleting account..."
+
+        AuthManager.deleteAccount { success, message ->
+            runOnUiThread {
+                if (success) {
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+
+                    val intent = Intent(this, LoginActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
+                    finish()
+                } else {
+                    // Nothing was deleted, so let the user try again.
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                    deleteAccountButton.isEnabled = true
+                    logoutButton.isEnabled = true
+                    deleteAccountButton.text = "Delete my account"
+                }
+            }
         }
     }
 
