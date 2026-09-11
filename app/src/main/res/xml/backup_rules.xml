@@ -1,13 +1,27 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Backup rules for Android 11 (API 30) and below.
+
+   Backup is switched off entirely via android:allowBackup="false" in the
+   manifest, so nothing here is consulted today. These excludes are kept as a
+   second line of defence: if backup is ever re-enabled, the session token and
+   user profile must still never leave the device.
+
+   Uninstalling the app is the user withdrawing consent to use it. Restoring a
+   live auth token on the next install would silently sign them back in.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+
+    <!-- Auth token, token expiry and user profile. Never back this up. -->
+    <exclude domain="sharedpref" path="iccc_auth_prefs.xml" />
+
+    <!-- Subscribed channels and their sync cursors: user state, not credentials,
+         but a reinstall should start clean rather than resurrect old channels. -->
+    <exclude domain="sharedpref" path="subscriptions.xml" />
+    <exclude domain="sharedpref" path="channel_sync_state.xml" />
+
+    <!-- Stable client id used for the JetStream consumer name. A restored copy
+         would collide with the consumer the previous install left behind. -->
+    <exclude domain="sharedpref" path="iccc_alert_prefs.xml" />
+
 </full-backup-content>
