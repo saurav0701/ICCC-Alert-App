@@ -36,10 +36,17 @@
         <!-- Transparent status/nav bars (edge-to-edge) -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+        <!-- The status bar sits over the navy toolbar, so its icons must be
+             light. This was true, which asks for dark icons on a light bar,
+             and made the system paint a light contrast scrim behind the
+             status bar - the pale strip above the toolbar. -->
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
         <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="p">shortEdges</item>
         <item name="android:enforceNavigationBarContrast" tools:targetApi="q">false</item>
+        <!-- Stop the system drawing its own scrim behind the status bar; the
+             AppBarLayout already paints navy all the way up behind it. -->
+        <item name="android:enforceStatusBarContrast" tools:targetApi="q">false</item>
 
         <!-- Toolbar style — Deep Ocean: dark bg, white text, cyan accent -->
         <item name="toolbarStyle">@style/Widget.ICCCAlertApp.Toolbar</item>
