@@ -55,6 +55,13 @@ class ChannelsFragment : Fragment() {
             startActivity(Intent(requireContext(), SearchActivity::class.java))
         }
 
+        // Empty-state call to action. SearchActivity is the subscribe screen
+        // ("Subscribe Channels"); reaching it previously meant knowing to tap
+        // the search bar, which does not say anything about subscribing.
+        view.findViewById<View>(R.id.browse_channels_button).setOnClickListener {
+            startActivity(Intent(requireContext(), SearchActivity::class.java))
+        }
+
         setupFilterChips()
 
         // Setup SwipeRefreshLayout

@@ -2,6 +2,15 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <!-- Shown alongside Filter so subscribing stays reachable once the
+         list is no longer empty. -->
+    <item
+        android:id="@+id/action_add_channels"
+        android:icon="@drawable/ic_add"
+        android:title="Subscribe to channels"
+        app:showAsAction="always"
+        android:iconTint="#FFFFFF" />
+
     <item
         android:id="@+id/action_filter"
         android:icon="@drawable/ic_filter"

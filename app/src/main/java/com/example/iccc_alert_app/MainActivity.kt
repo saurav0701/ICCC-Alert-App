@@ -154,6 +154,10 @@ class MainActivity : BaseDrawerActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.action_add_channels -> {
+                startActivity(Intent(this, SearchActivity::class.java))
+                true
+            }
             R.id.action_filter -> {
                 (currentFragment as? ChannelsFragment)?.showFilterDialog()
                 true

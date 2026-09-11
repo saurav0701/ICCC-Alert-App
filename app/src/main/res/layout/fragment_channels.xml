@@ -50,7 +50,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginStart="10dp"
-                    android:text="Search channels..."
+                    android:text="Search or subscribe to channels..."
                     android:textSize="13sp"
                     android:textColor="#FFFFFF88" />
 
@@ -233,6 +233,25 @@
                     android:textAlignment="center"
                     android:lineSpacingExtra="3dp"
                     android:layout_marginTop="8dp" />
+
+                <!-- Without this the empty state tells the user to subscribe
+                     but gives them nowhere to do it. -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/browse_channels_button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Browse Channels"
+                    android:textSize="15sp"
+                    android:textAllCaps="false"
+                    android:letterSpacing="0"
+                    android:paddingStart="24dp"
+                    android:paddingEnd="24dp"
+                    android:layout_marginTop="24dp"
+                    app:icon="@drawable/ic_add"
+                    app:iconGravity="textStart"
+                    app:iconPadding="8dp"
+                    app:cornerRadius="24dp"
+                    app:backgroundTint="@color/navy_700" />
 
             </LinearLayout>
 
