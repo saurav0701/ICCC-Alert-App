@@ -19,13 +19,48 @@ data class CameraInfo(
     @SerializedName("area") private val _area: String = "",
     @SerializedName("transporter") val transporter: String = "",
     @SerializedName("location") val location: String = "",
-    @SerializedName("lastUpdate") val lastUpdate: String? = null  // ✅ NULLABLE & OPTIONAL
+    @SerializedName("lastUpdate") val lastUpdate: String? = null,  // ✅ NULLABLE & OPTIONAL
+
+    /**
+     * Whether the media server actually serves this camera's playlist, as
+     * measured by the backend rather than inferred.
+     *
+     * null means not probed yet, which is different from "known to be down".
+     */
+    @SerializedName("streamAvailable") val streamAvailable: Boolean? = null,
+    @SerializedName("streamCheckedAt") val streamCheckedAt: String? = null,
+    @SerializedName("streamStatusCode") val streamStatusCode: Int? = null
 ) {
 
     val area: String
         get() = if (_area.isNotEmpty()) _area else getAreaNameForGroup(groupId)
 
-    fun isOnline(): Boolean = status == "online"
+    /**
+     * Whether this camera can actually be watched.
+     *
+     * Prefers the backend's measured stream availability over the status the
+     * upstream feed reports. That status was measured against the live media
+     * servers and was correct for only 46% of cameras: it both hid cameras
+     * that were streaming and offered cameras that served nothing, in roughly
+     * equal numbers.
+     *
+     * Falls back to the feed's status only while a camera has never been
+     * probed, so behaviour is unchanged until the backend running the prober
+     * is deployed.
+     */
+    fun isOnline(): Boolean = streamAvailable ?: (status == "online")
+
+    /** True once the backend has actually checked this camera's stream. */
+    fun isStreamProbed(): Boolean = streamAvailable != null
+
+    /**
+     * True when the feed and the measurement disagree. Useful for diagnosing
+     * a site whose camera status reporting has drifted.
+     */
+    fun statusDisagreesWithProbe(): Boolean {
+        val probed = streamAvailable ?: return false
+        return probed != (status == "online")
+    }
 
     // ✅ FIXED: Handle null/empty lastUpdate gracefully - ignore if not present
     fun getLastUpdateDate(): Date? {
