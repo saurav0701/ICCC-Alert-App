@@ -96,7 +96,15 @@ object WebViewManager {
             }
         }
 
-        webView.webChromeClient = WebChromeClient()
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(msg: android.webkit.ConsoleMessage): Boolean {
+                // hls.js reports codec and network problems here. Without this
+                // the page fails silently and the app only ever shows
+                // "buffering", which makes stream faults undiagnosable.
+                Log.d(TAG, "JS[${msg.messageLevel()}] ${msg.message()}")
+                return true
+            }
+        }
     }
 
     fun loadHlsStream(webView: WebView, streamUrl: String) {
@@ -275,7 +283,11 @@ object WebViewManager {
             return isPlaying ? 'playing' : 'paused';
         };
 
+        var isBuffering = false;
+
         function showBuffering() {
+            if (isBuffering) return;
+            isBuffering = true;
             try {
                 showLoading();
                 if (typeof Android !== 'undefined') Android.onBuffering();
@@ -283,6 +295,8 @@ object WebViewManager {
         }
 
         function hideBuffering() {
+            if (!isBuffering) return;
+            isBuffering = false;
             try {
                 hideLoading();
                 if (typeof Android !== 'undefined') Android.onBufferingEnd();
@@ -317,6 +331,23 @@ object WebViewManager {
         var networkRetries = 0;
         var MAX_NETWORK_RETRIES = 5;
 
+        // These streams are H.265. Hardware HEVC decoding does not imply the
+        // WebView will accept HEVC through MediaSource, which is what hls.js
+        // uses - and if MSE refuses it, playback stalls in buffering forever
+        // rather than reporting an error.
+        (function probeCodecs() {
+            try {
+                var hevc = 'video/mp4; codecs="hvc1.1.6.L150.0"';
+                var h264 = 'video/mp4; codecs="avc1.42E01E"';
+                console.log('CODEC-PROBE hevc_mse=' + (window.MediaSource ? MediaSource.isTypeSupported(hevc) : 'no-MSE') +
+                            ' h264_mse=' + (window.MediaSource ? MediaSource.isTypeSupported(h264) : 'no-MSE') +
+                            ' hevc_video=' + document.createElement('video').canPlayType(hevc) +
+                            ' hlsSupported=' + (typeof Hls !== 'undefined' ? Hls.isSupported() : 'no-hls'));
+            } catch (e) {
+                console.log('CODEC-PROBE failed: ' + e);
+            }
+        })();
+
         function initializeStream() {
             if (Hls.isSupported()) {
                 hls = new Hls({ 
@@ -343,10 +374,15 @@ object WebViewManager {
                 hls.attachMedia(video);
                 
                 hls.on(Hls.Events.FRAG_BUFFERED, function() {
-                    // Back on its feet: restore the full retry budget so a
-                    // later blip gets its own attempts.
-                    networkRetries = 0;
-                    hideBuffering();
+                    // Fires once per segment, so only act when something
+                    // actually changed - otherwise this crosses the JS bridge
+                    // every second on a healthy stream.
+                    if (networkRetries !== 0) {
+                        networkRetries = 0;
+                    }
+                    if (isBuffering) {
+                        hideBuffering();
+                    }
                 });
 
                 hls.on(Hls.Events.MANIFEST_PARSED, function() {
@@ -369,6 +405,19 @@ object WebViewManager {
                     if (data.fatal) {
                         switch(data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
+                                // An HTTP status from the media server is an
+                                // answer, not a blip: the camera is not
+                                // publishing. Retrying only spins for 15s
+                                // before failing, so say so immediately.
+                                var status = data.response && data.response.code;
+                                if (status && status >= 400) {
+                                    notifyStreamError(
+                                        status === 404
+                                            ? 'This camera is not streaming right now'
+                                            : 'Camera stream unavailable (' + status + ')'
+                                    );
+                                    break;
+                                }
                                 // Recoverable: retry with backoff before giving
                                 // up. Site links drop briefly and come back.
                                 if (networkRetries < MAX_NETWORK_RETRIES) {
