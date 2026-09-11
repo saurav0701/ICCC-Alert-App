@@ -103,6 +103,13 @@ object VtsCommentSubmitter {
         existingRemark: String,
         onResult: (Boolean, String) -> Unit
     ) {
+        // This runs after a network round trip, so the user may have navigated
+        // away. Showing a dialog on a dead window throws BadTokenException.
+        if (!context.canShowDialog()) {
+            onResult(false, "This alert already has a remark")
+            return
+        }
+
         AlertDialog.Builder(context)
             .setTitle("This alert already has a remark")
             .setMessage(
@@ -130,4 +137,22 @@ object VtsCommentSubmitter {
             .setCancelable(false)
             .show()
     }
+}
+
+/**
+ * True when [this] context still has a live window to attach a dialog to.
+ *
+ * Anything shown from a network callback has to check: the activity may have
+ * been finished or destroyed while the request was in flight, and attaching a
+ * dialog to it then throws WindowManager.BadTokenException.
+ */
+internal fun Context.canShowDialog(): Boolean {
+    var ctx: Context? = this
+    while (ctx is android.content.ContextWrapper) {
+        if (ctx is android.app.Activity) {
+            return !ctx.isFinishing && !ctx.isDestroyed
+        }
+        ctx = ctx.baseContext
+    }
+    return false
 }

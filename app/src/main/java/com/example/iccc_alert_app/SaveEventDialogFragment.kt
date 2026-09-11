@@ -41,6 +41,10 @@ class SaveEventDialogFragment : DialogFragment() {
                 }
                 onSaveCallback = onSave
             }
+            // Committing a fragment transaction after the host has saved its
+            // state throws IllegalStateException. Happens when the user
+            // backgrounds the app between tapping Save and this call.
+            if (fragmentManager.isStateSaved || fragmentManager.isDestroyed) return
             dialog.show(fragmentManager, "SaveEventDialog")
         }
     }

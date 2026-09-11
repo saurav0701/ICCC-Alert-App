@@ -581,6 +581,10 @@ class EventPriorityManager(
             onUpdateCallback = onUpdate
             onCancelCallback = onCancel
         }
+        // See SaveEventDialogFragment.show: a transaction after the host has
+        // saved state throws. This is reached from a network callback, so the
+        // host may well have been stopped in the meantime.
+        if (fragmentManager.isStateSaved || fragmentManager.isDestroyed) return
         dialog.show(fragmentManager, "ExistingCommentDialog")
     }
 
